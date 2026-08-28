@@ -57,6 +57,14 @@ android {
     }
 }
 
+// Declared before the dependencies block that uses it. Gradle adds the `natives(...)` method to
+// the dependency handler only when the configuration already exists, so declaring it afterwards
+// fails the whole build with "Could not find method natives()" - and because a broken subproject
+// script fails configuration for every project, that took the core tests down with it.
+configurations {
+    natives
+}
+
 dependencies {
     implementation project(':core')
     implementation "com.badlogicgames.gdx:gdx-backend-android:$gdxVersion"
@@ -65,8 +73,6 @@ dependencies {
     natives "com.badlogicgames.gdx:gdx-platform:$gdxVersion:natives-x86"
     natives "com.badlogicgames.gdx:gdx-platform:$gdxVersion:natives-x86_64"
 }
-
-configurations { natives }
 
 /** Unpacks the platform .so files libGDX needs into the jniLibs source set. */
 tasks.register('copyAndroidNatives') {

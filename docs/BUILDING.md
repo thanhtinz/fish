@@ -13,7 +13,7 @@ Honest account of what was actually run:
 | Desktop (LWJGL3) | ✅ Built and run; all five screens captured under Xvfb |
 | HTML5 (GWT) | ✅ Compiled, served, and driven in headless Chromium with no console errors |
 | iOS (RoboVM) | ⚠️ Java sources compile and dependencies resolve. Linking an `.ipa` needs macOS + Xcode, which was not available. |
-| Android | ⚠️ Module and manifest are complete, but nothing was built: the Android SDK could not be installed here because `dl.google.com` is unreachable from this environment. |
+| Android | ⚠️ Built by CI (`Android build` job assembles a debug APK), not locally: the SDK cannot be installed in the authoring environment because `dl.google.com` is unreachable there. |
 
 ---
 
@@ -82,6 +82,12 @@ export ANDROID_HOME=$HOME/Android/Sdk
   into the JNI merge task automatically.
 - Signing is not committed. Configure it with a `signingConfigs` block reading from environment
   variables or a keystore properties file kept out of version control.
+
+**The module is included whenever an SDK is present**, so a machine with the SDK configures
+`:android` for *every* Gradle invocation - including `:core:test`. A broken script in this module
+therefore fails builds that have nothing to do with Android, which is how a misordered
+`configurations {}` block once took the whole test suite down. CI builds the module on every push
+for that reason.
 
 `google()` is declared **only** in `android/build.gradle`. Declaring it for every project made
 unrelated dependency resolution fail on networks that answer 403 for that host, because Gradle
