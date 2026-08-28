@@ -151,17 +151,36 @@ class BalanceTest {
     }
 
     @Test
-    void aggressiveSnapsMoreLinesThanSafe() {
+    void aggressiveSnapsMoreLinesThanSafeWhenGearIsOnTier() {
+        // Checked on-tier, which is where the policy choice is actually a choice. Undergeared,
+        // the fish out-powers the line badly enough that its force alone sits above the wear
+        // threshold, so no pull level keeps the line intact and every policy converges - see
+        // undergearedLeavesNoSafeHeadroom below, which pins that behaviour deliberately.
+        GameContent content = TestContent.get();
+        for (SpotDef spot : content.spotsInOrder()) {
+            BuildStats build = TestBuilds.buildAtTier(content, spot.tier);
+            Stats safe = run(content, spot, build, AutoStrategy.SAFE);
+            Stats aggressive = run(content, spot, build, AutoStrategy.AGGRESSIVE);
+            assertTrue(aggressive.snapped >= safe.snapped,
+                    "in " + spot.id + " Aggressive snapped " + aggressive.snapped
+                            + " lines vs Safe's " + safe.snapped
+                            + "; risk tolerance is not translating into risk");
+        }
+    }
+
+    @Test
+    void undergearedLeavesNoSafeHeadroom() {
+        // Documents the flip side: one tier behind, even the Safe policy takes line damage,
+        // because the fish's own force exceeds the wear threshold before the angler pulls at all.
+        // This is the signal that a player should go upgrade rather than change tactics.
         GameContent content = TestContent.get();
         SpotDef[] spots = content.spotsInOrder().toArray(new SpotDef[0]);
-        int contested = spots.length - 1;
-        BuildStats build = TestBuilds.buildAtTier(content, contested);
-
-        Stats safe = run(content, spots[contested], build, AutoStrategy.SAFE);
-        Stats aggressive = run(content, spots[contested], build, AutoStrategy.AGGRESSIVE);
-        assertTrue(aggressive.snapped >= safe.snapped,
-                "Aggressive snapped " + aggressive.snapped + " lines vs Safe's " + safe.snapped
-                        + "; risk tolerance is not translating into risk");
+        SpotDef deep = spots[spots.length - 1];
+        Stats safe = run(content, deep, TestBuilds.buildAtTier(content, deep.tier - 1),
+                AutoStrategy.SAFE);
+        assertTrue(safe.snapped > 0,
+                "undergeared Safe play snapped no lines at all; the wear threshold is not "
+                        + "biting and gear tiers would stop mattering");
     }
 
     @Test

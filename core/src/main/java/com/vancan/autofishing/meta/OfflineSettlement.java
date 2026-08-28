@@ -35,6 +35,9 @@ public final class OfflineSettlement {
         public String txId;
     }
 
+    /** Absences shorter than this are folded into the next one rather than reported. */
+    public static final float MIN_REPORTABLE_HOURS = 0.25f;
+
     private OfflineSettlement() {
     }
 
@@ -92,7 +95,10 @@ public final class OfflineSettlement {
         float cap = cfg.offlineCapHours * build.offlineEfficiency;
         r.hoursCredited = Math.min(r.hoursElapsed, cap);
         r.capped = r.hoursElapsed > cap;
-        if (r.hoursCredited <= 0.01f) return null;
+        // Below the minimum, an absence is not worth interrupting the player with a modal that
+        // reports "0.0 hours" and a handful of gold - which is what happens on every quick
+        // app-switch if this is not filtered here.
+        if (r.hoursCredited < MIN_REPORTABLE_HOURS) return null;
 
         EncounterTable table = spot.buildTable(content.species);
         float catchRate = effectiveCatchRate(table, build, player.autoStrategy);
