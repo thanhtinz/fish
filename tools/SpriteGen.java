@@ -119,8 +119,15 @@ public final class SpriteGen {
      */
     private static void fish(String name, int ox, int oy, int w, int h, Archetype type) {
         mark(name, ox, oy, w, h);
-        Graphics2D c = (Graphics2D) g.create(ox, oy, w, h);
+
+        // Drawn offscreen first so the shading pass below can work against the finished
+        // silhouette. The shapes stay greyscale: the renderer multiplies them by the species'
+        // rarity colour, so baking real light and shade here is what turns a flat tinted blob
+        // into something that reads as a fish with volume.
+        BufferedImage buffer = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D c = buffer.createGraphics();
         c.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+        c.setRenderingHint(RenderingHints.KEY_STROKE_CONTROL, RenderingHints.VALUE_STROKE_PURE);
 
         switch (type) {
             case RUNNER:     runner(c, w, h); break;
@@ -130,7 +137,50 @@ public final class SpriteGen {
             case TRICKSTER:  trickster(c, w, h); break;
             default:         boss(c, w, h); break;
         }
+        shadeFish(c, w, h);
         c.dispose();
+
+        g.drawImage(buffer, ox, oy, null);
+    }
+
+    /**
+     * Adds volume to a finished fish.
+     *
+     * <p>Every step composites with {@code SrcAtop}, which only paints where the sprite already
+     * has pixels. That is what lets one generic fan of fin rays work for all six archetypes: the
+     * rays are clipped to whatever fin geometry that species actually has, so nothing has to know
+     * the tail's shape.
+     */
+    private static void shadeFish(Graphics2D c, float w, float h) {
+        float cy = h * 0.5f;
+        c.setComposite(AlphaComposite.SrcAtop);
+
+        // Fin rays, fanned from just behind the body.
+        c.setColor(new Color(0, 0, 0, 70));
+        c.setStroke(new BasicStroke(Math.max(1.5f, h * 0.012f)));
+        for (int i = -4; i <= 4; i++) {
+            double a = Math.toRadians(180 + i * 11);
+            c.draw(new Line2D.Double(w * 0.30f, cy,
+                    w * 0.30f + Math.cos(a) * w * 0.34f, cy + Math.sin(a) * h * 0.55f));
+        }
+
+        // Countershading: dark back fading out by mid-body, pale belly. Real fish are lit this
+        // way and it is the cheapest cue that the shape is round rather than cut from paper.
+        c.setPaint(new GradientPaint(0, 0, new Color(0, 0, 0, 135),
+                                     0, h * 0.62f, new Color(0, 0, 0, 0)));
+        c.fillRect(0, 0, (int) w, (int) h);
+        c.setPaint(new GradientPaint(0, h, new Color(255, 255, 255, 90),
+                                     0, h * 0.60f, new Color(255, 255, 255, 0)));
+        c.fillRect(0, 0, (int) w, (int) h);
+
+        // Specular streak along the upper flank.
+        c.setPaint(new RadialGradientPaint(
+                new Point2D.Float(w * 0.66f, h * 0.34f), w * 0.26f,
+                new float[]{0f, 1f},
+                new Color[]{new Color(255, 255, 255, 105), new Color(255, 255, 255, 0)}));
+        c.fill(new Ellipse2D.Float(w * 0.40f, h * 0.20f, w * 0.52f, h * 0.28f));
+
+        c.setComposite(AlphaComposite.SrcOver);
     }
 
     private static final Color FIN = new Color(255, 255, 255, 150);
@@ -216,11 +266,11 @@ public final class SpriteGen {
         tail.closePath();
         c.fill(tail);
 
-        // Spiked dorsal ridge.
+        // Spiked dorsal ridge, rooted below the body's top edge so it stays attached.
         for (int i = 0; i < 4; i++) {
             float x = w * (0.66f - i * 0.10f);
-            c.fill(triangle(x, cy - h * 0.24f, x - w * 0.035f, cy - h * (0.48f - i * 0.045f),
-                            x - w * 0.075f, cy - h * 0.24f));
+            c.fill(triangle(x, cy - h * 0.16f, x - w * 0.035f, cy - h * (0.46f - i * 0.045f),
+                            x - w * 0.075f, cy - h * 0.16f));
         }
 
         c.setColor(Color.WHITE);
@@ -280,20 +330,22 @@ public final class SpriteGen {
         tail.closePath();
         c.fill(tail);
 
-        c.setColor(FIN);
-        // A single tall sail above the back. A matching sweep below made the two fins meet around
-        // the body and the whole fish rendered as one symmetric lens instead of a fish with fins.
+        c.setColor(FIN_STRONG);
+        // A single tall sail above the back, its base sunk into the body. A matching sweep below
+        // made the two fins meet around the body and the whole fish rendered as one symmetric
+        // lens; drawn clear of the outline, the sail instead floated free of the fish.
         GeneralPath sail = new GeneralPath();
-        sail.moveTo(w * 0.76f, cy - h * 0.10f);
-        sail.curveTo(w * 0.70f, cy - h * 0.44f, w * 0.62f, cy - h * 0.54f, w * 0.56f, cy - h * 0.40f);
-        sail.curveTo(w * 0.52f, cy - h * 0.52f, w * 0.44f, cy - h * 0.52f, w * 0.40f, cy - h * 0.38f);
-        sail.curveTo(w * 0.36f, cy - h * 0.48f, w * 0.30f, cy - h * 0.44f, w * 0.30f, cy - h * 0.26f);
-        sail.curveTo(w * 0.44f, cy - h * 0.20f, w * 0.60f, cy - h * 0.15f, w * 0.76f, cy - h * 0.10f);
+        sail.moveTo(w * 0.78f, cy - h * 0.02f);
+        sail.curveTo(w * 0.70f, cy - h * 0.40f, w * 0.62f, cy - h * 0.50f, w * 0.56f, cy - h * 0.36f);
+        sail.curveTo(w * 0.52f, cy - h * 0.48f, w * 0.44f, cy - h * 0.48f, w * 0.40f, cy - h * 0.34f);
+        sail.curveTo(w * 0.36f, cy - h * 0.44f, w * 0.30f, cy - h * 0.40f, w * 0.30f, cy - h * 0.18f);
+        sail.curveTo(w * 0.44f, cy - h * 0.12f, w * 0.60f, cy - h * 0.07f, w * 0.78f, cy - h * 0.02f);
         sail.closePath();
         c.fill(sail);
 
         // Small pelvic fin low and forward, breaking the symmetry deliberately.
-        c.fill(triangle(w * 0.66f, cy + h * 0.10f, w * 0.52f, cy + h * 0.40f, w * 0.46f, cy + h * 0.09f));
+        c.setColor(FIN);
+        c.fill(triangle(w * 0.66f, cy + h * 0.04f, w * 0.52f, cy + h * 0.38f, w * 0.46f, cy + h * 0.03f));
 
         c.setColor(Color.WHITE);
         GeneralPath body = new GeneralPath();
@@ -341,17 +393,17 @@ public final class SpriteGen {
         body.closePath();
         c.fill(body);
 
-        // Dorsal spines on top of the filled body.
+        // Dorsal spines, rooted inside the body so they stay part of the silhouette.
         for (int i = 0; i < 5; i++) {
             float x = w * (0.70f - i * 0.095f);
-            c.fill(triangle(x, cy - h * 0.34f, x - w * 0.030f, cy - h * (0.60f - i * 0.03f),
-                            x - w * 0.070f, cy - h * 0.33f));
+            c.fill(triangle(x, cy - h * 0.26f, x - w * 0.030f, cy - h * (0.56f - i * 0.03f),
+                            x - w * 0.070f, cy - h * 0.25f));
         }
 
         c.setComposite(AlphaComposite.Clear);
         c.fill(new Ellipse2D.Float(w * 0.80f, cy - h * 0.22f, h * 0.11f, h * 0.11f));
+        // No separate jaw stroke: across the shaded body it read as a scratch rather than a mouth.
         c.setStroke(new BasicStroke(h * 0.032f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
-        c.draw(new Line2D.Float(w * 0.70f, cy + h * 0.08f, w * 0.965f, cy + h * 0.045f));
         c.draw(new Arc2D.Float(w * 0.56f, cy - h * 0.32f, w * 0.16f, h * 0.68f, 55, 130, Arc2D.OPEN));
         c.setComposite(AlphaComposite.SrcOver);
     }
@@ -389,84 +441,110 @@ public final class SpriteGen {
      */
     private static void angler(String name, int ox, int oy, int w, int h, boolean pulling) {
         mark(name, ox, oy, w, h);
-        Graphics2D c = (Graphics2D) g.create(ox, oy, w, h);
+
+        BufferedImage buffer = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D c = buffer.createGraphics();
         c.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+        c.setRenderingHint(RenderingHints.KEY_STROKE_CONTROL, RenderingHints.VALUE_STROKE_PURE);
 
         AffineTransform saved = c.getTransform();
         c.rotate(Math.toRadians(pulling ? -11 : 0), w * 0.5f, h * 0.92f);
 
+        // Chibi proportions - head roughly a third of the figure. At the size this is drawn on a
+        // phone (about 130px tall inside a busy scene) realistic proportions read as a stick;
+        // a large head and a strong hat silhouette stay legible.
         float cx = w * 0.46f;
-        float hipY = h * 0.60f, shoulderY = h * 0.31f, headY = h * 0.20f;
+        float headCy = h * 0.27f, headR = h * 0.135f;
+        float shoulderY = h * 0.46f, hipY = h * 0.68f;
 
         // Legs.
         c.setColor(TROUSERS);
-        c.setStroke(new BasicStroke(w * 0.10f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
-        c.draw(new Line2D.Float(cx, hipY, cx - w * 0.11f, h * 0.90f));
-        c.draw(new Line2D.Float(cx, hipY, cx + w * 0.15f, h * 0.90f));
+        c.setStroke(new BasicStroke(w * 0.115f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+        c.draw(new Line2D.Float(cx - w * 0.02f, hipY, cx - w * 0.10f, h * 0.90f));
+        c.draw(new Line2D.Float(cx + w * 0.02f, hipY, cx + w * 0.14f, h * 0.90f));
 
         c.setColor(new Color(0x22303F));
-        c.setStroke(new BasicStroke(w * 0.065f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+        c.setStroke(new BasicStroke(w * 0.075f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
         c.draw(new Line2D.Float(cx - w * 0.13f, h * 0.925f, cx - w * 0.03f, h * 0.925f));
-        c.draw(new Line2D.Float(cx + w * 0.13f, h * 0.925f, cx + w * 0.25f, h * 0.925f));
+        c.draw(new Line2D.Float(cx + w * 0.12f, h * 0.925f, cx + w * 0.24f, h * 0.925f));
 
-        // Rear arm, drawn before the torso so it reads as being behind it. It stays in sleeve
-        // colour for its whole length: a skin-toned arm across a blue shirt read as a slab.
+        // Rear arm, behind the torso and in sleeve colour for its whole length: a skin-toned arm
+        // crossing a blue shirt read as a slab.
         c.setColor(SHIRT_DARK);
-        c.setStroke(new BasicStroke(w * 0.055f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+        c.setStroke(new BasicStroke(w * 0.062f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
         GeneralPath rear = new GeneralPath();
-        rear.moveTo(cx - w * 0.06f, shoulderY + h * 0.02f);
+        rear.moveTo(cx - w * 0.07f, shoulderY + h * 0.02f);
         if (pulling) {
-            rear.quadTo(cx - w * 0.17f, shoulderY + h * 0.08f, cx - w * 0.08f, shoulderY + h * 0.01f);
+            rear.quadTo(cx - w * 0.19f, shoulderY + h * 0.07f, cx - w * 0.10f, shoulderY - h * 0.01f);
         } else {
-            rear.quadTo(cx - w * 0.13f, shoulderY + h * 0.12f, cx - w * 0.10f, shoulderY + h * 0.22f);
+            rear.quadTo(cx - w * 0.15f, shoulderY + h * 0.10f, cx - w * 0.12f, shoulderY + h * 0.19f);
         }
         c.draw(rear);
 
         // Torso.
         c.setColor(SHIRT);
         GeneralPath torso = new GeneralPath();
-        torso.moveTo(cx - w * 0.12f, shoulderY);
-        torso.curveTo(cx - w * 0.16f, hipY * 0.85f, cx - w * 0.11f, hipY, cx - w * 0.08f, hipY + h * 0.02f);
-        torso.lineTo(cx + w * 0.11f, hipY + h * 0.02f);
-        torso.curveTo(cx + w * 0.15f, hipY, cx + w * 0.14f, shoulderY + h * 0.05f, cx + w * 0.11f, shoulderY);
+        torso.moveTo(cx - w * 0.135f, shoulderY);
+        torso.curveTo(cx - w * 0.17f, shoulderY + h * 0.12f, cx - w * 0.12f, hipY, cx - w * 0.09f, hipY + h * 0.02f);
+        torso.lineTo(cx + w * 0.12f, hipY + h * 0.02f);
+        torso.curveTo(cx + w * 0.16f, hipY, cx + w * 0.155f, shoulderY + h * 0.06f, cx + w * 0.125f, shoulderY);
         torso.closePath();
         c.fill(torso);
         c.setColor(SHIRT_DARK);
-        c.fill(new Rectangle2D.Float(cx - w * 0.12f, hipY - h * 0.045f, w * 0.23f, h * 0.045f));
+        c.fill(new Rectangle2D.Float(cx - w * 0.13f, hipY - h * 0.045f, w * 0.25f, h * 0.045f));
 
-        // Head, then hat over it.
+        // Head.
         c.setColor(SKIN);
-        c.fill(new Ellipse2D.Float(cx - w * 0.10f, headY - h * 0.05f, w * 0.20f, h * 0.145f));
+        c.fill(new Ellipse2D.Float(cx - headR, headCy - headR, headR * 2f, headR * 2f));
+        // No separate neck shape: at this size it sat under the chin and read as a beard.
+
+        // Nón lá: a cone, not a round brim. It is the strongest silhouette cue available and it
+        // places the character without needing any detail that survives at this size.
         c.setColor(HAT);
-        c.fill(new Ellipse2D.Float(cx - w * 0.23f, headY - h * 0.030f, w * 0.46f, h * 0.042f));
-        GeneralPath crown = new GeneralPath();
-        crown.moveTo(cx - w * 0.105f, headY - h * 0.018f);
-        crown.curveTo(cx - w * 0.085f, headY - h * 0.110f,
-                      cx + w * 0.085f, headY - h * 0.110f, cx + w * 0.105f, headY - h * 0.018f);
-        crown.closePath();
-        c.fill(crown);
+        // Sized to sit on top of the head, not over it. A first pass ran the cone from well
+        // above the head down past the chin and buried the whole face.
+        float apexY = headCy - headR * 1.30f;
+        float brimY = headCy - headR * 0.10f;
+        float brimHalf = w * 0.225f;
+        GeneralPath hat = new GeneralPath();
+        hat.moveTo(cx, apexY);
+        hat.lineTo(cx + brimHalf, brimY);
+        hat.curveTo(cx + brimHalf * 0.45f, brimY + headR * 0.30f,
+                    cx - brimHalf * 0.45f, brimY + headR * 0.30f, cx - brimHalf, brimY);
+        hat.closePath();
+        c.fill(hat);
         c.setColor(new Color(0xB89E68));
-        c.fill(new Rectangle2D.Float(cx - w * 0.105f, headY - h * 0.036f, w * 0.21f, h * 0.015f));
+        c.setStroke(new BasicStroke(Math.max(1.4f, w * 0.009f)));
+        for (int i = 1; i <= 3; i++) {
+            float t = i / 4f;
+            float y = apexY + (brimY - apexY) * t;
+            c.draw(new Line2D.Float(cx - brimHalf * t, y, cx + brimHalf * t, y));
+        }
+
+        // Eyes, offset towards the direction the angler faces so the head reads as a 3/4 view.
+        c.setColor(new Color(0x2A2A33));
+        float eyeY = headCy + headR * 0.22f;
+        c.fill(new Ellipse2D.Float(cx - w * 0.005f, eyeY, w * 0.036f, h * 0.030f));
+        c.fill(new Ellipse2D.Float(cx + w * 0.062f, eyeY, w * 0.036f, h * 0.030f));
 
         // Front arm: sleeve to the elbow, bare forearm to the grip.
         float gripX, gripY, elbowX, elbowY;
         if (pulling) {
-            elbowX = cx + w * 0.17f; elbowY = shoulderY + h * 0.06f;
-            gripX  = cx + w * 0.24f; gripY  = shoulderY - h * 0.09f;
+            elbowX = cx + w * 0.18f; elbowY = shoulderY + h * 0.05f;
+            gripX  = cx + w * 0.25f; gripY  = shoulderY - h * 0.08f;
         } else {
-            elbowX = cx + w * 0.17f; elbowY = shoulderY + h * 0.11f;
-            gripX  = cx + w * 0.29f; gripY  = shoulderY + h * 0.04f;
+            elbowX = cx + w * 0.18f; elbowY = shoulderY + h * 0.10f;
+            gripX  = cx + w * 0.30f; gripY  = shoulderY + h * 0.03f;
         }
         c.setColor(SHIRT);
-        c.setStroke(new BasicStroke(w * 0.065f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
-        c.draw(new Line2D.Float(cx + w * 0.05f, shoulderY + h * 0.02f, elbowX, elbowY));
+        c.setStroke(new BasicStroke(w * 0.070f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+        c.draw(new Line2D.Float(cx + w * 0.06f, shoulderY + h * 0.02f, elbowX, elbowY));
         c.setColor(SKIN);
-        c.setStroke(new BasicStroke(w * 0.055f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+        c.setStroke(new BasicStroke(w * 0.058f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
         c.draw(new Line2D.Float(elbowX, elbowY, gripX, gripY));
 
-        // Record the grip in 0..1 sprite space. Reading it back off the Graphics2D transform
-        // would include the translation into the sprite's atlas slot, so the pose rotation is
-        // applied here by hand instead.
+        // Grip in 0..1 sprite space. Reading it back off the Graphics2D transform would include
+        // the translation into the sprite's atlas slot, so the pose rotation is applied by hand.
         double theta = Math.toRadians(pulling ? -11 : 0);
         double px = w * 0.5f, py = h * 0.92f;
         double dx = gripX - px, dy = gripY - py;
@@ -475,7 +553,15 @@ public final class SpriteGen {
         ANCHORS.put(name + "_grip", new float[]{(float) (rx / w), (float) (ry / h)});
 
         c.setTransform(saved);
+
+        // Light from the upper right, matching the fish shading, so the scene holds together.
+        c.setComposite(AlphaComposite.SrcAtop);
+        c.setPaint(new GradientPaint(0, 0, new Color(0, 0, 0, 0), w, h, new Color(0, 0, 0, 90)));
+        c.fillRect(0, 0, w, h);
+        c.setComposite(AlphaComposite.SrcOver);
         c.dispose();
+
+        g.drawImage(buffer, ox, oy, null);
     }
 
     /** Small boat the angler stands in. */

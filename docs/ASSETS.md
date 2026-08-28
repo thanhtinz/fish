@@ -61,6 +61,13 @@ behind one class for exactly that reason.
 - **Eight team portraits**, distinguished by hair silhouette, palette and a role accessory rather
   than by facial detail, which does not survive being drawn at 90 px on a phone.
 
+**Fish are baked in greyscale, not colour.** The renderer multiplies each sprite by its species'
+rarity colour, so a flat white silhouette can only ever come out as a flat tinted blob. Baking real
+light and shade instead - dark back, pale belly, a specular streak along the upper flank - means the
+same tint produces a fish with volume. The fin rays are one generic fan composited with `SrcAtop`,
+which paints only where the sprite already has pixels, so it is clipped to whatever fin geometry
+each archetype happens to have and no shape needs to know about it.
+
 The atlas carries **anchors** as well as regions: the angler's grip point is exported so the
 renderer knows where to start the rod. The rod is not baked, because a baked rod cannot bend — it
 is drawn at runtime as a sampled curve whose bend tracks line tension directly, which is the

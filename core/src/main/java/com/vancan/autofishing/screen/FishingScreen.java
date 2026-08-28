@@ -127,7 +127,29 @@ public class FishingScreen extends BaseScreen {
             ui.rect(x - 24f, surface + wave, 48f, 5f, Theme.ACCENT, 0.35f);
         }
 
+        drawLightRays(surface, bottom);
         drawBubbles(bottom, surface);
+    }
+
+    /**
+     * Shafts of light angling down from the surface.
+     *
+     * <p>Drawn with the vertical-fade texture so each shaft dies out with depth rather than
+     * ending in a hard edge. Without them the water panel is a flat gradient and the scene reads
+     * as empty space instead of as water with a surface above it.
+     */
+    private void drawLightRays(float surface, float bottom) {
+        float depth = surface - bottom;
+        for (int i = 0; i < 5; i++) {
+            float x = Theme.WORLD_WIDTH * (0.14f + i * 0.19f);
+            float drift = (float) Math.sin(time * 0.35f + i * 1.7f) * 26f;
+            float width = 70f + (i % 3) * 34f;
+            game.batch.setColor(0.55f, 0.85f, 1f, 0.075f);
+            // Origin at the top centre - the point on the surface - so each shaft pivots there.
+            game.batch.draw(art.verticalFade, x + drift, bottom,
+                    width * 0.5f, depth, width, depth, 1f, 1f, 8f + i * 2.5f);
+            game.batch.setColor(Color.WHITE);
+        }
     }
 
     private void drawBubbles(float bottom, float surface) {
@@ -163,6 +185,7 @@ public class FishingScreen extends BaseScreen {
     private static final float ROD_REST_ANGLE = 22f;
     private static final float ROD_BEND_RANGE = 74f;
     private static final Color ROD_COLOR = new Color(0.36f, 0.26f, 0.18f, 1f);
+    private static final Color ROD_HIGHLIGHT = new Color(0.62f, 0.48f, 0.33f, 1f);
 
     private float surfaceY() {
         float top = contentTop();
@@ -288,12 +311,22 @@ public class FishingScreen extends BaseScreen {
 
         int segments = 16;
         float px = gripX, py = gripY;
+        // Two passes: the shaft, then a thin highlight along it. A single flat stroke read as a
+        // stick rather than as a rod under load.
         for (int i = 1; i <= segments; i++) {
             float t = i / (float) segments;
             float mt = 1f - t;
             float x = mt * mt * gripX + 2f * mt * t * ctrlX + t * t * tipX;
             float y = mt * mt * gripY + 2f * mt * t * ctrlY + t * t * tipY;
             drawLine(px, py, x, y, 11f * (1f - t * 0.78f), ROD_COLOR);
+            drawLine(px, py + 2.5f, x, y + 2.5f, 3.5f * (1f - t * 0.8f), ROD_HIGHLIGHT);
+            // Guide rings, which also give the eye something to track the bend by.
+            if (i % 5 == 0) {
+                float r = 7f * (1f - t * 0.5f);
+                game.batch.setColor(Theme.TEXT_DIM);
+                game.batch.draw(art.bubble, x - r, y - r, r * 2f, r * 2f);
+                game.batch.setColor(Color.WHITE);
+            }
             px = x;
             py = y;
         }

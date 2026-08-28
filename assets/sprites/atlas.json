@@ -20,7 +20,7 @@
     "portrait_ag_thien_ngu": [360, 830, 180, 180]
   },
   "anchors": {
-    "angler_idle_grip": [0.75, 0.35],
-    "angler_pull_grip": [0.522, 0.204]
+    "angler_idle_grip": [0.76, 0.49],
+    "angler_pull_grip": [0.572, 0.359]
   }
 }
