@@ -28,7 +28,12 @@ What it contains, having reviewed all 92 images:
 | Unrelated (3D room renders, yin-yang symbols, avatar parts) | ~15 | ✖ |
 
 `tools/AssetExtract.java` does the cutting: it keys the chroma background to alpha, flood-fills to
-find each connected sprite, and writes it out cropped. Two things it learned the hard way, both
+find each connected sprite, and writes it out cropped.
+
+**The original sheets are not committed** - only the cut results, in `art-src/`. The build is
+therefore reproducible but the cutting step is not: re-running the tool needs the purchased pack,
+which the project owner holds. Keep it somewhere the team can reach, alongside the licence.
+Invoke it as `java tools/AssetExtract.java <sheet-dir> <out-dir> [minPixels]`. Two things it learned the hard way, both
 now handled - several sheets are letterboxed with black bars, so the four corners agree on black
 while the real key colour is the green in between; and JPEG ringing smears the key colour into
 sprite edges, so the mask threshold is generous and the edge eroded by a pixel.
