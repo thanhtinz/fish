@@ -92,11 +92,13 @@ public class CodexScreen extends ScrollScreen {
         float ix = x + w - iw - 20f;
         float iy = y + (ROW_HEIGHT - ih) * 0.5f;
         if (found) {
-            game.batch.setColor(Theme.rarityColor(species.rarity));
+            // Full colour: the art is painted, so a rarity tint would only mute it. Rarity is
+            // already carried by the name colour and the row border.
+            game.batch.setColor(com.badlogic.gdx.graphics.Color.WHITE);
         } else {
-            game.batch.setColor(0.22f, 0.27f, 0.33f, 1f);
+            game.batch.setColor(0.16f, 0.20f, 0.26f, 1f);
         }
-        game.batch.draw(art.fish(species.archetype), ix, iy, iw, ih);
+        game.batch.draw(art.fish(species.archetype, species.rarity), ix, iy, iw, ih);
         game.batch.setColor(com.badlogic.gdx.graphics.Color.WHITE);
 
         // Cursor stepped by the real line height. Fixed offsets put the stats line and the

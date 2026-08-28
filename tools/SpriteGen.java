@@ -37,14 +37,22 @@ public final class SpriteGen {
         g.setRenderingHint(RenderingHints.KEY_STROKE_CONTROL, RenderingHints.VALUE_STROKE_PURE);
         g.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
 
-        // --- Fish, one silhouette per behaviour archetype (GDD 7) ------------------------
+        // --- Fish, one per behaviour archetype (GDD 7) -----------------------------------
+        // Packed from the project's own licensed source art in art-src/fish, cut off its chroma
+        // background by tools/AssetExtract.java. These replace the procedural silhouettes an
+        // earlier revision drew here; the archetype each one is assigned to follows its
+        // silhouette, since that is the player's fastest read on how a fight will go.
         int fw = 330, fh = 165;
-        fish("fish_runner", 0, 0, fw, fh, Archetype.RUNNER);
-        fish("fish_power_tank", fw, 0, fw, fh, Archetype.POWER_TANK);
-        fish("fish_erratic", fw * 2, 0, fw, fh, Archetype.ERRATIC);
-        fish("fish_diver", 0, fh, fw, fh, Archetype.DIVER);
-        fish("fish_trickster", fw, fh, fw, fh, Archetype.TRICKSTER);
-        fish("fish_boss", fw * 2, fh, fw, fh, Archetype.BOSS);
+        packFish("fish_runner", 0, 0, fw, fh, "runner.png");
+        packFish("fish_power_tank", fw, 0, fw, fh, "power_tank.png");
+        packFish("fish_erratic", fw * 2, 0, fw, fh, "erratic.png");
+        packFish("fish_diver", 0, fh, fw, fh, "diver.png");
+        packFish("fish_trickster", fw, fh, fw, fh, "trickster.png");
+        packFish("fish_boss", fw * 2, fh, fw, fh, "boss.png");
+        // A distinct sprite for the top rarity tiers, so a legendary catch does not look
+        // identical to the common fish that shares its behaviour archetype. Tucked into the gap
+        // left by the portrait grid rather than growing the sheet.
+        packFish("fish_legendary", 560, 840, fw, fh, "extra_gold.png");
 
         // --- The player's angler, two poses ---------------------------------------------
         angler("angler_idle", 0, 340, 230, 300, false);
@@ -98,6 +106,36 @@ public final class SpriteGen {
         return String.valueOf(Math.round(v * 1000) / 1000f);
     }
 
+    /**
+     * Scales one source sprite to fit a cell, preserving aspect, and packs it into the atlas.
+     *
+     * <p>Fit rather than fill: the cells are a fixed grid but the source art varies in
+     * proportion, and stretching a fish to the cell would distort exactly the silhouette the
+     * archetype is meant to communicate.
+     */
+    private static void packFish(String name, int ox, int oy, int w, int h, String file) {
+        mark(name, ox, oy, w, h);
+        File source = new File("art-src/fish", file);
+        if (!source.isFile()) {
+            throw new IllegalStateException("Missing source art: " + source);
+        }
+        BufferedImage src;
+        try {
+            src = ImageIO.read(source);
+        } catch (Exception e) {
+            throw new IllegalStateException("Cannot read " + source, e);
+        }
+
+        double scale = Math.min((w - 8.0) / src.getWidth(), (h - 8.0) / src.getHeight());
+        int dw = (int) Math.round(src.getWidth() * scale);
+        int dh = (int) Math.round(src.getHeight() * scale);
+        Graphics2D c = (Graphics2D) g.create();
+        c.setRenderingHint(RenderingHints.KEY_INTERPOLATION,
+                RenderingHints.VALUE_INTERPOLATION_BICUBIC);
+        c.drawImage(src, ox + (w - dw) / 2, oy + (h - dh) / 2, dw, dh, null);
+        c.dispose();
+    }
+
     private static void mark(String name, int x, int y, int w, int h) {
         REGIONS.put(name, new int[]{x, y, w, h});
     }
@@ -105,308 +143,6 @@ public final class SpriteGen {
     // =====================================================================================
     // Fish
     // =====================================================================================
-
-    private enum Archetype { RUNNER, POWER_TANK, ERRATIC, DIVER, TRICKSTER, BOSS }
-
-    /**
-     * Draws a fish facing left, matching how it is rendered in the fight (swimming away from the
-     * angler).
-     *
-     * <p>Each archetype gets its own construction rather than one body with tweaked numbers. A
-     * first pass parameterised a single shape and every fish came out looking the same, which
-     * defeats the point: the silhouette is the player's fastest read on what they have hooked and
-     * therefore on how the fight will go.
-     */
-    private static void fish(String name, int ox, int oy, int w, int h, Archetype type) {
-        mark(name, ox, oy, w, h);
-
-        // Drawn offscreen first so the shading pass below can work against the finished
-        // silhouette. The shapes stay greyscale: the renderer multiplies them by the species'
-        // rarity colour, so baking real light and shade here is what turns a flat tinted blob
-        // into something that reads as a fish with volume.
-        BufferedImage buffer = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
-        Graphics2D c = buffer.createGraphics();
-        c.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-        c.setRenderingHint(RenderingHints.KEY_STROKE_CONTROL, RenderingHints.VALUE_STROKE_PURE);
-
-        switch (type) {
-            case RUNNER:     runner(c, w, h); break;
-            case POWER_TANK: powerTank(c, w, h); break;
-            case ERRATIC:    erratic(c, w, h); break;
-            case DIVER:      diver(c, w, h); break;
-            case TRICKSTER:  trickster(c, w, h); break;
-            default:         boss(c, w, h); break;
-        }
-        shadeFish(c, w, h);
-        c.dispose();
-
-        g.drawImage(buffer, ox, oy, null);
-    }
-
-    /**
-     * Adds volume to a finished fish.
-     *
-     * <p>Every step composites with {@code SrcAtop}, which only paints where the sprite already
-     * has pixels. That is what lets one generic fan of fin rays work for all six archetypes: the
-     * rays are clipped to whatever fin geometry that species actually has, so nothing has to know
-     * the tail's shape.
-     */
-    private static void shadeFish(Graphics2D c, float w, float h) {
-        float cy = h * 0.5f;
-        c.setComposite(AlphaComposite.SrcAtop);
-
-        // Fin rays, fanned from just behind the body.
-        c.setColor(new Color(0, 0, 0, 70));
-        c.setStroke(new BasicStroke(Math.max(1.5f, h * 0.012f)));
-        for (int i = -4; i <= 4; i++) {
-            double a = Math.toRadians(180 + i * 11);
-            c.draw(new Line2D.Double(w * 0.30f, cy,
-                    w * 0.30f + Math.cos(a) * w * 0.34f, cy + Math.sin(a) * h * 0.55f));
-        }
-
-        // Countershading: dark back fading out by mid-body, pale belly. Real fish are lit this
-        // way and it is the cheapest cue that the shape is round rather than cut from paper.
-        c.setPaint(new GradientPaint(0, 0, new Color(0, 0, 0, 135),
-                                     0, h * 0.62f, new Color(0, 0, 0, 0)));
-        c.fillRect(0, 0, (int) w, (int) h);
-        c.setPaint(new GradientPaint(0, h, new Color(255, 255, 255, 90),
-                                     0, h * 0.60f, new Color(255, 255, 255, 0)));
-        c.fillRect(0, 0, (int) w, (int) h);
-
-        // Specular streak along the upper flank.
-        c.setPaint(new RadialGradientPaint(
-                new Point2D.Float(w * 0.66f, h * 0.34f), w * 0.26f,
-                new float[]{0f, 1f},
-                new Color[]{new Color(255, 255, 255, 105), new Color(255, 255, 255, 0)}));
-        c.fill(new Ellipse2D.Float(w * 0.40f, h * 0.20f, w * 0.52f, h * 0.28f));
-
-        c.setComposite(AlphaComposite.SrcOver);
-    }
-
-    private static final Color FIN = new Color(255, 255, 255, 150);
-    private static final Color FIN_STRONG = new Color(255, 255, 255, 200);
-
-    /** Punches out the eye and gill so they read against whatever tint the renderer applies. */
-    private static void face(Graphics2D c, float ex, float ey, float r, float gillX, float gillY,
-                             float gillW, float gillH) {
-        c.setComposite(AlphaComposite.Clear);
-        c.fill(new Ellipse2D.Float(ex - r, ey - r, r * 2, r * 2));
-        c.setStroke(new BasicStroke(Math.max(2f, r * 0.55f)));
-        c.draw(new Arc2D.Float(gillX, gillY, gillW, gillH, 55, 130, Arc2D.OPEN));
-        c.setComposite(AlphaComposite.SrcOver);
-    }
-
-    /** Long, slim, deeply forked tail. Built to read as speed. */
-    private static void runner(Graphics2D c, float w, float h) {
-        float cy = h * 0.5f;
-        c.setColor(FIN);
-        c.fill(triangle(w * 0.52f, cy + h * 0.10f, w * 0.36f, cy + h * 0.34f, w * 0.58f, cy + h * 0.12f));
-
-        c.setColor(FIN_STRONG);
-        GeneralPath tail = new GeneralPath();      // deep crescent fork
-        tail.moveTo(w * 0.26f, cy);
-        tail.curveTo(w * 0.16f, cy - h * 0.14f, w * 0.10f, cy - h * 0.36f, w * 0.03f, cy - h * 0.44f);
-        tail.curveTo(w * 0.12f, cy - h * 0.16f, w * 0.12f, cy + h * 0.16f, w * 0.03f, cy + h * 0.44f);
-        tail.curveTo(w * 0.10f, cy + h * 0.36f, w * 0.16f, cy + h * 0.14f, w * 0.26f, cy);
-        tail.closePath();
-        c.fill(tail);
-        c.fill(triangle(w * 0.56f, cy - h * 0.11f, w * 0.44f, cy - h * 0.30f, w * 0.38f, cy - h * 0.10f));
-
-        c.setColor(Color.WHITE);
-        GeneralPath body = new GeneralPath();
-        body.moveTo(w * 0.97f, cy);                // pointed snout
-        body.curveTo(w * 0.70f, cy - h * 0.20f, w * 0.45f, cy - h * 0.21f, w * 0.25f, cy - h * 0.05f);
-        body.lineTo(w * 0.25f, cy + h * 0.05f);
-        body.curveTo(w * 0.45f, cy + h * 0.21f, w * 0.70f, cy + h * 0.20f, w * 0.97f, cy);
-        body.closePath();
-        c.fill(body);
-        face(c, w * 0.86f, cy - h * 0.05f, h * 0.032f, w * 0.66f, cy - h * 0.17f, w * 0.14f, h * 0.34f);
-    }
-
-    /** Short and very deep, blunt head, small tail. Mass over speed. */
-    private static void powerTank(Graphics2D c, float w, float h) {
-        float cy = h * 0.5f;
-        c.setColor(FIN);
-        c.fill(triangle(w * 0.60f, cy + h * 0.26f, w * 0.42f, cy + h * 0.46f, w * 0.68f, cy + h * 0.28f));
-
-        c.setColor(FIN_STRONG);
-        GeneralPath tail = new GeneralPath();      // stubby, shallow fork
-        tail.moveTo(w * 0.32f, cy);
-        tail.curveTo(w * 0.22f, cy - h * 0.16f, w * 0.16f, cy - h * 0.28f, w * 0.10f, cy - h * 0.30f);
-        tail.curveTo(w * 0.20f, cy - h * 0.10f, w * 0.20f, cy + h * 0.10f, w * 0.10f, cy + h * 0.30f);
-        tail.curveTo(w * 0.16f, cy + h * 0.28f, w * 0.22f, cy + h * 0.16f, w * 0.32f, cy);
-        tail.closePath();
-        c.fill(tail);
-        c.fill(triangle(w * 0.68f, cy - h * 0.30f, w * 0.54f, cy - h * 0.46f, w * 0.44f, cy - h * 0.28f));
-
-        c.setColor(Color.WHITE);
-        GeneralPath body = new GeneralPath();
-        body.moveTo(w * 0.94f, cy + h * 0.06f);    // blunt, rounded head
-        body.curveTo(w * 0.96f, cy - h * 0.22f, w * 0.80f, cy - h * 0.36f, w * 0.62f, cy - h * 0.35f);
-        body.curveTo(w * 0.44f, cy - h * 0.34f, w * 0.32f, cy - h * 0.20f, w * 0.30f, cy);
-        body.curveTo(w * 0.32f, cy + h * 0.20f, w * 0.44f, cy + h * 0.34f, w * 0.62f, cy + h * 0.35f);
-        body.curveTo(w * 0.80f, cy + h * 0.36f, w * 0.96f, cy + h * 0.26f, w * 0.94f, cy + h * 0.06f);
-        body.closePath();
-        c.fill(body);
-        face(c, w * 0.84f, cy - h * 0.10f, h * 0.042f, w * 0.62f, cy - h * 0.28f, w * 0.16f, h * 0.56f);
-    }
-
-    /** Angular, tall spiked dorsal, wide fork. Looks unpredictable. */
-    private static void erratic(Graphics2D c, float w, float h) {
-        float cy = h * 0.5f;
-        c.setColor(FIN);
-        c.fill(triangle(w * 0.56f, cy + h * 0.18f, w * 0.40f, cy + h * 0.44f, w * 0.64f, cy + h * 0.20f));
-
-        c.setColor(FIN_STRONG);
-        GeneralPath tail = new GeneralPath();      // hard-edged, very wide fork
-        tail.moveTo(w * 0.30f, cy);
-        tail.lineTo(w * 0.04f, cy - h * 0.46f);
-        tail.lineTo(w * 0.20f, cy);
-        tail.lineTo(w * 0.04f, cy + h * 0.46f);
-        tail.closePath();
-        c.fill(tail);
-
-        // Spiked dorsal ridge, rooted below the body's top edge so it stays attached.
-        for (int i = 0; i < 4; i++) {
-            float x = w * (0.66f - i * 0.10f);
-            c.fill(triangle(x, cy - h * 0.16f, x - w * 0.035f, cy - h * (0.46f - i * 0.045f),
-                            x - w * 0.075f, cy - h * 0.16f));
-        }
-
-        c.setColor(Color.WHITE);
-        GeneralPath body = new GeneralPath();
-        body.moveTo(w * 0.95f, cy - h * 0.02f);
-        body.lineTo(w * 0.74f, cy - h * 0.25f);    // faceted back
-        body.lineTo(w * 0.50f, cy - h * 0.26f);
-        body.lineTo(w * 0.30f, cy - h * 0.08f);
-        body.lineTo(w * 0.30f, cy + h * 0.08f);
-        body.lineTo(w * 0.52f, cy + h * 0.27f);
-        body.lineTo(w * 0.78f, cy + h * 0.22f);
-        body.closePath();
-        c.fill(body);
-        face(c, w * 0.84f, cy - h * 0.06f, h * 0.034f, w * 0.64f, cy - h * 0.20f, w * 0.13f, h * 0.40f);
-    }
-
-    /** A ray: the wings are the whole silhouette, with a whip tail and no dorsal. */
-    private static void diver(Graphics2D c, float w, float h) {
-        float cy = h * 0.5f;
-
-        c.setColor(FIN_STRONG);
-        GeneralPath tailWhip = new GeneralPath();
-        tailWhip.moveTo(w * 0.30f, cy);
-        tailWhip.quadTo(w * 0.16f, cy - h * 0.10f, w * 0.02f, cy - h * 0.04f);
-        c.setStroke(new BasicStroke(h * 0.045f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
-        c.draw(tailWhip);
-        c.fill(triangle(w * 0.14f, cy - h * 0.07f, w * 0.06f, cy - h * 0.22f, w * 0.10f, cy - h * 0.05f));
-
-        c.setColor(Color.WHITE);
-        GeneralPath wings = new GeneralPath();
-        wings.moveTo(w * 0.92f, cy);               // snout
-        wings.curveTo(w * 0.72f, cy - h * 0.16f, w * 0.60f, cy - h * 0.46f, w * 0.34f, cy - h * 0.44f);
-        wings.curveTo(w * 0.24f, cy - h * 0.43f, w * 0.28f, cy - h * 0.12f, w * 0.30f, cy);
-        wings.curveTo(w * 0.28f, cy + h * 0.12f, w * 0.24f, cy + h * 0.43f, w * 0.34f, cy + h * 0.44f);
-        wings.curveTo(w * 0.60f, cy + h * 0.46f, w * 0.72f, cy + h * 0.16f, w * 0.92f, cy);
-        wings.closePath();
-        c.fill(wings);
-
-        // Eyes on top of the disc, as a ray's are.
-        c.setComposite(AlphaComposite.Clear);
-        c.fill(new Ellipse2D.Float(w * 0.74f, cy - h * 0.14f, h * 0.075f, h * 0.075f));
-        c.fill(new Ellipse2D.Float(w * 0.74f, cy + h * 0.07f, h * 0.075f, h * 0.075f));
-        c.setComposite(AlphaComposite.SrcOver);
-    }
-
-    /** Slim body, one tall scalloped sail, long trailing streamers. Ornate and unmistakable. */
-    private static void trickster(Graphics2D c, float w, float h) {
-        float cy = h * 0.5f;
-
-        c.setColor(FIN_STRONG);
-        GeneralPath tail = new GeneralPath();      // long trailing streamers
-        tail.moveTo(w * 0.32f, cy);
-        tail.curveTo(w * 0.18f, cy - h * 0.22f, w * 0.08f, cy - h * 0.42f, w * 0.02f, cy - h * 0.48f);
-        tail.curveTo(w * 0.14f, cy - h * 0.18f, w * 0.18f, cy - h * 0.04f, w * 0.22f, cy);
-        tail.curveTo(w * 0.18f, cy + h * 0.04f, w * 0.14f, cy + h * 0.18f, w * 0.02f, cy + h * 0.48f);
-        tail.curveTo(w * 0.08f, cy + h * 0.42f, w * 0.18f, cy + h * 0.22f, w * 0.32f, cy);
-        tail.closePath();
-        c.fill(tail);
-
-        c.setColor(FIN_STRONG);
-        // A single tall sail above the back, its base sunk into the body. A matching sweep below
-        // made the two fins meet around the body and the whole fish rendered as one symmetric
-        // lens; drawn clear of the outline, the sail instead floated free of the fish.
-        GeneralPath sail = new GeneralPath();
-        sail.moveTo(w * 0.78f, cy - h * 0.02f);
-        sail.curveTo(w * 0.70f, cy - h * 0.40f, w * 0.62f, cy - h * 0.50f, w * 0.56f, cy - h * 0.36f);
-        sail.curveTo(w * 0.52f, cy - h * 0.48f, w * 0.44f, cy - h * 0.48f, w * 0.40f, cy - h * 0.34f);
-        sail.curveTo(w * 0.36f, cy - h * 0.44f, w * 0.30f, cy - h * 0.40f, w * 0.30f, cy - h * 0.18f);
-        sail.curveTo(w * 0.44f, cy - h * 0.12f, w * 0.60f, cy - h * 0.07f, w * 0.78f, cy - h * 0.02f);
-        sail.closePath();
-        c.fill(sail);
-
-        // Small pelvic fin low and forward, breaking the symmetry deliberately.
-        c.setColor(FIN);
-        c.fill(triangle(w * 0.66f, cy + h * 0.04f, w * 0.52f, cy + h * 0.38f, w * 0.46f, cy + h * 0.03f));
-
-        c.setColor(Color.WHITE);
-        GeneralPath body = new GeneralPath();
-        body.moveTo(w * 0.96f, cy);
-        body.curveTo(w * 0.78f, cy - h * 0.15f, w * 0.52f, cy - h * 0.16f, w * 0.32f, cy - h * 0.05f);
-        body.lineTo(w * 0.32f, cy + h * 0.05f);
-        body.curveTo(w * 0.52f, cy + h * 0.16f, w * 0.78f, cy + h * 0.15f, w * 0.96f, cy);
-        body.closePath();
-        c.fill(body);
-        face(c, w * 0.86f, cy - h * 0.035f, h * 0.032f, w * 0.68f, cy - h * 0.13f, w * 0.13f, h * 0.26f);
-    }
-
-    /** Massive, spined, heavy jaw. Has to read as a different class of creature. */
-    private static void boss(Graphics2D c, float w, float h) {
-        float cy = h * 0.52f;
-
-        c.setColor(FIN);
-        c.fill(triangle(w * 0.58f, cy + h * 0.30f, w * 0.38f, cy + h * 0.50f, w * 0.68f, cy + h * 0.32f));
-
-        c.setColor(FIN_STRONG);
-        GeneralPath tail = new GeneralPath();      // huge asymmetric sweep
-        tail.moveTo(w * 0.28f, cy);
-        tail.curveTo(w * 0.16f, cy - h * 0.22f, w * 0.06f, cy - h * 0.44f, w * 0.01f, cy - h * 0.50f);
-        tail.curveTo(w * 0.14f, cy - h * 0.20f, w * 0.16f, cy + h * 0.14f, w * 0.06f, cy + h * 0.38f);
-        tail.curveTo(w * 0.14f, cy + h * 0.30f, w * 0.20f, cy + h * 0.14f, w * 0.28f, cy);
-        tail.closePath();
-        c.fill(tail);
-
-        // The lower jaw is a separate shape under the body. Cutting it out of the body outline
-        // instead left a notch that read as a bite taken out of the fish.
-        c.setColor(Color.WHITE);
-        GeneralPath jaw = new GeneralPath();
-        jaw.moveTo(w * 0.99f, cy + h * 0.06f);
-        jaw.curveTo(w * 0.90f, cy + h * 0.26f, w * 0.74f, cy + h * 0.26f, w * 0.66f, cy + h * 0.16f);
-        jaw.lineTo(w * 0.72f, cy + h * 0.04f);
-        jaw.closePath();
-        c.fill(jaw);
-
-        GeneralPath body = new GeneralPath();
-        body.moveTo(w * 0.99f, cy + h * 0.04f);    // heavy brow sloping to the snout
-        body.curveTo(w * 0.96f, cy - h * 0.18f, w * 0.84f, cy - h * 0.36f, w * 0.62f, cy - h * 0.38f);
-        body.curveTo(w * 0.42f, cy - h * 0.40f, w * 0.30f, cy - h * 0.22f, w * 0.28f, cy);
-        body.curveTo(w * 0.30f, cy + h * 0.24f, w * 0.44f, cy + h * 0.38f, w * 0.64f, cy + h * 0.38f);
-        body.curveTo(w * 0.82f, cy + h * 0.38f, w * 0.94f, cy + h * 0.24f, w * 0.99f, cy + h * 0.04f);
-        body.closePath();
-        c.fill(body);
-
-        // Dorsal spines, rooted inside the body so they stay part of the silhouette.
-        for (int i = 0; i < 5; i++) {
-            float x = w * (0.70f - i * 0.095f);
-            c.fill(triangle(x, cy - h * 0.26f, x - w * 0.030f, cy - h * (0.56f - i * 0.03f),
-                            x - w * 0.070f, cy - h * 0.25f));
-        }
-
-        c.setComposite(AlphaComposite.Clear);
-        c.fill(new Ellipse2D.Float(w * 0.80f, cy - h * 0.22f, h * 0.11f, h * 0.11f));
-        // No separate jaw stroke: across the shaded body it read as a scratch rather than a mouth.
-        c.setStroke(new BasicStroke(h * 0.032f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
-        c.draw(new Arc2D.Float(w * 0.56f, cy - h * 0.32f, w * 0.16f, h * 0.68f, 55, 130, Arc2D.OPEN));
-        c.setComposite(AlphaComposite.SrcOver);
-    }
 
     private static Shape triangle(float x1, float y1, float x2, float y2, float x3, float y3) {
         GeneralPath p = new GeneralPath();

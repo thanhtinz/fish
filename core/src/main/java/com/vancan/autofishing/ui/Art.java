@@ -135,8 +135,19 @@ public final class Art implements Disposable {
         return d > 1f - edge ? (1f - d) / edge : 1f;
     }
 
-    /** Fish silhouette for a behaviour archetype (GDD 7). */
-    public TextureRegion fish(com.vancan.autofishing.sim.Archetype archetype) {
+    /**
+     * Sprite for a fish.
+     *
+     * <p>Keyed on behaviour archetype, because the silhouette is what tells a player how the
+     * fight will go - except at the top rarity tiers, which get their own sprite so a legendary
+     * catch is visibly not the same creature as the common fish sharing its archetype.
+     */
+    public TextureRegion fish(com.vancan.autofishing.sim.Archetype archetype,
+                              com.vancan.autofishing.sim.Rarity rarity) {
+        if (rarity != null
+                && rarity.ordinal() >= com.vancan.autofishing.sim.Rarity.LEGENDARY.ordinal()) {
+            return atlas.get("fish_legendary");
+        }
         return atlas.get("fish_" + archetype.name().toLowerCase());
     }
 

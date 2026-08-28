@@ -266,26 +266,38 @@ public class FishingScreen extends BaseScreen {
         float fishY = swimTop - d * (swimTop - swimBottom);
         fishY += (float) Math.sin(time * (1.8f + fish.phase.driveMultiplier)) * 16f;
 
-        Color tensionColor = Theme.tensionColor(shownTension, s.getSafeTensionRatio());
-        drawLine(tip[0], tip[1], fishX + 40f, fishY, 4f, tensionColor);
-
         float scale = 0.80f + Math.min(1.5f, fish.weight / 55f);
         float fw = 210f * scale;
         float fh = fw * 0.5f;
-        Color tint = Theme.rarityColor(fish.rarity);
-        // A tired fish dims; a raging one flashes. Both read before the gauges do.
-        float energy = 0.62f + 0.38f * fish.staminaRatio();
-        float flash = fish.phase == com.vancan.autofishing.sim.FishPhase.RAGE
-                ? 0.35f + 0.35f * (float) Math.sin(time * 18f) : 0f;
-        game.batch.setColor(
-                Math.min(1f, tint.r * energy + flash),
-                Math.min(1f, tint.g * energy),
-                Math.min(1f, tint.b * energy), 1f);
-        game.batch.draw(art.fish(fish.species.archetype), fishX - fw / 2f, fishY - fh / 2f, fw, fh);
+
+        // The line meets the fish at its head. The art faces left, towards the angler, so the
+        // hook belongs on the left edge - anchoring on the right ran the line to the tail.
+        Color tensionColor = Theme.tensionColor(shownTension, s.getSafeTensionRatio());
+        drawLine(tip[0], tip[1], fishX - fw * 0.38f, fishY, 4f, tensionColor);
+
+        // Rarity now reads as a glow behind the fish rather than as a tint on it: the art is
+        // full-colour, and multiplying a painted sprite by a rarity colour only muddies it.
+        Color rarity = Theme.rarityColor(fish.rarity);
+        if (fish.rarity.ordinal() > 0) {
+            float glow = 0.16f + 0.10f * (float) Math.sin(time * 2.2f)
+                    + 0.05f * fish.rarity.ordinal();
+            game.batch.setColor(rarity.r, rarity.g, rarity.b, glow);
+            game.batch.draw(art.softCircle, fishX - fw * 0.62f, fishY - fh * 0.85f,
+                    fw * 1.24f, fh * 1.70f);
+        }
+
+        // A tired fish dims; a raging one flushes red. Both read before the gauges do.
+        float energy = 0.66f + 0.34f * fish.staminaRatio();
+        float rage = fish.phase == com.vancan.autofishing.sim.FishPhase.RAGE
+                ? 0.30f + 0.25f * (float) Math.sin(time * 18f) : 0f;
+        game.batch.setColor(Math.min(1f, energy + rage), energy * (1f - rage * 0.5f),
+                energy * (1f - rage * 0.5f), 1f);
+        game.batch.draw(art.fish(fish.species.archetype, fish.rarity),
+                fishX - fw / 2f, fishY - fh / 2f, fw, fh);
         game.batch.setColor(Color.WHITE);
 
         ui.textCentered(art.fontSmall, fish.species.name + "  ·  " + Ui.weight(fish.weight),
-                fishX, fishY - fh / 2f - 12f, tint);
+                fishX, fishY - fh / 2f - 12f, rarity);
         ui.textCentered(art.fontSmall, fish.phase.displayName, fishX, fishY + fh / 2f + 46f,
                 fish.phase.isOpening() ? Theme.GOOD : Theme.WARN);
     }
