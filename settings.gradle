@@ -1,0 +1,29 @@
+pluginManagement {
+    repositories {
+        gradlePluginPortal()
+        mavenCentral()
+        google()
+    }
+}
+
+rootProject.name = 'van-can-auto-fishing'
+
+include 'core'
+include 'lwjgl3'
+include 'html'
+
+// The Android module needs a local Android SDK; the iOS module needs RoboVM (and a Mac
+// to actually produce an .ipa). Both are included only when the toolchain is present so
+// that `gradle build` / `gradle :core:test` keep working on a bare CI machine.
+def androidSdk = System.getenv('ANDROID_HOME') ?: System.getenv('ANDROID_SDK_ROOT')
+if (androidSdk || file('local.properties').exists()) {
+    include 'android'
+} else {
+    logger.lifecycle('[settings] Android SDK not found -> skipping :android (see docs/BUILDING.md)')
+}
+
+if (Boolean.getBoolean('withIos') || project.hasProperty('withIos')) {
+    include 'ios'
+} else {
+    logger.lifecycle('[settings] :ios disabled -> enable with -PwithIos (see docs/BUILDING.md)')
+}

@@ -1,0 +1,26 @@
+apply plugin: 'java-library'
+
+java {
+    // GWT 2.11 transpiles Java 11 bytecode/sources at most, and RoboVM tracks Java 11 too,
+    // so the shared module is pinned to 11 even though the JDK here is newer.
+    sourceCompatibility = JavaVersion.VERSION_11
+    targetCompatibility = JavaVersion.VERSION_11
+}
+
+dependencies {
+    api "com.badlogicgames.gdx:gdx:$gdxVersion"
+
+    testImplementation "org.junit.jupiter:junit-jupiter:$junitVersion"
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+test {
+    useJUnitPlatform()
+    testLogging {
+        events 'passed', 'skipped', 'failed'
+        exceptionFormat = 'full'
+    }
+}
+
+// The GWT backend compiles from *source*, so the .java files have to ship in the jar too.
+sourceSets.main.resources.srcDirs += ['src/main/java']

@@ -1,0 +1,37 @@
+# Build output
+build/
+out/
+bin/
+.gradle/
+gradle-app.setting
+local.properties
+
+# GWT / web
+html/war/
+html/gwt-unitCache/
+war/
+
+# Android
+*.apk
+*.aab
+*.keystore
+android/libs/
+android/gen/
+
+# iOS
+ios/robovm-build/
+ios/build/
+*.ipa
+*.dSYM
+
+# IDE
+.idea/
+*.iml
+.classpath
+.project
+.settings/
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db

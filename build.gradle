@@ -1,0 +1,18 @@
+allprojects {
+    apply plugin: 'eclipse'
+
+    version = project.appVersionName
+    ext.appName = project.appName
+
+    repositories {
+        mavenCentral()
+        google()
+        maven { url 'https://oss.sonatype.org/content/repositories/snapshots/' }
+    }
+}
+
+subprojects {
+    tasks.withType(JavaCompile).configureEach {
+        options.encoding = 'UTF-8'
+    }
+}
