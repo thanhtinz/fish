@@ -137,15 +137,26 @@ public final class AssetExtract {
     private static boolean[] buildMask(BufferedImage img, int[] bg) {
         int w = img.getWidth(), h = img.getHeight();
         boolean[] mask = new boolean[w * h];
-        // JPEG ringing smears the key colour into the sprite edge, so the threshold is generous
-        // and the edge is eroded once below rather than kept tight here.
+        // JPEG ringing smears the key colour into the sprite edge, so the threshold is generous.
         int threshold = 90;
         for (int y = 0; y < h; y++) {
             for (int x = 0; x < w; x++) {
                 mask[y * w + x] = dist(rgb(img, x, y), bg) > threshold;
             }
         }
-        return erode(mask, w, h);
+        // Erode only chroma keys. On a green screen the fringe is a real halo worth removing, but
+        // on a white or black sheet the content is usually line art a pixel or two wide, and
+        // eroding it deletes the artwork outright - which is exactly what happened to the face
+        // and expression sheets, where every slice came out as unconnected fragments.
+        boolean chroma = isChroma(bg);
+        return chroma ? erode(mask, w, h) : mask;
+    }
+
+    /** True for a saturated key colour, as opposed to a plain white or black sheet background. */
+    private static boolean isChroma(int[] c) {
+        int max = Math.max(c[0], Math.max(c[1], c[2]));
+        int min = Math.min(c[0], Math.min(c[1], c[2]));
+        return max - min > 60;
     }
 
     /** Removes single-pixel fringe left by JPEG compression around the key colour. */
