@@ -1,0 +1,102 @@
+{
+  "anglers": [
+    {
+      "id": "ag_lam",
+      "name": "Lâm",
+      "role": "STRIKER",
+      "rarity": "COMMON",
+      "statsPerLevel": {
+        "teamPull": 0.9,
+        "damageBonus": 0.01
+      },
+      "signatureSkill": "sk_manh_keo",
+      "description": "Cần thủ trẻ, đánh nhanh thắng nhanh."
+    },
+    {
+      "id": "ag_hue",
+      "name": "Huệ",
+      "role": "CONTROLLER",
+      "rarity": "COMMON",
+      "statsPerLevel": {
+        "safetyMitigation": 0.85,
+        "teamPull": 0.3
+      },
+      "signatureSkill": "sk_tru_the",
+      "description": "Đọc lực căng tốt, giữ dây cho cả đội."
+    },
+    {
+      "id": "ag_bac_ho",
+      "name": "Bác Hồ Lô",
+      "role": "ANCHOR",
+      "rarity": "UNCOMMON",
+      "statsPerLevel": {
+        "distanceControl": 0.006,
+        "teamPull": 0.5
+      },
+      "signatureSkill": "sk_thu_toc",
+      "description": "Lão ngư giàu kinh nghiệm, không cho cá chạy."
+    },
+    {
+      "id": "ag_thao",
+      "name": "Thảo",
+      "role": "HUNTER",
+      "rarity": "RARE",
+      "statsPerLevel": {
+        "luck": 0.012,
+        "teamPull": 0.35
+      },
+      "signatureSkill": "sk_hao_khi",
+      "description": "Chuyên tìm luồng cá hiếm."
+    },
+    {
+      "id": "ag_kien",
+      "name": "Kiên",
+      "role": "SUPPORT",
+      "rarity": "RARE",
+      "statsPerLevel": {
+        "offlineEfficiency": 0.016,
+        "recovery": 0.02
+      },
+      "signatureSkill": "sk_va_day",
+      "description": "Quản ngư cụ, tối ưu thời gian ngoại tuyến."
+    },
+    {
+      "id": "ag_hai_long",
+      "name": "Hải Long",
+      "role": "STRIKER",
+      "rarity": "EPIC",
+      "statsPerLevel": {
+        "teamPull": 1.6,
+        "damageBonus": 0.018,
+        "critChance": 0.0016
+      },
+      "signatureSkill": "sk_manh_keo",
+      "description": "Truyền nhân môn phái biển sâu."
+    },
+    {
+      "id": "ag_van_nuong",
+      "name": "Vân Nương",
+      "role": "CONTROLLER",
+      "rarity": "EPIC",
+      "statsPerLevel": {
+        "safetyMitigation": 1.5,
+        "elasticity": 0.02
+      },
+      "signatureSkill": "sk_dinh_luc",
+      "description": "Thân pháp mềm, hoá giải mọi cú sốc lực."
+    },
+    {
+      "id": "ag_thien_ngu",
+      "name": "Thiên Ngư Tử",
+      "role": "HUNTER",
+      "rarity": "LEGENDARY",
+      "statsPerLevel": {
+        "luck": 0.022,
+        "rareDetection": 0.004,
+        "teamPull": 0.7
+      },
+      "signatureSkill": "sk_hao_khi",
+      "description": "Kẻ săn huyền thoại của Biển Thiên."
+    }
+  ]
+}

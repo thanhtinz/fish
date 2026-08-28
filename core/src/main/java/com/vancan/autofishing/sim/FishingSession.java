@@ -212,7 +212,8 @@ public final class FishingSession {
         if (tension > safe) {
             float over = tension - safe;
             tensionWaste += over * dt;
-            lineIntegrity -= (over / breaking) * cfg.wearRate * dt;
+            float overshoot = over / breaking;
+            lineIntegrity -= overshoot * overshoot * cfg.wearRate * dt;
         } else {
             lineIntegrity = Math.min(1f, lineIntegrity + build.recovery * 0.004f * dt);
         }

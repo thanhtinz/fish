@@ -1,0 +1,192 @@
+{
+  "spots": [
+    {
+      "id": "z1_dam_say",
+      "name": "Đầm Sậy",
+      "theme": "Đầm lầy nước ngọt",
+      "unlockLevel": 1,
+      "tier": 1,
+      "weather": "CALM",
+      "description": "Nước nông, cá nhỏ. Nơi học nghề của mọi cần thủ.",
+      "fishPool": [
+        {
+          "species": "ca_ro",
+          "weight": 50
+        },
+        {
+          "species": "ca_diec",
+          "weight": 34
+        },
+        {
+          "species": "ca_tram_co",
+          "weight": 13
+        },
+        {
+          "species": "ca_qua",
+          "weight": 3
+        }
+      ],
+      "bossSpecies": null
+    },
+    {
+      "id": "z2_song_ngoc",
+      "name": "Sông Ngọc",
+      "theme": "Sông nước chảy",
+      "unlockLevel": 8,
+      "tier": 2,
+      "weather": "CALM",
+      "description": "Dòng chảy mạnh, cá khoẻ hơn và nhanh hơn.",
+      "fishPool": [
+        {
+          "species": "ca_chep",
+          "weight": 34
+        },
+        {
+          "species": "ca_mai",
+          "weight": 26
+        },
+        {
+          "species": "ca_lang",
+          "weight": 22
+        },
+        {
+          "species": "ca_chien",
+          "weight": 13
+        },
+        {
+          "species": "ca_anh_vu",
+          "weight": 5
+        }
+      ],
+      "bossSpecies": "boss_thuy_qui"
+    },
+    {
+      "id": "z3_bo_bao",
+      "name": "Bờ Bão",
+      "theme": "Biển ven bờ",
+      "unlockLevel": 15,
+      "tier": 3,
+      "weather": "STORM",
+      "description": "Biển động làm tăng lực căng nhưng cũng gọi cá hiếm.",
+      "fishPool": [
+        {
+          "species": "ca_vuoc",
+          "weight": 32
+        },
+        {
+          "species": "ca_hong",
+          "weight": 25
+        },
+        {
+          "species": "ca_thu",
+          "weight": 22
+        },
+        {
+          "species": "ca_mu",
+          "weight": 15
+        },
+        {
+          "species": "ca_nham",
+          "weight": 6
+        }
+      ],
+      "bossSpecies": null
+    },
+    {
+      "id": "z4_vuc_tham",
+      "name": "Vực Thẳm",
+      "theme": "Biển sâu",
+      "unlockLevel": 25,
+      "tier": 4,
+      "weather": "DEEP",
+      "description": "Độ sâu phạt nặng khoảng cách. Cần dây dài.",
+      "fishPool": [
+        {
+          "species": "ca_tra_dau",
+          "weight": 30
+        },
+        {
+          "species": "ca_duoi",
+          "weight": 26
+        },
+        {
+          "species": "ca_ngu",
+          "weight": 22
+        },
+        {
+          "species": "ca_co",
+          "weight": 16
+        },
+        {
+          "species": "ca_ho",
+          "weight": 6
+        }
+      ],
+      "bossSpecies": "boss_hai_xa"
+    },
+    {
+      "id": "z5_long_chao_rong",
+      "name": "Lòng Chảo Rồng",
+      "theme": "Vùng nước thần thoại",
+      "unlockLevel": 40,
+      "tier": 5,
+      "weather": "MYSTIC",
+      "description": "Thủy tộc cổ xưa trú ngụ. Mọi trận đều là thử thách build.",
+      "fishPool": [
+        {
+          "species": "ca_map_xam",
+          "weight": 30
+        },
+        {
+          "species": "ca_mo_neo",
+          "weight": 26
+        },
+        {
+          "species": "ca_bac_tuyet",
+          "weight": 22
+        },
+        {
+          "species": "giao_long",
+          "weight": 16
+        },
+        {
+          "species": "ca_ngoc_lan",
+          "weight": 6
+        }
+      ],
+      "bossSpecies": null
+    },
+    {
+      "id": "z6_bien_thien",
+      "name": "Biển Thiên",
+      "theme": "Endgame",
+      "unlockLevel": 60,
+      "tier": 6,
+      "weather": "CELESTIAL",
+      "description": "Ngư trường cuối. Mở theo mùa giải.",
+      "fishPool": [
+        {
+          "species": "ca_thien_ngu",
+          "weight": 32
+        },
+        {
+          "species": "ca_kinh",
+          "weight": 26
+        },
+        {
+          "species": "ca_van_lan",
+          "weight": 22
+        },
+        {
+          "species": "ca_tinh_hai",
+          "weight": 15
+        },
+        {
+          "species": "an_ha_ngu",
+          "weight": 5
+        }
+      ],
+      "bossSpecies": "boss_long_ngu"
+    }
+  ]
+}

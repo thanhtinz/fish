@@ -1,0 +1,471 @@
+{
+  "gear": [
+    {
+      "id": "rod_t1",
+      "name": "Cần Tre",
+      "slot": "ROD",
+      "tier": 1,
+      "rarity": "COMMON",
+      "stats": {
+        "rodPower": 10,
+        "control": 1.0,
+        "critChance": 0.05
+      },
+      "description": ""
+    },
+    {
+      "id": "reel_t1",
+      "name": "Máy Tay Quay",
+      "slot": "REEL",
+      "tier": 1,
+      "rarity": "COMMON",
+      "stats": {
+        "reelPower": 6,
+        "pullSpeed": 3.8,
+        "maxDrag": 60,
+        "recovery": 1.0
+      },
+      "description": ""
+    },
+    {
+      "id": "line_t1",
+      "name": "Cước Gai",
+      "slot": "LINE",
+      "tier": 1,
+      "rarity": "COMMON",
+      "stats": {
+        "lineStrength": 60,
+        "lineLength": 34,
+        "elasticity": 1.0
+      },
+      "description": ""
+    },
+    {
+      "id": "hook_t1",
+      "name": "Lưỡi Sắt",
+      "slot": "HOOK",
+      "tier": 1,
+      "rarity": "COMMON",
+      "stats": {
+        "hookRate": 0.88,
+        "critHook": 0.01
+      },
+      "description": ""
+    },
+    {
+      "id": "float_t1",
+      "name": "Phao Xốp",
+      "slot": "FLOAT",
+      "tier": 1,
+      "rarity": "COMMON",
+      "stats": {
+        "biteDetection": 1.0,
+        "rareDetection": 0.0
+      },
+      "description": ""
+    },
+    {
+      "id": "rod_t2",
+      "name": "Cần Gỗ Lim",
+      "slot": "ROD",
+      "tier": 2,
+      "rarity": "COMMON",
+      "stats": {
+        "rodPower": 16,
+        "control": 1.12,
+        "critChance": 0.07
+      },
+      "description": ""
+    },
+    {
+      "id": "reel_t2",
+      "name": "Máy Đồng",
+      "slot": "REEL",
+      "tier": 2,
+      "rarity": "COMMON",
+      "stats": {
+        "reelPower": 9,
+        "pullSpeed": 4.5,
+        "maxDrag": 85,
+        "recovery": 1.1
+      },
+      "description": ""
+    },
+    {
+      "id": "line_t2",
+      "name": "Cước Bện",
+      "slot": "LINE",
+      "tier": 2,
+      "rarity": "COMMON",
+      "stats": {
+        "lineStrength": 85,
+        "lineLength": 39,
+        "elasticity": 1.12
+      },
+      "description": ""
+    },
+    {
+      "id": "hook_t2",
+      "name": "Lưỡi Thép",
+      "slot": "HOOK",
+      "tier": 2,
+      "rarity": "COMMON",
+      "stats": {
+        "hookRate": 0.902,
+        "critHook": 0.018
+      },
+      "description": ""
+    },
+    {
+      "id": "float_t2",
+      "name": "Phao Gỗ",
+      "slot": "FLOAT",
+      "tier": 2,
+      "rarity": "COMMON",
+      "stats": {
+        "biteDetection": 1.1,
+        "rareDetection": 0.04
+      },
+      "description": ""
+    },
+    {
+      "id": "rod_t3",
+      "name": "Cần Thép Sông",
+      "slot": "ROD",
+      "tier": 3,
+      "rarity": "UNCOMMON",
+      "stats": {
+        "rodPower": 24,
+        "control": 1.24,
+        "critChance": 0.09
+      },
+      "description": ""
+    },
+    {
+      "id": "reel_t3",
+      "name": "Máy Trục Kép",
+      "slot": "REEL",
+      "tier": 3,
+      "rarity": "UNCOMMON",
+      "stats": {
+        "reelPower": 13,
+        "pullSpeed": 5.4,
+        "maxDrag": 120,
+        "recovery": 1.2
+      },
+      "description": ""
+    },
+    {
+      "id": "line_t3",
+      "name": "Cước Hợp Kim",
+      "slot": "LINE",
+      "tier": 3,
+      "rarity": "UNCOMMON",
+      "stats": {
+        "lineStrength": 120,
+        "lineLength": 44,
+        "elasticity": 1.24
+      },
+      "description": ""
+    },
+    {
+      "id": "hook_t3",
+      "name": "Lưỡi Ngạnh Kép",
+      "slot": "HOOK",
+      "tier": 3,
+      "rarity": "UNCOMMON",
+      "stats": {
+        "hookRate": 0.924,
+        "critHook": 0.026
+      },
+      "description": ""
+    },
+    {
+      "id": "float_t3",
+      "name": "Phao Nhạy",
+      "slot": "FLOAT",
+      "tier": 3,
+      "rarity": "UNCOMMON",
+      "stats": {
+        "biteDetection": 1.2,
+        "rareDetection": 0.08
+      },
+      "description": ""
+    },
+    {
+      "id": "rod_t4",
+      "name": "Cần Carbon Bão",
+      "slot": "ROD",
+      "tier": 4,
+      "rarity": "RARE",
+      "stats": {
+        "rodPower": 34,
+        "control": 1.36,
+        "critChance": 0.11
+      },
+      "description": ""
+    },
+    {
+      "id": "reel_t4",
+      "name": "Máy Thuỷ Lực",
+      "slot": "REEL",
+      "tier": 4,
+      "rarity": "RARE",
+      "stats": {
+        "reelPower": 18,
+        "pullSpeed": 6.3,
+        "maxDrag": 165,
+        "recovery": 1.3
+      },
+      "description": ""
+    },
+    {
+      "id": "line_t4",
+      "name": "Cước Sợi Sâu",
+      "slot": "LINE",
+      "tier": 4,
+      "rarity": "RARE",
+      "stats": {
+        "lineStrength": 165,
+        "lineLength": 49,
+        "elasticity": 1.36
+      },
+      "description": ""
+    },
+    {
+      "id": "hook_t4",
+      "name": "Lưỡi Xuyên Vực",
+      "slot": "HOOK",
+      "tier": 4,
+      "rarity": "RARE",
+      "stats": {
+        "hookRate": 0.946,
+        "critHook": 0.034
+      },
+      "description": ""
+    },
+    {
+      "id": "float_t4",
+      "name": "Phao Sâu",
+      "slot": "FLOAT",
+      "tier": 4,
+      "rarity": "RARE",
+      "stats": {
+        "biteDetection": 1.3,
+        "rareDetection": 0.12
+      },
+      "description": ""
+    },
+    {
+      "id": "rod_t5",
+      "name": "Cần Long Cốt",
+      "slot": "ROD",
+      "tier": 5,
+      "rarity": "EPIC",
+      "stats": {
+        "rodPower": 46,
+        "control": 1.48,
+        "critChance": 0.13
+      },
+      "description": ""
+    },
+    {
+      "id": "reel_t5",
+      "name": "Máy Long Trục",
+      "slot": "REEL",
+      "tier": 5,
+      "rarity": "EPIC",
+      "stats": {
+        "reelPower": 24,
+        "pullSpeed": 7.4,
+        "maxDrag": 225,
+        "recovery": 1.4
+      },
+      "description": ""
+    },
+    {
+      "id": "line_t5",
+      "name": "Cước Long Tơ",
+      "slot": "LINE",
+      "tier": 5,
+      "rarity": "EPIC",
+      "stats": {
+        "lineStrength": 225,
+        "lineLength": 54,
+        "elasticity": 1.48
+      },
+      "description": ""
+    },
+    {
+      "id": "hook_t5",
+      "name": "Lưỡi Long Nha",
+      "slot": "HOOK",
+      "tier": 5,
+      "rarity": "EPIC",
+      "stats": {
+        "hookRate": 0.968,
+        "critHook": 0.042
+      },
+      "description": ""
+    },
+    {
+      "id": "float_t5",
+      "name": "Phao Long Nhãn",
+      "slot": "FLOAT",
+      "tier": 5,
+      "rarity": "EPIC",
+      "stats": {
+        "biteDetection": 1.4,
+        "rareDetection": 0.16
+      },
+      "description": ""
+    },
+    {
+      "id": "rod_t6",
+      "name": "Cần Thiên Vấn",
+      "slot": "ROD",
+      "tier": 6,
+      "rarity": "LEGENDARY",
+      "stats": {
+        "rodPower": 60,
+        "control": 1.6,
+        "critChance": 0.15
+      },
+      "description": ""
+    },
+    {
+      "id": "reel_t6",
+      "name": "Máy Vô Cực",
+      "slot": "REEL",
+      "tier": 6,
+      "rarity": "LEGENDARY",
+      "stats": {
+        "reelPower": 32,
+        "pullSpeed": 8.6,
+        "maxDrag": 300,
+        "recovery": 1.5
+      },
+      "description": ""
+    },
+    {
+      "id": "line_t6",
+      "name": "Cước Thiên Ty",
+      "slot": "LINE",
+      "tier": 6,
+      "rarity": "LEGENDARY",
+      "stats": {
+        "lineStrength": 300,
+        "lineLength": 59,
+        "elasticity": 1.6
+      },
+      "description": ""
+    },
+    {
+      "id": "hook_t6",
+      "name": "Lưỡi Vô Ảnh",
+      "slot": "HOOK",
+      "tier": 6,
+      "rarity": "LEGENDARY",
+      "stats": {
+        "hookRate": 0.99,
+        "critHook": 0.05
+      },
+      "description": ""
+    },
+    {
+      "id": "float_t6",
+      "name": "Phao Thiên Nhãn",
+      "slot": "FLOAT",
+      "tier": 6,
+      "rarity": "LEGENDARY",
+      "stats": {
+        "biteDetection": 1.5,
+        "rareDetection": 0.2
+      },
+      "description": ""
+    },
+    {
+      "id": "bait_giun",
+      "name": "Mồi Giun",
+      "slot": "BAIT",
+      "tier": 1,
+      "rarity": "COMMON",
+      "stats": {
+        "attraction": 1.0
+      },
+      "description": "Mồi cơ bản, luôn có sẵn."
+    },
+    {
+      "id": "bait_tep",
+      "name": "Mồi Tép",
+      "slot": "BAIT",
+      "tier": 2,
+      "rarity": "COMMON",
+      "stats": {
+        "attraction": 1.25
+      },
+      "description": "Cá cắn nhanh hơn."
+    },
+    {
+      "id": "bait_ca_moi",
+      "name": "Mồi Cá Con",
+      "slot": "BAIT",
+      "tier": 3,
+      "rarity": "UNCOMMON",
+      "stats": {
+        "attraction": 1.15,
+        "weightModifier": 1.12
+      },
+      "description": "Dụ cá lớn hơn."
+    },
+    {
+      "id": "bait_huyet",
+      "name": "Mồi Huyết",
+      "slot": "BAIT",
+      "tier": 4,
+      "rarity": "RARE",
+      "stats": {
+        "attraction": 1.3,
+        "rarityBias": 0.18
+      },
+      "description": "Tăng cơ hội gặp cá hiếm."
+    },
+    {
+      "id": "bait_long_dien",
+      "name": "Mồi Long Diên",
+      "slot": "BAIT",
+      "tier": 5,
+      "rarity": "EPIC",
+      "stats": {
+        "attraction": 1.35,
+        "rarityBias": 0.32,
+        "weightModifier": 1.1
+      },
+      "description": "Mồi cao cấp cho vùng thần thoại."
+    },
+    {
+      "id": "bait_ho_vang",
+      "name": "Mồi Dụ Hô Vàng",
+      "slot": "BAIT",
+      "tier": 4,
+      "rarity": "RARE",
+      "stats": {
+        "attraction": 1.2,
+        "speciesBias": "ca_ho"
+      },
+      "description": "Nhắm riêng Cá Hô Vàng."
+    },
+    {
+      "id": "bait_tinh_hai",
+      "name": "Mồi Dụ Tinh Hải",
+      "slot": "BAIT",
+      "tier": 6,
+      "rarity": "EPIC",
+      "stats": {
+        "attraction": 1.25,
+        "speciesBias": "ca_tinh_hai"
+      },
+      "description": "Nhắm riêng Cá Tinh Hải."
+    }
+  ]
+}

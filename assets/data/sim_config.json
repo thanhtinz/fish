@@ -1,0 +1,23 @@
+{
+  "tickSeconds": 0.03333333333333333,
+  "baseBiteIntervalSeconds": 4.5,
+  "biteWindowSeconds": 1.6,
+  "searchTimeoutSeconds": 45.0,
+  "damageCoefficient": 1.1,
+  "critMultiplier": 1.8,
+  "staminaDamageCoefficient": 1.05,
+  "pullTensionCoefficient": 1.7,
+  "safeTensionRatio": 0.7,
+  "wearRate": 0.18,
+  "lineResponse": 2.6,
+  "elasticityRelief": 0.3,
+  "phaseShockFactor": 0.85,
+  "landingThreshold": 1.5,
+  "castDistanceRatio": 0.42,
+  "reelSpeedCoefficient": 1.0,
+  "fightTimeoutSeconds": 90.0,
+  "fishStaminaRecovery": 0.055,
+  "fatigueForceFloor": 0.35,
+  "offlinePenalty": 0.55,
+  "offlineCapHours": 8.0
+}

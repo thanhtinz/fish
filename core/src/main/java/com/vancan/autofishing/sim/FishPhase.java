@@ -8,7 +8,7 @@ public enum FishPhase {
     /** Steady pull. The baseline. */
     STEADY("Ổn định", 1.00f, 1.00f),
     /** Sprints away: distance climbs fast, force spikes. */
-    RUN("Bỏ chạy", 1.25f, 2.30f),
+    RUN("Bỏ chạy", 1.25f, 1.80f),
     /** Dives: heavy force, little lateral movement, tension trap. */
     DIVE("Lặn sâu", 1.55f, 0.45f),
     /** Rage window: dangerous but burns the fish's own stamina. */

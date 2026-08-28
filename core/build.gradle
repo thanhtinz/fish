@@ -16,6 +16,12 @@ dependencies {
 
 test {
     useJUnitPlatform()
+
+    // The balance and content tests read the shipped JSON tables straight from assets/data.
+    // Without declaring them, Gradle caches a green run and a content change silently skips
+    // re-validation - exactly the regression these tests exist to catch.
+    inputs.dir("$rootDir/assets/data").withPathSensitivity(PathSensitivity.RELATIVE)
+    systemProperty 'vancan.dataRoot', "$rootDir/assets/data"
     testLogging {
         events 'passed', 'skipped', 'failed'
         exceptionFormat = 'full'
@@ -24,3 +30,12 @@ test {
 
 // The GWT backend compiles from *source*, so the .java files have to ship in the jar too.
 sourceSets.main.resources.srcDirs += ['src/main/java']
+
+/** Designer-facing balance sweep; see docs/BALANCE.md. */
+tasks.register('balanceReport', JavaExec) {
+    group = 'verification'
+    description = 'Prints the catch-rate / gold-per-minute grid for every zone and strategy.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'com.vancan.autofishing.BalanceReport'
+    systemProperty 'vancan.dataRoot', "$rootDir/assets/data"
+}

@@ -32,12 +32,16 @@ public final class SimConfig {
     /** Fraction of line strength above which the line starts taking permanent wear. */
     public float safeTensionRatio = 0.70f;
     /**
-     * Wear per second at full overshoot. Kept low on purpose: the hard breaking point is meant to
-     * be what punishes a reckless policy, while wear is the slow tax on merely sloppy play. When
-     * wear was steep, even the Safe policy shredded its line and every strategy collapsed into
-     * "you snap eventually", which is the opposite of a build-driven game.
+     * Wear coefficient. Wear is <em>quadratic</em> in how far tension exceeds the safe threshold,
+     * not linear.
+     *
+     * <p>Under a linear model the Safe policy snapped as many lines as the Aggressive one: its
+     * small, occasional overshoots during phase shocks cost little per second, but its fights ran
+     * 60% longer and the totals came out even. Squaring the overshoot makes brushing the limit
+     * nearly free and riding it genuinely expensive, which is the risk gradient the five presets
+     * are supposed to trade along. It also matches how material fatigue actually behaves.
      */
-    public float wearRate = 0.18f;
+    public float wearRate = 1.25f;
     /** How fast tension chases its target. Higher = twitchier, less forgiving. */
     public float lineResponse = 2.6f;
     public float elasticityRelief = 0.30f;
