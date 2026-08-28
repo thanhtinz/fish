@@ -32,9 +32,20 @@ public abstract class BaseScreen extends ScreenAdapter {
         this.art = game.art;
     }
 
+    /**
+     * Actual world height, which is taller than the design height on screens narrower than 9:16.
+     *
+     * <p>ExtendViewport keeps the design width and grows the world vertically to fill the display.
+     * Anchoring top-of-screen chrome to the fixed design height instead left a black band above
+     * the header on a 414x896 phone - the extra world was simply never drawn into.
+     */
+    protected float worldHeight() {
+        return game.viewport.getWorldHeight();
+    }
+
     /** Content area top edge. */
     protected float contentTop() {
-        return Theme.WORLD_HEIGHT - HEADER_HEIGHT;
+        return worldHeight() - HEADER_HEIGHT;
     }
 
     /** Content area bottom edge. */
@@ -77,21 +88,21 @@ public abstract class BaseScreen extends ScreenAdapter {
     protected abstract String title();
 
     private void drawHeader() {
-        float y = Theme.WORLD_HEIGHT - HEADER_HEIGHT;
+        float top = worldHeight();
+        float y = top - HEADER_HEIGHT;
         ui.rect(0, y, Theme.WORLD_WIDTH, HEADER_HEIGHT, Theme.PANEL);
         ui.rect(0, y, Theme.WORLD_WIDTH, 3f, Theme.BORDER);
 
         PlayerState p = game.player;
-        ui.text(art.font, title(), Theme.PAD, Theme.WORLD_HEIGHT - 40f, Theme.TEXT);
+        ui.text(art.font, title(), Theme.PAD, top - 40f, Theme.TEXT);
         ui.text(art.fontSmall, "Cấp " + p.level + "  ·  " + p.discoveredSpecies() + "/"
                         + game.content.species.size() + " loài",
-                Theme.PAD, Theme.WORLD_HEIGHT - 100f, Theme.TEXT_DIM);
+                Theme.PAD, top - 100f, Theme.TEXT_DIM);
 
         String gold = Ui.number(p.get(Currency.GOLD)) + " ⧫";
-        ui.textRight(art.font, gold, Theme.WORLD_WIDTH - Theme.PAD,
-                Theme.WORLD_HEIGHT - 40f, Theme.GOLD);
+        ui.textRight(art.font, gold, Theme.WORLD_WIDTH - Theme.PAD, top - 40f, Theme.GOLD);
         ui.textRight(art.fontSmall, Ui.number(p.get(Currency.GEMS)) + " ◆",
-                Theme.WORLD_WIDTH - Theme.PAD, Theme.WORLD_HEIGHT - 100f, Theme.ACCENT);
+                Theme.WORLD_WIDTH - Theme.PAD, top - 100f, Theme.ACCENT);
 
         // XP bar hugging the bottom edge of the header.
         float need = PlayerState.xpForLevel(p.level);

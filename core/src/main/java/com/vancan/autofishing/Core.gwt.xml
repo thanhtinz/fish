@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  GWT module for the shared game code.
+
+  path="" (rather than the default "client") makes GWT compile this package and everything
+  beneath it, which is where all the game code lives. Every class under it must stay inside the
+  GWT JRE emulation: no reflection, no java.util.stream, no String.format, no native libraries.
+  That constraint is why the simulation uses its own PRNG and the save file is written by hand.
+-->
+<module>
+    <source path="" />
+</module>

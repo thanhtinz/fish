@@ -1,0 +1,50 @@
+buildscript {
+    repositories { gradlePluginPortal() }
+    dependencies { classpath "org.docstr:gwt-gradle-plugin:$gwtPluginVersion" }
+}
+
+apply plugin: 'java'
+apply plugin: 'org.docstr.gwt'
+apply plugin: 'war'
+
+eclipse.project.name = appName + '-html'
+webAppDirName = 'webapp'
+
+dependencies {
+    implementation project(':core')
+    implementation "com.badlogicgames.gdx:gdx-backend-gwt:$gdxVersion"
+    // GWT transpiles from source, so the backend's and core libGDX's sources jars are required
+    // on the compile path in addition to their class jars.
+    implementation "com.badlogicgames.gdx:gdx-backend-gwt:$gdxVersion:sources"
+    implementation "com.badlogicgames.gdx:gdx:$gdxVersion:sources"
+}
+
+gwt {
+    gwtVersion = "$gwtFrameworkVersion"
+    modules = ['com.vancan.autofishing.gwt.GdxDefinition']
+    devModules = ['com.vancan.autofishing.gwt.GdxDefinitionSuperdev']
+    maxHeapSize = '2G'
+    minHeapSize = '1G'
+
+    // The shared module's .java files, not just its jar: GWT needs the sources to transpile.
+    src = files(file('src/main/java'), project(':core').file('src/main/java'))
+
+    compiler.strict = true
+    // Cast checking costs runtime performance for a safety net the JVM test suite already gives.
+    compiler.disableCastChecking = true
+}
+
+// The plugin reads gdx.assetpath from GdxDefinition.gwt.xml, copies assets into html/war/assets
+// with cache-busting hashes, and writes the preloader's assets.txt itself. Nothing here needs to
+// duplicate that; a hand-rolled manifest would only diverge from the format the preloader reads.
+
+/** Assembles a static, deployable HTML5 build under html/build/dist. */
+tasks.register('dist', Copy) {
+    group = 'build'
+    description = 'Produces a static HTML5 build in html/build/dist, ready to serve.'
+    dependsOn 'compileGwt'
+    into "$buildDir/dist"
+    from("$buildDir/gwt/out") { include 'html/**' }
+    from('webapp') { exclude 'WEB-INF/**' }
+    from('war') { include 'assets/**' }
+}

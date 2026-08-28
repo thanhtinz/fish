@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0,
+          user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#0f1a2e">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>Vạn Cân: Auto Fishing</title>
+    <link rel="icon" href="data:,">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div id="embed-html">
+    <div id="loading">
+        <div class="loading-title">Vạn Cân</div>
+        <div class="loading-sub">Đang tải ngư cụ...</div>
+    </div>
+</div>
+<script type="text/javascript" src="html/html.nocache.js"></script>
+<script>
+    // GWT appends its canvas alongside the placeholder rather than replacing it, so the loading
+    // text stayed visible underneath the running game. Hide it as soon as a canvas appears.
+    (function () {
+        var host = document.getElementById('embed-html');
+        var loading = document.getElementById('loading');
+        if (!host || !loading) return;
+        var observer = new MutationObserver(function () {
+            if (host.querySelector('canvas')) {
+                loading.classList.add('done');
+                observer.disconnect();
+            }
+        });
+        observer.observe(host, { childList: true, subtree: true });
+    })();
+</script>
+</body>
+</html>

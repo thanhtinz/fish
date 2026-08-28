@@ -6,8 +6,10 @@ allprojects {
 
     repositories {
         mavenCentral()
-        google()
-        maven { url 'https://oss.sonatype.org/content/repositories/snapshots/' }
+        // google() is declared only by the :android module, which is the only consumer of the
+        // Android Gradle Plugin. Declaring it for every project made unrelated resolutions fail
+        // outright on networks that return 403 (rather than 404) for that host, because Gradle
+        // treats a 403 from a repository as an error instead of "not here, try the next one".
     }
 }
 

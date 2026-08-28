@@ -436,9 +436,9 @@ public class FishingScreen extends BaseScreen {
         float w = Theme.WORLD_WIDTH - 120f;
         float h = 700f;
         float x = 60f;
-        float y = (Theme.WORLD_HEIGHT - h) / 2f;
+        float y = (worldHeight() - h) / 2f;
 
-        ui.rect(0, 0, Theme.WORLD_WIDTH, Theme.WORLD_HEIGHT, Color.BLACK, 0.72f);
+        ui.rect(0, 0, Theme.WORLD_WIDTH, worldHeight(), Color.BLACK, 0.72f);
         ui.panel(x, y, w, h);
 
         // fontLarge overflowed the panel at this string length; the heading uses the body face.
