@@ -10,7 +10,7 @@ import com.vancan.autofishing.ui.Theme;
 /** Team formation and talents (GDD 8). The captain slot is what makes ordering matter. */
 public class TeamScreen extends ScrollScreen {
 
-    private static final float ROW_HEIGHT = 230f;
+    private static final float ROW_HEIGHT = 310f;
 
     public TeamScreen(VanCanGame game) {
         super(game);
@@ -40,11 +40,13 @@ public class TeamScreen extends ScrollScreen {
         drawTalents(x, y, w, talentHeight);
         y -= Theme.PAD + 60f;
 
+        // Each line has to clear the one above it by a full line height: font.draw takes the
+        // top of the line, not the baseline, so fixed gaps overlap at this font size.
         ui.text(art.font, "Đội hình  (" + p.loadout.team.size() + "/" + Loadout.MAX_TEAM + ")",
-                x, y + 30f, Theme.ACCENT);
+                x, y + 40f, Theme.ACCENT);
         ui.text(art.fontSmall, "Người đầu tiên là đội trưởng, đóng góp nhiều hơn.",
-                x, y - 10f, Theme.TEXT_DIM);
-        y -= 40f;
+                x, y + 40f - art.font.getLineHeight() - 8f, Theme.TEXT_DIM);
+        y -= art.font.getLineHeight() + art.fontSmall.getLineHeight() + 20f;
 
         for (OwnedAngler owned : p.anglers.values()) {
             y -= ROW_HEIGHT;
@@ -102,13 +104,17 @@ public class TeamScreen extends ScrollScreen {
         ui.panel(x, y, w, ROW_HEIGHT);
         if (isCaptain) ui.border(x, y, w, ROW_HEIGHT, 3f, Theme.GOLD);
 
-        ui.text(art.font, def.name, x + 24f, y + ROW_HEIGHT - 34f, Theme.rarityColor(def.rarity));
+        float line = y + ROW_HEIGHT - 22f;
+        ui.text(art.font, def.name, x + 24f, line, Theme.rarityColor(def.rarity));
         ui.textRight(art.fontSmall,
                 def.role.displayName + "  ·  Lv" + owned.level + "  ·  " + owned.stars + "★",
-                x + w - 24f, y + ROW_HEIGHT - 34f, Theme.TEXT);
-        ui.text(art.fontSmall, def.role.summary, x + 24f, y + ROW_HEIGHT - 78f, Theme.TEXT_DIM);
-        ui.textWrapped(art.fontSmall, def.description, x + 24f, y + ROW_HEIGHT - 112f,
-                w - 48f, Theme.TEXT_DIM);
+                x + w - 24f, line, Theme.TEXT);
+
+        line -= art.font.getLineHeight() + 6f;
+        ui.text(art.fontSmall, def.role.summary, x + 24f, line, Theme.ACCENT);
+
+        line -= art.fontSmall.getLineHeight() + 6f;
+        ui.textWrapped(art.fontSmall, def.description, x + 24f, line, w - 48f, Theme.TEXT_DIM);
 
         float buttonH = Theme.TOUCH_MIN;
         float buttonY = y + 22f;

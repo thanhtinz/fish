@@ -10,7 +10,7 @@ import com.vancan.autofishing.ui.Theme;
 /** Zone selection (GDD 10). Each row previews the pool so the choice is informed. */
 public class MapScreen extends ScrollScreen {
 
-    private static final float ROW_HEIGHT = 300f;
+    private static final float ROW_HEIGHT = 430f;
 
     public MapScreen(VanCanGame game) {
         super(game);
@@ -36,12 +36,16 @@ public class MapScreen extends ScrollScreen {
         float w = Theme.WORLD_WIDTH - Theme.PAD * 2f;
 
         for (int i = 0; i < spots.size(); i++) {
-            SpotDef spot = spots.get(i);
-            drawSpotRow(spot, x, y, w);
+            drawSpotRow(spots.get(i), x, y, w);
             y -= ROW_HEIGHT + Theme.PAD;
         }
     }
 
+    /**
+     * One zone card. Laid out with a downward cursor stepped by the real font line height:
+     * fixed offsets overlapped badly here, because the pool preview and the description are both
+     * variable-length and the boss label shared a line with the rarest-fish label.
+     */
     private void drawSpotRow(SpotDef spot, float x, float y, float w) {
         boolean unlocked = PlayerFactory.isUnlocked(game.player, spot);
         boolean current = spot.id.equals(game.player.currentSpotId);
@@ -49,59 +53,73 @@ public class MapScreen extends ScrollScreen {
         ui.rect(x, y, w, ROW_HEIGHT, unlocked ? Theme.PANEL : Theme.BUTTON_DISABLED);
         ui.border(x, y, w, ROW_HEIGHT, 3f, current ? Theme.ACCENT : Theme.BORDER);
 
-        ui.text(art.font, spot.name, x + 24f, y + ROW_HEIGHT - 34f,
-                unlocked ? Theme.TEXT : Theme.TEXT_DIM);
-        ui.textRight(art.fontSmall, "Bậc " + spot.tier, x + w - 24f, y + ROW_HEIGHT - 34f,
-                Theme.TEXT_DIM);
-        ui.text(art.fontSmall, spot.theme, x + 24f, y + ROW_HEIGHT - 78f, Theme.TEXT_DIM);
+        float left = x + 24f;
+        float inner = w - 48f;
+        float big = art.font.getLineHeight();
+        float small = art.fontSmall.getLineHeight();
+        float line = y + ROW_HEIGHT - 22f;
 
-        // Pool preview: the rarest few entries are what a player actually chooses a zone for.
-        StringBuilder pool = new StringBuilder();
+        ui.text(art.font, spot.name, left, line, unlocked ? Theme.TEXT : Theme.TEXT_DIM);
+        ui.textRight(art.fontSmall, "Bậc " + spot.tier, left + inner, line, Theme.TEXT_DIM);
+        line -= big + 4f;
+
+        ui.text(art.fontSmall, spot.theme, left, line, Theme.TEXT_DIM);
+        line -= small + 4f;
+
         EncounterTable table = spot.buildTable(game.content.species);
         SpeciesDef rarest = null;
+        StringBuilder pool = new StringBuilder();
+        int shown = 0;
         for (EncounterTable.Entry e : table.getEntries()) {
             if (rarest == null || e.species.rarity.ordinal() > rarest.rarity.ordinal()) {
                 rarest = e.species;
             }
+            // Two names plus an ellipsis: three overflowed the width on the deep-sea zones,
+            // whose species have the longest names.
+            if (shown < 2) {
+                if (shown > 0) pool.append("  ·  ");
+                pool.append(e.species.name);
+                shown++;
+            }
         }
-        int shown = 0;
-        for (EncounterTable.Entry e : table.getEntries()) {
-            if (shown++ >= 3) break;
-            if (pool.length() > 0) pool.append(" · ");
-            pool.append(e.species.name);
-        }
-        if (table.getEntries().size() > 3) pool.append(" · ...");
-        ui.text(art.fontSmall, pool.toString(), x + 24f, y + ROW_HEIGHT - 122f, Theme.TEXT_DIM);
+        if (table.getEntries().size() > shown) pool.append("  ·  ...");
+        ui.text(art.fontSmall, pool.toString(), left, line, Theme.TEXT_DIM);
+        line -= small + 4f;
 
         if (rarest != null) {
             ui.text(art.fontSmall, "Hiếm nhất: " + rarest.name + " (" + rarest.rarity.displayName + ")",
-                    x + 24f, y + ROW_HEIGHT - 164f, Theme.rarityColor(rarest.rarity));
+                    left, line, Theme.rarityColor(rarest.rarity));
+            line -= small + 4f;
         }
+
+        // Boss gets its own line; sharing one with the rarest-fish label collided on every zone
+        // that has both.
         if (spot.bossSpecies != null) {
             SpeciesDef boss = game.content.species.get(spot.bossSpecies);
             if (boss != null) {
-                ui.textRight(art.fontSmall, "Boss: " + boss.name, x + w - 24f,
-                        y + ROW_HEIGHT - 164f, Theme.WARN);
+                ui.text(art.fontSmall, "Boss: " + boss.name, left, line, Theme.WARN);
+                line -= small + 4f;
             }
         }
 
-        float buttonY = y + 24f;
+        ui.textWrapped(art.fontSmall, spot.description, left, line, inner, Theme.TEXT_DIM);
+
         float buttonH = Theme.TOUCH_MIN;
+        float buttonY = y + 22f;
         if (!unlocked) {
-            ui.text(art.fontSmall, "Mở khoá ở cấp " + spot.unlockLevel,
-                    x + 24f, buttonY + buttonH / 2f + 8f, Theme.WARN);
+            ui.rect(left, buttonY, inner, buttonH, Theme.BUTTON_DISABLED);
+            ui.border(left, buttonY, inner, buttonH, 2f, Theme.BORDER);
+            ui.textCentered(art.fontSmall, "Mở khoá ở cấp " + spot.unlockLevel,
+                    x + w / 2f, buttonY + buttonH / 2f + 10f, Theme.WARN);
         } else if (current) {
-            ui.text(art.fontSmall, "Đang câu tại đây", x + 24f,
-                    buttonY + buttonH / 2f + 8f, Theme.ACCENT);
-        } else if (ui.button(x + 24f, buttonY, w - 48f, buttonH, "Đến ngư trường này")) {
+            ui.rect(left, buttonY, inner, buttonH, Theme.BUTTON_ACTIVE, 0.30f);
+            ui.border(left, buttonY, inner, buttonH, 2f, Theme.ACCENT);
+            ui.textCentered(art.fontSmall, "Đang câu tại đây",
+                    x + w / 2f, buttonY + buttonH / 2f + 10f, Theme.ACCENT);
+        } else if (ui.button(left, buttonY, inner, buttonH, "Đến ngư trường này")) {
             game.player.currentSpotId = spot.id;
             game.saveNow();
             game.setScreen(new FishingScreen(game));
-        }
-
-        if (unlocked) {
-            ui.textWrapped(art.fontSmall, spot.description, x + 24f,
-                    buttonY + buttonH + 52f, w - 48f, Theme.TEXT_DIM);
         }
     }
 }

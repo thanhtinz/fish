@@ -21,7 +21,14 @@ public final class BalanceReport {
 
     private static final int RUNS = 2000;
 
-    public static void main(String[] args) {
+    public static void main(String[] args) throws Exception {
+        // Vietnamese zone and species names print as question marks otherwise. Since Java 19
+        // System.out follows stdout.encoding rather than file.encoding, so setting a JVM flag is
+        // not portable across JDK versions; replacing the stream is.
+        java.io.PrintStream out = new java.io.PrintStream(
+                new java.io.FileOutputStream(java.io.FileDescriptor.out), true, "UTF-8");
+        System.setOut(out);
+
         GameContent content = TestContent.get();
         SpotDef[] spots = content.spotsInOrder().toArray(new SpotDef[0]);
 

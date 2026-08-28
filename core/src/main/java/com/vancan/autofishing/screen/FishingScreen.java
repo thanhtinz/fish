@@ -6,6 +6,7 @@ import com.vancan.autofishing.auto.AutoStrategy;
 import com.vancan.autofishing.meta.FishRecord;
 import com.vancan.autofishing.meta.FishingController;
 import com.vancan.autofishing.meta.OfflineSettlement;
+import com.vancan.autofishing.sim.EncounterTable;
 import com.vancan.autofishing.sim.FailureReason;
 import com.vancan.autofishing.sim.FishState;
 import com.vancan.autofishing.sim.FishingSession;
@@ -355,8 +356,28 @@ public class FishingScreen extends BaseScreen {
             }
             ui.text(art.font, s.displayName, x + 34f, by + h - 24f,
                     active ? Theme.ACCENT : Theme.TEXT);
-            ui.text(art.fontSmall, s.description, x + 34f, by + 30f, Theme.TEXT_DIM);
+            // A filter strategy in a zone that has nothing matching it aborts every single fish
+            // and looks identical to a broken game. Say so before the player picks it.
+            boolean futile = rejectsWholeSpot(s);
+            ui.text(art.fontSmall,
+                    futile ? "⚠ Ngư trường này không có cá phù hợp" : s.description,
+                    x + 34f, by + 30f, futile ? Theme.WARN : Theme.TEXT_DIM);
         }
+    }
+
+    /** True when the strategy's target filter rejects every species in the current spot. */
+    private boolean rejectsWholeSpot(AutoStrategy strategy) {
+        if (strategy.minRarity == null && strategy.minWeight <= 0f) return false;
+        if (controller.spot() == null) return false;
+        for (EncounterTable.Entry e : controller.spot()
+                .buildTable(game.content.species).getEntries()) {
+            boolean rarityOk = strategy.minRarity == null
+                    || e.species.rarity.ordinal() >= strategy.minRarity.ordinal();
+            boolean weightOk = strategy.minWeight <= 0f
+                    || e.species.maxWeight >= strategy.minWeight;
+            if (rarityOk && weightOk) return false;
+        }
+        return true;
     }
 
     private void drawSkillBar(float y) {

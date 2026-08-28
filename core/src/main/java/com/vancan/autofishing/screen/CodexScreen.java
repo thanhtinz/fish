@@ -32,7 +32,7 @@ public class CodexScreen extends ScrollScreen {
 
     @Override
     protected void drawRows(float delta) {
-        float headerHeight = 210f;
+        float headerHeight = 260f;
         java.util.List<SpeciesDef> shown = new java.util.ArrayList<SpeciesDef>();
         for (SpeciesDef s : game.content.species.values()) {
             if (filter == null || s.rarity == filter) shown.add(s);
@@ -58,10 +58,12 @@ public class CodexScreen extends ScrollScreen {
         int found = game.player.discoveredSpecies();
 
         ui.panel(x, y, w, h);
-        ui.text(art.font, "Đã ghi nhận " + found + " / " + total, x + 24f, y + h - 34f,
-                Theme.ACCENT);
-        ui.bar(x + 24f, y + h - 76f, w - 48f, 18f, total == 0 ? 0f : found / (float) total,
-                Theme.ACCENT, Theme.PANEL_LIGHT);
+        // Text descends from the y given to font.draw, so the bar has to clear a full line
+        // height below the title rather than a fixed gap.
+        float titleTop = y + h - 22f;
+        ui.text(art.font, "Đã ghi nhận " + found + " / " + total, x + 24f, titleTop, Theme.ACCENT);
+        ui.bar(x + 24f, titleTop - art.font.getLineHeight() - 14f, w - 48f, 18f,
+                total == 0 ? 0f : found / (float) total, Theme.ACCENT, Theme.PANEL_LIGHT);
 
         // Rarity filter chips.
         float chipW = (w - 48f) / 4f - 8f;

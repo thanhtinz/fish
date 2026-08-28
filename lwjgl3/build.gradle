@@ -14,10 +14,14 @@ dependencies {
     implementation "com.badlogicgames.gdx:gdx-freetype-platform:$gdxVersion:natives-desktop"
 }
 
+/** Runnable fat jar for local distribution of the development build. */
 jar {
     archiveBaseName = appName
     manifest { attributes 'Main-Class': mainClassName }
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    // The `from` closure is lazy, so without this the task has no declared dependency on the
+    // jars it unpacks and a clean build fails with ':core' having produced nothing yet.
+    dependsOn configurations.runtimeClasspath
     from { configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) } }
     exclude 'META-INF/*.SF', 'META-INF/*.DSA', 'META-INF/*.RSA'
 }
