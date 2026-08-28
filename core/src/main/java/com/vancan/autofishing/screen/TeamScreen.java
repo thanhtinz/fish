@@ -104,17 +104,29 @@ public class TeamScreen extends ScrollScreen {
         ui.panel(x, y, w, ROW_HEIGHT);
         if (isCaptain) ui.border(x, y, w, ROW_HEIGHT, 3f, Theme.GOLD);
 
+        // Portrait on the left, text column beside it. A rarity ring rather than a coloured
+        // name alone: at a glance the roster should sort by strength without reading it.
+        float portraitSize = 150f;
+        float px = x + 24f;
+        float py = y + ROW_HEIGHT - portraitSize - 24f;
+        game.batch.setColor(Theme.rarityColor(def.rarity));
+        game.batch.draw(art.circle, px - 6f, py - 6f, portraitSize + 12f, portraitSize + 12f);
+        game.batch.setColor(com.badlogic.gdx.graphics.Color.WHITE);
+        game.batch.draw(art.portrait(def.id), px, py, portraitSize, portraitSize);
+
+        float textX = px + portraitSize + 22f;
         float line = y + ROW_HEIGHT - 22f;
-        ui.text(art.font, def.name, x + 24f, line, Theme.rarityColor(def.rarity));
+        ui.text(art.font, def.name, textX, line, Theme.rarityColor(def.rarity));
         ui.textRight(art.fontSmall,
                 def.role.displayName + "  ·  Lv" + owned.level + "  ·  " + owned.stars + "★",
                 x + w - 24f, line, Theme.TEXT);
 
         line -= art.font.getLineHeight() + 6f;
-        ui.text(art.fontSmall, def.role.summary, x + 24f, line, Theme.ACCENT);
+        ui.text(art.fontSmall, def.role.summary, textX, line, Theme.ACCENT);
 
         line -= art.fontSmall.getLineHeight() + 6f;
-        ui.textWrapped(art.fontSmall, def.description, x + 24f, line, w - 48f, Theme.TEXT_DIM);
+        ui.textWrapped(art.fontSmall, def.description, textX, line,
+                w - (textX - x) - 24f, Theme.TEXT_DIM);
 
         float buttonH = Theme.TOUCH_MIN;
         float buttonY = y + 22f;

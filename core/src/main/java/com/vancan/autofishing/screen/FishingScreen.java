@@ -146,79 +146,159 @@ public class FishingScreen extends BaseScreen {
         game.batch.setColor(Color.WHITE);
     }
 
-    private void drawFightVisual() {
-        FishingSession s = controller.session();
+    // Scene composition: the angler stands in a boat on the left, the rod arcs out to the right,
+    // and the fish works the open water under it. A centred angler with a vertical line left the
+    // fish nowhere to swim and made distance impossible to read.
+    private static final float ANGLER_X = 0.24f;
+    private static final float ROD_LENGTH = 300f;
+    /**
+     * Waterline as a fraction up the water panel, and the rod's resting angle.
+     *
+     * <p>These are tightly coupled and were both wrong at first: with the surface at 86% the boat
+     * and angler sat above the header and the rod ran off the top of the screen entirely. The
+     * surface has to leave a full angler height plus the rod's vertical reach below the header,
+     * and at the 9:16 design ratio that is the binding constraint on the whole scene.
+     */
+    private static final float SURFACE_FRACTION = 0.70f;
+    private static final float ROD_REST_ANGLE = 22f;
+    private static final float ROD_BEND_RANGE = 74f;
+    private static final Color ROD_COLOR = new Color(0.36f, 0.26f, 0.18f, 1f);
+
+    private float surfaceY() {
         float top = contentTop();
         float bottom = waterBottom();
-        float height = top - bottom;
-        float surface = bottom + height * 0.86f;
+        return bottom + (top - bottom) * SURFACE_FRACTION;
+    }
 
-        float rodX = Theme.WORLD_WIDTH * 0.5f;
-        float rodY = surface + 20f;
+    private void drawFightVisual() {
+        FishingSession s = controller.session();
+        float surface = surfaceY();
+        float bottom = waterBottom();
+
+        float pull = s != null && s.getPhase() == SessionPhase.FIGHT ? controller.lastPull() : 0f;
+        boolean straining = pull > 0.45f;
+
+        // --- Boat and angler -------------------------------------------------------------
+        float boatW = 300f, boatH = 100f;
+        float boatX = Theme.WORLD_WIDTH * ANGLER_X - boatW * 0.5f;
+        float boatY = surface - boatH * 0.52f;
+        game.batch.setColor(Color.WHITE);
+        game.batch.draw(art.atlas.get("boat"), boatX, boatY, boatW, boatH);
+
+        String pose = straining ? "angler_pull" : "angler_idle";
+        float anglerW = 134f, anglerH = 176f;
+        float anglerX = Theme.WORLD_WIDTH * ANGLER_X - anglerW * 0.5f;
+        float anglerY = boatY + boatH * 0.34f;
+        game.batch.draw(art.atlas.get(pose), anglerX, anglerY, anglerW, anglerH);
+
+        float[] grip = art.atlas.anchor(pose + "_grip");
+        // Anchors are in image space, where y runs downwards; the world has y up.
+        float gripX = anglerX + grip[0] * anglerW;
+        float gripY = anglerY + (1f - grip[1]) * anglerH;
+
+        // --- Rod -------------------------------------------------------------------------
+        float[] tip = drawRod(gripX, gripY, s == null ? 0f : shownTension);
 
         if (s == null) {
             ui.textCentered(art.font, "Đang chuẩn bị...", Theme.WORLD_WIDTH / 2f,
-                    bottom + height * 0.45f, Theme.TEXT_DIM);
+                    bottom + 220f, Theme.TEXT_DIM);
             return;
         }
 
         if (s.getPhase() == SessionPhase.SEARCHING) {
-            float bob = (float) Math.sin(time * 3.1f) * 8f;
+            float bobY = surface + (float) Math.sin(time * 3.1f) * 8f;
+            drawLine(tip[0], tip[1], tip[0] + 26f, bobY, 3f, Theme.TEXT_DIM);
             game.batch.setColor(Theme.GOLD);
-            game.batch.draw(art.circle, rodX - 18f, surface + bob - 18f, 36f, 36f);
+            game.batch.draw(art.circle, tip[0] + 26f - 17f, bobY - 17f, 34f, 34f);
             game.batch.setColor(Color.WHITE);
             ui.textCentered(art.fontSmall, "Đang chờ cá cắn câu...", Theme.WORLD_WIDTH / 2f,
-                    surface - 70f, Theme.TEXT_DIM);
+                    surface - 90f, Theme.TEXT_DIM);
             return;
         }
 
         if (s.getPhase() == SessionPhase.BITE) {
             float pulse = 0.5f + 0.5f * (float) Math.sin(time * 24f);
+            float bx = tip[0] + 26f;
+            drawLine(tip[0], tip[1], bx, surface, 3f, Theme.DANGER);
             game.batch.setColor(Theme.DANGER.r, Theme.DANGER.g, Theme.DANGER.b,
                     0.4f + pulse * 0.6f);
-            float size = 120f + pulse * 40f;
-            game.batch.draw(art.ripple, rodX - size / 2f, surface - size / 2f, size, size);
+            float size = 130f + pulse * 46f;
+            game.batch.draw(art.ripple, bx - size / 2f, surface - size / 2f, size, size);
             game.batch.setColor(Color.WHITE);
             ui.textCentered(art.fontLarge, "CẮN CÂU!", Theme.WORLD_WIDTH / 2f,
-                    surface - 100f, Theme.DANGER);
+                    surface - 110f, Theme.DANGER);
             return;
         }
 
         FishState fish = s.getFish();
         if (fish == null) return;
 
-        // The fish sits deeper and further out the more line is paid out, so distance is legible
-        // at a glance without reading the number.
-        float depthT = shownDistance;
-        float swimTop = surface - 90f;
-        float swimBottom = bottom + 90f;
-        float fishY = swimTop - depthT * (swimTop - swimBottom);
-        float sway = (float) Math.sin(time * (2.2f + fish.phase.driveMultiplier)) * 40f * depthT;
-        float fishX = rodX + sway;
+        // --- Fish ------------------------------------------------------------------------
+        // Distance drives how far right and how deep the fish sits, so spool risk is legible
+        // from the picture alone.
+        float d = shownDistance;
+        float fishX = Theme.WORLD_WIDTH * (0.44f + 0.38f * d);
+        float swimTop = surface - 100f;
+        float swimBottom = bottom + 100f;
+        float fishY = swimTop - d * (swimTop - swimBottom);
+        fishY += (float) Math.sin(time * (1.8f + fish.phase.driveMultiplier)) * 16f;
 
         Color tensionColor = Theme.tensionColor(shownTension, s.getSafeTensionRatio());
-        drawLine(rodX, rodY, fishX, fishY, 4f, tensionColor);
+        drawLine(tip[0], tip[1], fishX + 40f, fishY, 4f, tensionColor);
 
-        float scale = 0.9f + Math.min(2.0f, fish.weight / 45f);
-        float fw = 150f * scale;
-        float fh = 75f * scale;
+        float scale = 0.80f + Math.min(1.5f, fish.weight / 55f);
+        float fw = 210f * scale;
+        float fh = fw * 0.5f;
         Color tint = Theme.rarityColor(fish.rarity);
-        float energy = 0.58f + 0.42f * fish.staminaRatio();
+        // A tired fish dims; a raging one flashes. Both read before the gauges do.
+        float energy = 0.62f + 0.38f * fish.staminaRatio();
         float flash = fish.phase == com.vancan.autofishing.sim.FishPhase.RAGE
-                ? 0.5f + 0.5f * (float) Math.sin(time * 18f) : 0f;
+                ? 0.35f + 0.35f * (float) Math.sin(time * 18f) : 0f;
         game.batch.setColor(
                 Math.min(1f, tint.r * energy + flash),
                 Math.min(1f, tint.g * energy),
                 Math.min(1f, tint.b * energy), 1f);
-        game.batch.draw(art.fishBody, fishX - fw / 2f, fishY - fh / 2f, fw, fh);
+        game.batch.draw(art.fish(fish.species.archetype), fishX - fw / 2f, fishY - fh / 2f, fw, fh);
         game.batch.setColor(Color.WHITE);
 
         ui.textCentered(art.fontSmall, fish.species.name + "  ·  " + Ui.weight(fish.weight),
-                fishX, fishY - fh / 2f - 14f, tint);
-        ui.textCentered(art.fontSmall, fish.phase.displayName, fishX, fishY + fh / 2f + 44f,
+                fishX, fishY - fh / 2f - 12f, tint);
+        ui.textCentered(art.fontSmall, fish.phase.displayName, fishX, fishY + fh / 2f + 46f,
                 fish.phase.isOpening() ? Theme.GOOD : Theme.WARN);
     }
 
+    /**
+     * Draws the rod as a curve bending under load and returns its tip.
+     *
+     * <p>The bend is the clearest feedback the game has: it tracks tension directly, so a player
+     * can read how close the line is to snapping without looking away from the water. Sampled as
+     * a quadratic curve of tapering segments rather than baked as a sprite, because a baked rod
+     * cannot bend.
+     */
+    private float[] drawRod(float gripX, float gripY, float bend) {
+        // Unloaded the rod points up and forward; under load the tip is dragged down and out.
+        float rad = (float) Math.toRadians(ROD_REST_ANGLE - ROD_BEND_RANGE * Ui.clamp01(bend));
+        float tipX = gripX + ROD_LENGTH * (float) Math.cos(rad);
+        float tipY = gripY + ROD_LENGTH * (float) Math.sin(rad);
+
+        // Control point on the unbent line, which makes the curve bow rather than kink.
+        float straight = (float) Math.toRadians(ROD_REST_ANGLE);
+        float ctrlX = gripX + ROD_LENGTH * 0.55f * (float) Math.cos(straight);
+        float ctrlY = gripY + ROD_LENGTH * 0.55f * (float) Math.sin(straight);
+
+        int segments = 16;
+        float px = gripX, py = gripY;
+        for (int i = 1; i <= segments; i++) {
+            float t = i / (float) segments;
+            float mt = 1f - t;
+            float x = mt * mt * gripX + 2f * mt * t * ctrlX + t * t * tipX;
+            float y = mt * mt * gripY + 2f * mt * t * ctrlY + t * t * tipY;
+            drawLine(px, py, x, y, 11f * (1f - t * 0.78f), ROD_COLOR);
+            px = x;
+            py = y;
+        }
+        return new float[]{px, py};
+    }
     /** Draws a straight line by stretching and rotating the pixel region. */
     private void drawLine(float x1, float y1, float x2, float y2, float thickness, Color color) {
         float dx = x2 - x1, dy = y2 - y1;

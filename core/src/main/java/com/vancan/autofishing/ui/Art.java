@@ -8,22 +8,26 @@ import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import com.badlogic.gdx.utils.Disposable;
 
 /**
- * All game art, generated procedurally at start-up.
+ * All game art.
  *
- * <p>The reference material supplied with this project was third-party artwork of unclear
- * provenance, and the design brief explicitly forbids reusing another game's assets. Generating
- * the art from code keeps the build free of licensing risk, keeps the download small, and means
- * every target - including the HTML5 build, where large binary assets hurt most - ships the same
- * visuals with no atlas pipeline. Replace this class with a real atlas when art direction lands.
+ * <p>Two layers. Character, fish and portrait sprites come from an atlas baked offline by
+ * {@code tools/SpriteGen.java}; the primitives below (discs, ripples, gradients) are still
+ * generated at start-up because they are stretched and tinted per frame and would gain nothing
+ * from being baked.
+ *
+ * <p>Everything is drawn for this project. The reference title's assets are copyrighted, and the
+ * brief (GDD 2.2) forbids reusing another game's artwork - so no sprite here derives from one.
  */
 public final class Art implements Disposable {
+
+    /** Baked sprites: fish, the angler, the boat, team portraits. */
+    public Atlas atlas;
 
     /** 1x1 white pixel; every solid rectangle and bar is drawn by stretching this. */
     public TextureRegion pixel;
     public TextureRegion circle;
     public TextureRegion softCircle;
     public TextureRegion ripple;
-    public TextureRegion fishBody;
     public TextureRegion bubble;
     public TextureRegion verticalFade;
 
@@ -35,11 +39,13 @@ public final class Art implements Disposable {
             new com.badlogic.gdx.utils.Array<Texture>();
 
     public void load() {
+        atlas = new Atlas();
+        atlas.load("sprites/atlas.png", "sprites/atlas.json");
+
         pixel = region(solid(4, 4, Color.WHITE));
         circle = region(circle(128, false));
         softCircle = region(circle(128, true));
         ripple = region(ring(128, 0.72f));
-        fishBody = region(fish(256, 128));
         bubble = region(ring(64, 0.55f));
         verticalFade = region(verticalFade(4, 256));
 
@@ -112,52 +118,6 @@ public final class Art implements Disposable {
         return p;
     }
 
-    /**
-     * A generic fish silhouette: an ellipse body with a swept tail. Species are differentiated by
-     * tint and scale at draw time rather than by separate sprites.
-     */
-    private Pixmap fish(int w, int h) {
-        Pixmap p = new Pixmap(w, h, Pixmap.Format.RGBA8888);
-        p.setBlending(Pixmap.Blending.None);
-        float bodyCx = w * 0.58f, bodyCy = h * 0.5f;
-        float bodyRx = w * 0.36f, bodyRy = h * 0.30f;
-
-        for (int y = 0; y < h; y++) {
-            for (int x = 0; x < w; x++) {
-                float a = 0f;
-
-                float nx = (x - bodyCx) / bodyRx;
-                float ny = (y - bodyCy) / bodyRy;
-                float body = nx * nx + ny * ny;
-                if (body <= 1f) {
-                    a = Math.min(1f, (1f - body) * 6f);
-                }
-
-                // Tail: a triangle sweeping back from the body towards the left edge.
-                float tailStart = w * 0.24f, tailEnd = bodyCx - bodyRx * 0.75f;
-                if (x >= tailStart && x <= tailEnd) {
-                    float t = (x - tailStart) / Math.max(1f, tailEnd - tailStart);
-                    float halfHeight = h * (0.34f - 0.24f * t);
-                    if (Math.abs(y - bodyCy) <= halfHeight) {
-                        a = Math.max(a, 1f);
-                    }
-                }
-
-                // Dorsal fin.
-                float finCx = bodyCx - bodyRx * 0.1f;
-                if (Math.abs(x - finCx) < bodyRx * 0.42f) {
-                    float t = 1f - Math.abs(x - finCx) / (bodyRx * 0.42f);
-                    float top = bodyCy - bodyRy - h * 0.14f * t;
-                    if (y >= top && y <= bodyCy) a = Math.max(a, 1f);
-                }
-
-                p.setColor(1f, 1f, 1f, a);
-                p.drawPixel(x, y);
-            }
-        }
-        return p;
-    }
-
     private Pixmap verticalFade(int w, int h) {
         Pixmap p = new Pixmap(w, h, Pixmap.Format.RGBA8888);
         p.setBlending(Pixmap.Blending.None);
@@ -175,8 +135,20 @@ public final class Art implements Disposable {
         return d > 1f - edge ? (1f - d) / edge : 1f;
     }
 
+    /** Fish silhouette for a behaviour archetype (GDD 7). */
+    public TextureRegion fish(com.vancan.autofishing.sim.Archetype archetype) {
+        return atlas.get("fish_" + archetype.name().toLowerCase());
+    }
+
+    /** Portrait for a recruitable angler, falling back to the first if content adds a new one. */
+    public TextureRegion portrait(String anglerId) {
+        String key = "portrait_" + anglerId;
+        return atlas.has(key) ? atlas.get(key) : atlas.get("portrait_ag_lam");
+    }
+
     @Override
     public void dispose() {
+        if (atlas != null) atlas.dispose();
         for (Texture t : textures) t.dispose();
         textures.clear();
         if (font != null) font.dispose();

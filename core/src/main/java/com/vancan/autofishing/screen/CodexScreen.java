@@ -13,7 +13,7 @@ import com.vancan.autofishing.ui.Ui;
  */
 public class CodexScreen extends ScrollScreen {
 
-    private static final float ROW_HEIGHT = 165f;
+    private static final float ROW_HEIGHT = 285f;
     private Rarity filter;
 
     public CodexScreen(VanCanGame game) {
@@ -85,25 +85,46 @@ public class CodexScreen extends ScrollScreen {
         ui.rect(x, y, w, ROW_HEIGHT, found ? Theme.PANEL : Theme.BUTTON_DISABLED);
         ui.border(x, y, w, ROW_HEIGHT, 2f, found ? Theme.rarityColor(species.rarity) : Theme.BORDER);
 
+        // The silhouette is shown for undiscovered species too, in near-black. Revealing the
+        // shape but not the identity is what makes the codex a hunt rather than a checklist -
+        // a player can see there is a ray-shaped thing out there they have never landed.
+        float iw = 230f, ih = iw * 0.5f;
+        float ix = x + w - iw - 20f;
+        float iy = y + (ROW_HEIGHT - ih) * 0.5f;
+        if (found) {
+            game.batch.setColor(Theme.rarityColor(species.rarity));
+        } else {
+            game.batch.setColor(0.22f, 0.27f, 0.33f, 1f);
+        }
+        game.batch.draw(art.fish(species.archetype), ix, iy, iw, ih);
+        game.batch.setColor(com.badlogic.gdx.graphics.Color.WHITE);
+
+        // Cursor stepped by the real line height. Fixed offsets put the stats line and the
+        // description on the same y.
+        float textW = ix - x - 44f;
+        float small = art.fontSmall.getLineHeight();
+        float line = y + ROW_HEIGHT - 22f;
+
         if (!found) {
-            ui.text(art.font, "? ? ?", x + 24f, y + ROW_HEIGHT - 42f, Theme.TEXT_DIM);
+            ui.text(art.font, "? ? ?", x + 24f, line, Theme.TEXT_DIM);
+            line -= art.font.getLineHeight() + 6f;
             ui.text(art.fontSmall, species.rarity.displayName + "  ·  chưa bắt được",
-                    x + 24f, y + ROW_HEIGHT - 92f, Theme.TEXT_DIM);
-            ui.textRight(art.fontSmall, species.archetype.displayName,
-                    x + w - 24f, y + ROW_HEIGHT - 42f, Theme.TEXT_DIM);
+                    x + 24f, line, Theme.TEXT_DIM);
+            line -= small + 6f;
+            ui.text(art.fontSmall, species.archetype.displayName, x + 24f, line, Theme.TEXT_DIM);
             return;
         }
 
-        ui.text(art.font, species.name, x + 24f, y + ROW_HEIGHT - 42f,
-                Theme.rarityColor(species.rarity));
-        ui.textRight(art.fontSmall, species.rarity.displayName, x + w - 24f,
-                y + ROW_HEIGHT - 42f, Theme.rarityColor(species.rarity));
-
+        ui.text(art.font, species.name, x + 24f, line, Theme.rarityColor(species.rarity));
+        line -= art.font.getLineHeight() + 6f;
         ui.text(art.fontSmall,
-                species.archetype.displayName + "  ·  bắt " + entry.caughtCount + " lần",
-                x + 24f, y + ROW_HEIGHT - 88f, Theme.TEXT_DIM);
-        ui.textRight(art.fontSmall, "Nặng nhất " + Ui.weight(entry.heaviest),
-                x + w - 24f, y + ROW_HEIGHT - 88f, Theme.GOLD);
-        ui.text(art.fontSmall, species.description, x + 24f, y + 34f, Theme.TEXT_DIM);
+                species.rarity.displayName + "  ·  " + species.archetype.displayName,
+                x + 24f, line, Theme.TEXT_DIM);
+        line -= small + 6f;
+        ui.text(art.fontSmall, "Bắt " + entry.caughtCount + " lần  ·  nặng nhất "
+                        + Ui.weight(entry.heaviest), x + 24f, line, Theme.GOLD);
+        line -= small + 6f;
+        ui.textWrapped(art.fontSmall, species.description, x + 24f, line,
+                textW, Theme.TEXT_DIM);
     }
 }

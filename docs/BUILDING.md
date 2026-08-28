@@ -112,6 +112,7 @@ Generated output is committed; re-run these only when changing the inputs.
 
 ```bash
 java tools/FontGen.java        # assets/fonts/game.{fnt,png} - the Vietnamese glyph atlas
+java tools/SpriteGen.java      # assets/sprites/atlas.{png,json} - fish, angler, boat, portraits
 java tools/IconGen.java        # Android launcher icons + web logo
 python3 tools/gen_species.py   # assets/data/species.json from the tier curves
 ```

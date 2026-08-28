@@ -50,6 +50,8 @@ public final class FishingController {
 
     /** Manual pull level, used when Auto is off. */
     public float manualPull = 0.6f;
+    /** Pull level applied on the most recent tick. The renderer poses the angler from it. */
+    private float lastPull;
     /** Skill the player tapped this frame; consumed by the next tick. */
     private int requestedSkill = -1;
 
@@ -131,11 +133,13 @@ public final class FishingController {
                 a.skillIndex = requestedSkill;
                 requestedSkill = -1;
             }
+            lastPull = a.pullLevel;
             return a;
         }
         // Manual: striking at a bite is automatic, because a bite window is 1.6s and asking the
         // player to also find a separate "strike" button in that time is not one-handed play.
         float pull = session.getPhase() == SessionPhase.BITE ? 1f : manualPull;
+        lastPull = pull;
         manualAction.set(pull, requestedSkill, false);
         requestedSkill = -1;
         return manualAction;
@@ -210,6 +214,11 @@ public final class FishingController {
 
     public int levelsGainedOnLastCatch() {
         return levelsGainedOnLastCatch;
+    }
+
+    /** 0..1 pull applied on the last tick, for posing the angler and bending the rod. */
+    public float lastPull() {
+        return lastPull;
     }
 
     public boolean isIdle() {

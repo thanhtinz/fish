@@ -25,7 +25,8 @@ Viết bằng **Java + libGDX**, build ra **H5 (web), Android và iOS** từ m�
 | Build H5 / Android / iOS | ✅ Cấu hình đầy đủ (mức kiểm chứng: xem `docs/BUILDING.md`) |
 | Bang hội, boss thế giới, giải đấu, live-ops | ❌ Chưa làm — xem `docs/GDD_COVERAGE.md` |
 | Server thẩm quyền, chống gian lận thực thi | ❌ Chưa làm — client đã tách sẵn seam, xem `docs/ARCHITECTURE.md` |
-| Âm thanh, hiệu ứng, art thành phẩm | ❌ Art hiện sinh procedural, xem `docs/ASSETS.md` |
+| Art nhân vật, NPC, cá, cần câu | ✅ Atlas sprite gốc — 6 dáng cá theo archetype, cần thủ 2 tư thế, thuyền, 8 chân dung |
+| Âm thanh và hiệu ứng | ❌ Chưa có |
 
 ---
 
@@ -62,14 +63,14 @@ core/     Java thuần + libGDX. Không phụ thuộc nền tảng.
   auto/     Bộ điều khiển Auto Fishing (đọc state, phát ra hành động).
   content/  Nạp và kiểm tra bảng dữ liệu JSON.
   meta/     Tiến trình, kho đồ, kinh tế, ngoại tuyến, lưu game.
-  ui/       Bộ widget immediate-mode + art procedural.
+  ui/       Bộ widget immediate-mode, atlas sprite, art procedural.
   screen/   Năm màn hình dọc.
 lwjgl3/   Launcher desktop (phát triển) + harness chụp màn hình.
 html/     Build GWT cho web.
 android/  Launcher Android.
 ios/      Launcher RoboVM.
 assets/   Bảng dữ liệu JSON + font bitmap.
-tools/    Sinh font, sinh icon, sinh dữ liệu loài cá.
+tools/    Sinh font, sinh sprite, sinh icon, sinh dữ liệu loài cá.
 ```
 
 `core/sim` **không tham chiếu libGDX**. Cùng đoạn code đó chạy trong client, trong test,
