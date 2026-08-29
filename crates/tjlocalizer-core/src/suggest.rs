@@ -105,8 +105,8 @@ pub fn candidates(
                 auto_approvable: exact,
                 terms,
             })
-        } else if let Some(entry) = glossary.lookup(source) {
-            Some(Candidate {
+        } else {
+            glossary.lookup(source).map(|entry| Candidate {
                 node_id: node.id.clone(),
                 source: source.to_string(),
                 target: entry.target.clone(),
@@ -114,8 +114,6 @@ pub fn candidates(
                 auto_approvable: false,
                 terms,
             })
-        } else {
-            None
         };
 
         match candidate {
