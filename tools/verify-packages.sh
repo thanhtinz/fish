@@ -59,6 +59,28 @@ with zipfile.ZipFile(work / "steam.zip", "w") as z:
     z.writestr("Content/Localization/Game/en/Game.locres",
                locres([("MENU_START", "Start Game"), ("MENU_QUIT", "Quit")]))
     z.writestr("Content/dialogue.json", '{"lines":[{"text":"You caught a fish!"}]}')
+    # A Ren'Py game ships both: the script, which is code, and the file its own tooling
+    # generates for translators. They share an extension and get opposite answers.
+    z.writestr("game/script.rpy",
+               'label start:\n'
+               '    e "Cast your line into the water."\n'
+               '    $ points += 1\n'
+               '    return\n')
+    z.writestr("game/tl/vietnamese/script.rpy",
+               '# game/script.rpy:12\n'
+               'translate vietnamese start_a1b2c3:\n'
+               '\n'
+               '    # e "Cast your line into the water."\n'
+               '    e ""\n'
+               '\n'
+               '    # "The float bobs once."\n'
+               '    ""\n'
+               '\n'
+               'translate vietnamese strings:\n'
+               '\n'
+               '    # game/script.rpy:20\n'
+               '    old "Start Game"\n'
+               '    new ""\n')
 BUILD
 
 "$tj" import "$work/game.apk" --into "$work/p" --name game --source-language en > /dev/null
@@ -80,8 +102,11 @@ wanted = {"Start Game": "Bắt đầu", "Shop": "Cửa hàng",
           "You caught a fish!": "Bạn câu được một con cá!", "Quit": "Thoát"}
 approved = {n["id"]: wanted[n["source_text"]] for n in graph["nodes"]
             if n["source_text"] in wanted}
-if len(approved) != len(wanted):
-    raise SystemExit(f"only {len(approved)} of {len(wanted)} strings were extracted")
+# Counted by source rather than by node, because one string now genuinely appears twice: the
+# Unreal table and the Ren'Py strings block both hold "Start Game", and both should be translated.
+covered = {n["source_text"] for n in graph["nodes"] if n["source_text"] in wanted}
+if covered != set(wanted):
+    raise SystemExit(f"never extracted: {sorted(set(wanted) - covered)}")
 json.dump({"approved": approved}, open(work / "p/translations/vi-vn.json", "w"),
           ensure_ascii=False)
 TRANSLATE
@@ -140,17 +165,29 @@ UNTOUCHED
 "$tj" analyze "$work/steam" | tee "$work/steam-analyze"
 grep -q "unreal-locres" "$work/steam-analyze" \
     || { echo "the Unreal string table was not read" >&2; exit 1; }
+grep -q "renpy" "$work/steam-analyze" \
+    || { echo "the generated Ren'Py file was not read" >&2; exit 1; }
+# The two `.rpy` files must land on opposite sides. Offering the script would be worse than not
+# reading Ren'Py at all: every line of it, `label start:` included, becomes translatable and the
+# build replaces whole lines, so one approved line stops the game parsing.
+grep -q "game/script.rpy .*Ren'Py is translated through" "$work/steam-analyze" \
+    || { echo "the Ren'Py script was not refused with a reason" >&2; exit 1; }
 
 "$tj" extract "$work/steam" > /dev/null
 python3 - "$work" <<'UNREAL'
 import sys, json, pathlib
 work = pathlib.Path(sys.argv[1])
 graph = json.load(open(work / "steam/content/graph.json"))
-wanted = {"Start Game": "Bắt đầu", "You caught a fish!": "Bạn câu được một con cá!"}
+wanted = {"Start Game": "Bắt đầu", "You caught a fish!": "Bạn câu được một con cá!",
+          "Cast your line into the water.": "Thả dây câu xuống nước.",
+          "The float bobs once.": "Chiếc phao nhấp một cái."}
 approved = {n["id"]: wanted[n["source_text"]] for n in graph["nodes"]
             if n["source_text"] in wanted}
-if len(approved) != len(wanted):
-    raise SystemExit(f"only {len(approved)} of {len(wanted)} strings were extracted")
+# Counted by source rather than by node, because one string now genuinely appears twice: the
+# Unreal table and the Ren'Py strings block both hold "Start Game", and both should be translated.
+covered = {n["source_text"] for n in graph["nodes"] if n["source_text"] in wanted}
+if covered != set(wanted):
+    raise SystemExit(f"never extracted: {sorted(set(wanted) - covered)}")
 json.dump({"approved": approved}, open(work / "steam/translations/vi-vn.json", "w"),
           ensure_ascii=False)
 UNREAL
@@ -184,8 +221,30 @@ if "Bắt đầu" not in texts:
 if "Quit" not in texts:
     raise SystemExit(f"an untranslated entry was lost: {texts}")
 print(f"the built .locres holds {texts}")
+
+# The Ren'Py side of the same build, checked line by line. What matters is not only that the
+# translation arrived but where: Ren'Py reads a file by its indentation, and the original in the
+# comment above each line is what its own tooling matches on when the game is updated.
+rpy = zipfile.ZipFile(built).read("game/tl/vietnamese/script.rpy").decode()
+for wanted_line in ['    e "Thả dây câu xuống nước."',
+                    '    "Chiếc phao nhấp một cái."',
+                    '    new "Bắt đầu"',
+                    '    # e "Cast your line into the water."',
+                    '    # game/script.rpy:20',
+                    '    old "Start Game"',
+                    '# game/script.rpy:12']:
+    if wanted_line not in rpy.split("\n"):
+        raise SystemExit(f"the Ren'Py file lost or moved {wanted_line!r}:\n{rpy}")
+
+# And the script itself came through untouched, which is the whole reason it was refused.
+before = zipfile.ZipFile(work / "steam.zip").read("game/script.rpy")
+if zipfile.ZipFile(built).read("game/script.rpy") != before:
+    raise SystemExit("the Ren'Py script was modified by a build that refused to write it")
+print("the built .rpy holds the dialogue, keeps its comments and its indentation, and the")
+print("game's own script came out byte-identical")
 UNREALCHECK
 
 echo "ok: an Android package was recognised, read, translated and rebuilt, files it cannot write"
 echo "    came out untouched, and it said what it"
-echo "    still needs from a person; a PC game's Unreal string table went through as well"
+echo "    still needs from a person; a PC game's Unreal string table and its Ren'Py dialogue went"
+echo "    through as well, while the Ren'Py script itself was refused by name"

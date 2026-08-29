@@ -146,3 +146,32 @@ fn the_manifest_is_never_offered_for_translation() {
     // The resource text that is real game content is still there.
     assert!(graph.translatable().any(|n| n.source_text == "Green Field"));
 }
+
+/// Ren'Py interpolates by bracket, so `[fish_name]` has to survive translation - and a Vietnamese
+/// sentence in brackets has to not be mistaken for one, because reporting every bracketed aside
+/// as a lost placeholder gives a translator an error they cannot clear.
+#[test]
+fn a_bracketed_name_is_a_placeholder_and_a_bracketed_sentence_is_not() {
+    for (text, expected) in [
+        ("You caught a [fish_name]!", vec!["[fish_name]"]),
+        ("Hello, [p.name].", vec!["[p.name]"]),
+        // Ren'Py's conversion and format flags, which are common in exactly these files.
+        ("[points!t] points", vec!["[points!t]"]),
+        ("[points:>3] points", vec!["[points:>3]"]),
+        // Ordinary text that happens to use brackets. A J2ME menu line looks like this.
+        ("[1] Bat dau", vec![]),
+        ("[Nhan de bat dau]", vec![]),
+        ("an aside [like this one] mid-sentence", vec![]),
+    ] {
+        assert_eq!(graph::find_placeholders(text), expected, "for {text:?}");
+    }
+}
+
+/// The brace form still works, and the two do not interfere.
+#[test]
+fn brace_and_bracket_placeholders_are_both_found_in_one_string() {
+    assert_eq!(
+        graph::find_placeholders("{0} caught a [fish_name] worth %d gold"),
+        vec!["{0}", "[fish_name]", "%d"]
+    );
+}

@@ -232,4 +232,10 @@ fn holds_text(name: &str) -> bool {
         || lower.ends_with(".unity3d")
         || lower.ends_with(".pck")
         || lower.ends_with(".rpa")
+        // A Ren'Py script certainly holds text - it is the game's dialogue - and it is refused
+        // for a different reason from the rest: not that this build cannot read it, but that
+        // rewriting it is not how Ren'Py is translated. Leaving it off this list would drop it
+        // from the survey silently, which is the one outcome worse than explaining it.
+        || lower.ends_with(".rpy")
+        || lower.ends_with(".rpym")
 }

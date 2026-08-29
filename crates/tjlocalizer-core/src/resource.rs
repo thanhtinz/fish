@@ -29,6 +29,8 @@ pub enum Format {
     Ini,
     /// A JSON object or array of them, as RPG Maker and many engines ship.
     Json,
+    /// `translate <language> <label>:` blocks, as Ren'Py generates them.
+    Renpy,
     /// Nothing recognised: every non-empty line is offered on its own.
     Lines,
 }
@@ -42,6 +44,7 @@ impl Format {
             Format::Gettext => "gettext",
             Format::Ini => "ini",
             Format::Json => "json",
+            Format::Renpy => "renpy",
             Format::Lines => "lines",
         }
     }
@@ -73,6 +76,17 @@ pub fn detect(name: &str, text: &str) -> Format {
         lower.ends_with(".po") || lower.ends_with(".pot") || text.contains("\nmsgstr");
     if looks_like_gettext && text.contains("msgid") {
         return Format::Gettext;
+    }
+    // Ren'Py ships translations as generated `.rpy` files: a `translate <language> <label>:`
+    // header over the lines to fill in. Kept beside gettext because they are the same kind of
+    // thing - a generated template carrying the original beside an empty slot - and the next
+    // person looking for that pattern should find both in one place.
+    //
+    // The header is confirmed rather than the extension, because a `.rpy` without one is the
+    // game's own script: there the dialogue is the original and the file is code, not a resource.
+    let looks_like_renpy = lower.ends_with(".rpy") || lower.ends_with(".rpym");
+    if looks_like_renpy && text.lines().any(|l| renpy_header(l.trim()).is_some()) {
+        return Format::Renpy;
     }
     if lower.ends_with(".strings") {
         return Format::AppleStrings;
@@ -115,6 +129,7 @@ pub fn read(format: Format, text: &str) -> Vec<Field> {
         Format::Gettext => read_gettext(text),
         Format::Ini => read_ini(text),
         Format::Json => read_json(text),
+        Format::Renpy => read_renpy(text),
         Format::Lines => read_lines(text),
     }
 }
@@ -128,6 +143,7 @@ pub fn write(format: Format, text: &str, patches: &BTreeMap<String, String>) -> 
         Format::Gettext => write_gettext(text, patches),
         Format::Ini => write_ini(text, patches),
         Format::Json => write_json(text, patches),
+        Format::Renpy => write_renpy(text, patches),
         Format::Lines => write_lines(text, patches),
     }
 }
@@ -422,6 +438,278 @@ fn write_ini(text: &str, patches: &BTreeMap<String, String>) -> String {
         })
         .collect();
     finish(text, out)
+}
+
+// -- Ren'Py -----------------------------------------------------------------------------------
+
+/// How a Ren'Py block label and the value inside it are written as one address.
+///
+/// The same `::` Unreal's string table uses, chosen for the same reason - a Ren'Py label is an
+/// identifier and never contains it - but a constant of its own rather than a shared one. These
+/// addresses are hashed into node ids and stored in every translation file, so borrowing
+/// `locres::SEPARATOR` would mean an Unreal-motivated change to it silently orphaning every
+/// Ren'Py translation on disk.
+const RENPY_SEPARATOR: &str = "::";
+
+/// Statements that look like a say statement and are not.
+///
+/// A generated dialogue block copies more than speech into itself - the voice line that goes with
+/// a say, a `pause`, an `nvl clear`. They take a quoted argument and a speaker prefix is optional,
+/// so nothing about their shape distinguishes them; the keyword does. Counting one of them as a
+/// line of dialogue would shift every address after it in the block.
+const RENPY_NOT_SAY: &[&str] = &[
+    "voice", "play", "queue", "stop", "pause", "window", "nvl", "show", "hide", "scene", "with",
+    "jump", "call", "return", "python", "init", "label", "old", "new",
+];
+
+/// One value in a generated Ren'Py translation file, and the line its target sits on.
+///
+/// Produced by one scan that both the reader and the writer call, for the reason `android_spans`
+/// exists: the address of a dialogue line is its position in its block, and two walks that each
+/// counted for themselves would eventually disagree about that position - which does not fail
+/// loudly, it writes a translation into the line below the one it belongs to.
+struct RenpyUnit {
+    /// `<block label>::<discriminator>`; see `renpy_address`.
+    key: String,
+    /// The original, from the `# ...` comment or from the `old` line.
+    source: String,
+    /// Which line, in `text.lines()`, holds the string to be rewritten.
+    target_line: usize,
+}
+
+/// The address of one value, as the rest of the pipeline uses it.
+///
+/// One rule for both kinds of block: a dialogue block gives its label and the position of the
+/// line within it, the strings block gives the literal label `strings` and the original text. A
+/// dialogue label cannot be `strings`, because Ren'Py's own parser would read the header it
+/// generated as the strings block.
+///
+/// The address is only ever built, never split, so a `::` inside an original string cannot be
+/// misread. Do not add a reverse of this function.
+fn renpy_address(label: &str, discriminator: &str) -> String {
+    format!("{label}{RENPY_SEPARATOR}{discriminator}")
+}
+
+/// The label of a `translate <language> <label>:` header, if the line is one.
+///
+/// Three words and a colon, exactly. A looser test matches ordinary prose - and this is also what
+/// `detect` confirms a Ren'Py file by, so it is the one thing here that has to be tight. It is
+/// not tight enough to reject `translate this label:` written as prose; reaching it at all
+/// requires the `.rpy` extension, and that is deliberate rather than overlooked.
+fn renpy_header(trimmed: &str) -> Option<String> {
+    let head = trimmed.strip_prefix("translate ")?.strip_suffix(':')?;
+    let mut words = head.split_whitespace();
+    let _language = words.next()?;
+    let label = words.next()?;
+    words.next().is_none().then(|| label.to_string())
+}
+
+/// Splits `e "Hello."`, `"Just text."` or `e happy "Hello." nointeract` into the speaker prefix
+/// and the quoted text.
+///
+/// The prefix is whatever stands before the quote, unparsed: a say statement may carry image
+/// attributes, and all this has to do with the prefix is compare it with the one on the comment
+/// above. Narration has no speaker, and an empty prefix is the ordinary case in a visual novel
+/// rather than a failure.
+fn renpy_say(trimmed: &str) -> Option<(String, String)> {
+    let open = trimmed.find('"')?;
+    let who = trimmed[..open].trim_end().to_string();
+    let mut words = who.split_whitespace();
+    if let Some(first) = words.clone().next() {
+        if RENPY_NOT_SAY.contains(&first) {
+            return None;
+        }
+    }
+    // A speaker and its attributes are identifiers. Anything else before the quote - an operator,
+    // a bracket, a comma - means this is some other statement that happens to take a string.
+    if !words.all(|word| {
+        word.chars()
+            .all(|c| c.is_alphanumeric() || matches!(c, '_' | '@' | '-' | '.'))
+    }) {
+        return None;
+    }
+    let (text, _) = quoted(&trimmed[open + 1..])?;
+    Some((who, text))
+}
+
+/// The string after `old ` or `new `, in the file's own escaped form.
+fn renpy_quoted(rest: &str) -> Option<String> {
+    let rest = rest.trim().strip_prefix('"')?;
+    quoted(rest).map(|(text, _)| text)
+}
+
+fn renpy_units(text: &str) -> Vec<RenpyUnit> {
+    let mut units = Vec::new();
+    // Which block we are in, if any: `Some("strings")`, `Some("start_a1b2c3")`, or nothing.
+    let mut block: Option<String> = None;
+    // How many say statements this dialogue block has held so far. Reset with the block.
+    let mut spoken = 0usize;
+    // The speaker and the original read out of the comment above a statement not yet reached.
+    let mut pending: Option<(String, String)> = None;
+
+    for (i, line) in text.lines().enumerate() {
+        let trimmed = line.trim();
+
+        // Ren'Py is indentation-sensitive, and that is what says where a block ends: any non-blank
+        // line in column zero closes the one before it. This is also the first of two reasons the
+        // `# game/script.rpy:12` note the generator writes above each header is never mistaken for
+        // dialogue - it sits in column zero, so it closes a block rather than being read inside
+        // one.
+        if !trimmed.is_empty() && !line.starts_with([' ', '\t']) {
+            block = renpy_header(trimmed);
+            spoken = 0;
+            pending = None;
+            continue;
+        }
+
+        let Some(label) = block.as_deref() else {
+            continue;
+        };
+
+        if label == "strings" {
+            // `old "..."` over `new ""`. The same shape as gettext's msgid over msgstr, and read
+            // the same way: the key is the original, because the file carries both.
+            if let Some(rest) = trimmed.strip_prefix("old ") {
+                pending = renpy_quoted(rest).map(|source| (String::new(), source));
+            } else if trimmed.starts_with("new ") {
+                if let Some((_, source)) = pending.take() {
+                    if !source.is_empty() {
+                        units.push(RenpyUnit {
+                            key: renpy_address(label, &source),
+                            source,
+                            target_line: i,
+                        });
+                    }
+                }
+            }
+            continue;
+        }
+
+        // A dialogue block. The original is in a comment; the translation goes in the statement
+        // below it.
+        if let Some(rest) = trimmed.strip_prefix('#') {
+            // The second reason the file-and-line note is safe, and the one that covers the
+            // strings block, where `# game/script.rpy:20` really is indented: `renpy_say` needs a
+            // quoted string, and no file-and-line note has one. That, not the position in the
+            // block, is what tells the two kinds of comment apart - a translator handed a file
+            // path as a line of dialogue would translate it.
+            pending = renpy_say(rest.trim());
+            continue;
+        }
+        if trimmed.is_empty() {
+            continue;
+        }
+
+        let Some((who, _)) = renpy_say(trimmed) else {
+            // Not a statement this reader understands. A dialogue block holds ordinary Ren'Py in
+            // among the say statements, and guessing at it is how a file gets corrupted.
+            pending = None;
+            continue;
+        };
+
+        match pending.take() {
+            // The speaker on the comment and the speaker on the statement have to match. Where
+            // they do not, the pairing is not the one the generator wrote, and writing a
+            // translation into it would put one character's line in another's mouth.
+            Some((said_by, source)) if said_by == who && !source.is_empty() => {
+                units.push(RenpyUnit {
+                    key: renpy_address(label, &spoken.to_string()),
+                    source,
+                    target_line: i,
+                });
+                spoken += 1;
+            }
+            // Still a say statement, so it still holds a position in the block - it is only one
+            // this reader has nothing to put in.
+            _ => spoken += 1,
+        }
+    }
+    units
+}
+
+/// Every line waiting for a translation, from both kinds of block.
+///
+/// A generated Ren'Py file carries the original beside the empty slot for the translation, the
+/// way a `.po` file does - so what is read out is the original, and whatever is already in the
+/// slot is left for `write` to overwrite or keep.
+fn read_renpy(text: &str) -> Vec<Field> {
+    renpy_units(text)
+        .into_iter()
+        .map(|unit| Field {
+            key: unit.key,
+            value: unit.source,
+        })
+        .collect()
+}
+
+fn write_renpy(text: &str, patches: &BTreeMap<String, String>) -> String {
+    let mut out: Vec<String> = text.lines().map(|l| l.to_string()).collect();
+
+    for unit in renpy_units(text) {
+        let Some(target) = patches.get(&unit.key) else {
+            continue;
+        };
+        let Some(line) = out.get_mut(unit.target_line) else {
+            continue;
+        };
+        if let Some(rewritten) = replace_quoted(line, &escape_renpy(target)) {
+            *line = rewritten;
+        }
+    }
+    finish(text, out)
+}
+
+/// Replaces the first quoted string in a line, keeping every byte outside the quotes.
+///
+/// Both ends matter. Ren'Py decides what a line belongs to by its indentation, so a rebuilt line
+/// that lost a space changes the structure of the file; and a say statement may carry clauses
+/// after its string - `nointeract`, `with vpunch`, an `id` - that a rebuilt line would drop. That
+/// is why this does not use the rebuild-from-the-indent idiom the other writers here use: their
+/// lines have nothing after the string, and a say statement does.
+fn replace_quoted(line: &str, value: &str) -> Option<String> {
+    let open = line.find('"')?;
+    let (_, rest) = quoted(&line[open + 1..])?;
+    Some(format!("{}\"{value}\"{rest}", &line[..open]))
+}
+
+/// The characters Ren'Py recognises after a backslash.
+///
+/// `%`, `{` and `[` are in the set because escaping those is how a literal percent, brace or
+/// bracket is written in text that also carries tags and interpolation; the space is Ren'Py's
+/// non-collapsing space.
+const RENPY_ESCAPES: &str = "\\\"'nt %{[";
+
+/// Escapes a translation for a Ren'Py string, without escaping what is already escaped.
+///
+/// `read` hands back the file's own escaped form - `quoted` keeps backslashes - so a translator
+/// who left `\"` or `\n` in place gives them back that way. Escaping blindly would turn `\n` into
+/// a backslash and an `n` on the player's screen, and would do it again on every build, one level
+/// deeper each time. Applying this twice gives the same result as applying it once, and that
+/// property is what makes rebuilding an already-built game safe.
+fn escape_renpy(text: &str) -> String {
+    let mut out = String::with_capacity(text.len() + 8);
+    let mut chars = text.chars().peekable();
+    while let Some(c) = chars.next() {
+        match c {
+            '\\' => match chars.peek() {
+                Some(&next) if RENPY_ESCAPES.contains(next) => {
+                    out.push('\\');
+                    out.push(next);
+                    chars.next();
+                }
+                // A backslash that means a backslash.
+                _ => out.push_str("\\\\"),
+            },
+            '"' => out.push_str("\\\""),
+            // A translation that arrived with a real line break still has to reach the file as
+            // one Ren'Py can read: a raw newline inside a string ends the statement, and takes
+            // the rest of the block with it.
+            '\n' => out.push_str("\\n"),
+            '\t' => out.push_str("\\t"),
+            _ => out.push(c),
+        }
+    }
+    out
 }
 
 // -- JSON -------------------------------------------------------------------------------------

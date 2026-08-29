@@ -331,6 +331,37 @@ pub fn find_placeholders(text: &str) -> Vec<String> {
                 }
                 i += 1;
             }
+            // Ren'Py-style: [name] [p.name] [name!t] [points:>3]
+            //
+            // Unlike the braces above, the contents are checked and not only the length. A brace
+            // in ordinary game text is rare; a square bracket is not - "[1] Start" is an ordinary
+            // menu line in a J2ME game - and calling one a placeholder would report an error a
+            // translator cannot clear. So only what looks like a name gets through, with the `!`
+            // and `:` that carry Ren'Py's conversion and format flags, which are common in
+            // exactly the files this rule is for.
+            '[' => {
+                if let Some(end) = bytes[i..].iter().position(|&c| c == ']') {
+                    let inside = &bytes[i + 1..i + end];
+                    // It has to start like a name. Without that rule `[1] Start` - an ordinary
+                    // menu line in a J2ME game - reads as a placeholder, and the translator gets
+                    // an error about a lost `[1]` they never had. Ren'Py interpolates Python
+                    // names, and a Python name does not start with a digit.
+                    let named = inside
+                        .first()
+                        .is_some_and(|c| c.is_ascii_alphabetic() || *c == '_')
+                        && inside.len() <= 24
+                        && inside.iter().all(|c| {
+                            c.is_ascii_alphanumeric()
+                                || matches!(c, '_' | '.' | '!' | ':' | '>' | '<' | '^')
+                        });
+                    if named {
+                        out.push(bytes[i..=i + end].iter().collect());
+                    }
+                    i += end + 1;
+                    continue;
+                }
+                i += 1;
+            }
             _ => i += 1,
         }
     }

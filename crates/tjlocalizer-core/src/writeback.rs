@@ -94,10 +94,37 @@ pub fn plan(entry_name: &str, data: &[u8]) -> Plan {
         };
     };
     let text = decode(data, &candidate.label);
+    let format = crate::resource::detect(entry_name, &text);
+
+    // A `.rpy` that `detect` could not place is the game's own script, not a resource - and it
+    // has to be named as read-only here rather than left to fall through, because the fallback is
+    // worse than no support at all. `Lines` offers every non-blank line of the file as
+    // translatable, `label start:` and `$ points += 1` included, and writes back by replacing the
+    // whole line. One approved line and the game stops parsing.
+    //
+    // Ren'Py is localized through the files its own tooling generates under `game/tl/`, which is
+    // what the branch above recognises.
+    if format == crate::resource::Format::Lines && is_renpy_source(entry_name) {
+        return Plan::ReadOnly {
+            reason: "a Ren'Py script: Ren'Py is translated through the generated files under \
+                     game/tl/, and rewriting the script itself is not how that works"
+                .into(),
+        };
+    }
+
     Plan::Text {
-        format: crate::resource::detect(entry_name, &text),
+        format,
         encoding: candidate.label,
     }
+}
+
+/// Whether a name is a Ren'Py source file, as opposed to a generated translation file.
+///
+/// Both end in `.rpy`; only the contents tell them apart, which is why this is a name test used
+/// after `resource::detect` has looked at the contents rather than before.
+fn is_renpy_source(name: &str) -> bool {
+    let lower = name.to_lowercase();
+    lower.ends_with(".rpy") || lower.ends_with(".rpym")
 }
 
 /// Decodes a resource with the character set that was detected for it.

@@ -53,6 +53,7 @@ and the game's own tooling then reports a diff nobody made. So every writer edit
 | `gettext` | `msgid` / `msgstr` | a great many PC games |
 | `json` | any string in the document | Unity, RPG Maker, most engines |
 | `ini` | `[section]` over `key=value` | older PC games |
+| `renpy` | `translate <language> <label>:` blocks | Ren'Py, so a great many indie and visual-novel games |
 | `unreal-locres` | a compiled binary string table | Unreal Engine, so a great many Steam games |
 | `lines` | every non-empty line | anything else that decodes as text |
 
@@ -69,6 +70,42 @@ Where a format has keys they are used, because a key still finds its value after
 the file and a line number does not. INI keys are qualified by their section (`menu.title`), since
 two sections may hold the same key and a reader that ignored sections would translate one and
 silently overwrite the other.
+
+## Ren'Py: two files with one extension, and opposite answers
+
+Ren'Py is translated through files **its own tooling generates**, under `game/tl/<language>/`. Those
+carry the original beside an empty slot, the way a `.po` file does, in two shapes:
+
+```renpy
+translate vietnamese start_a1b2c3:
+
+    # e "Cast your line."      ← the original, in a comment
+    e ""                       ← the slot
+
+translate vietnamese strings:
+
+    old "Start Game"
+    new ""
+```
+
+Both are read and both are written. Addresses follow one rule, `<block label>::<what distinguishes
+it>`: a dialogue line gives `start_a1b2c3::0`, `start_a1b2c3::1`, because a block holds several
+lines and a label alone would let the second translation overwrite the first; the strings block
+gives `strings::Start Game`, because there the original is the key Ren'Py itself matches on. The
+ordinal is a position, so inserting a line into a block shifts the ones after it — but a node id
+hashes the source text as well as the address, so a shifted line gets a **new** id and its old
+translation is dropped rather than misapplied. Lost work, never wrong text.
+
+**The game's own `.rpy` script is read-only, and that is the point of the rule.** A script decodes
+as text and is full of dialogue, so with no rule at all it would fall to the `lines` reader — which
+offers every non-blank line, `label start:` and `$ points += 1` among them, and writes back by
+replacing whole lines. One approved line and the game stops parsing. So the script is refused by
+name, with a reason that says where translations do go. Both files end in `.rpy`; only the contents
+tell them apart, which is why the `translate` header is what is confirmed and the extension is only
+the hint.
+
+A third thing shares the name and is still not read at all: `.rpa`, Ren'Py's **archive**, which
+needs its own container reader.
 
 ## Unreal's string table
 
@@ -133,9 +170,13 @@ với người dịch những chuỗi họ sẽ không bao giờ thấy.
 ## What is named but not read
 
 Listed rather than passed over, each with what it is: `classes.dex`, `resources.arsc`, Unity
-asset bundles, Godot `.pck`, Ren'Py `.rpa`. A translator who cannot see that a
-game keeps half its dialogue in one of those will conclude the game is half translated when it is
-not.
+asset bundles, Godot `.pck`, Ren'Py `.rpa`, and a Ren'Py `.rpy` script. A translator who cannot see
+that a game keeps half its dialogue in one of those will conclude the game is half translated when
+it is not.
+
+The `.rpy` script is the odd one on that list, and worth saying so: it is not refused because this
+build cannot read it — it reads perfectly well — but because rewriting it is not how Ren'Py is
+localized. Everything else there is a format waiting for a reader.
 
 The DEX string pool is a documented format and readable in principle. It is not read yet, and the
 list says so rather than staying quiet - which matters most for Android, where a game that keeps

@@ -246,3 +246,74 @@ fn locres_is_still_read_and_written_through_the_same_decision() {
         Plan::Binary(BinaryFormat::Locres)
     );
 }
+
+/// The one that matters most in this file after the refusal path itself.
+///
+/// A Ren'Py script decodes as text and is full of dialogue, so the plain-lines fallback would
+/// offer every line of it - `label start:` and `$ points += 1` included - and write back by
+/// replacing whole lines. One approved line and the game stops parsing. It is refused by name
+/// rather than left to fall through, because falling through is worse than not supporting it.
+#[test]
+fn a_renpy_script_is_read_only_even_though_it_is_full_of_dialogue() {
+    let script = b"label start:\n    e \"Hello there.\"\n    $ points += 1\n    return\n";
+    match writeback::plan("game/script.rpy", script) {
+        Plan::ReadOnly { reason } => {
+            assert!(reason.contains("Ren'Py"), "{reason}");
+            assert!(
+                reason.contains("game/tl/"),
+                "the reason should say where translations do go: {reason}"
+            );
+        }
+        other => panic!("a Ren'Py script was offered as writable: {other:?}"),
+    }
+}
+
+/// And the generated file it is actually translated through is not refused along with it. Two
+/// files, one extension, opposite answers - which is why the contents decide and the name does
+/// not.
+#[test]
+fn a_generated_renpy_translation_file_is_planned_as_text() {
+    let generated = b"translate vietnamese start_a1b2c3:\n\n    # e \"Hello there.\"\n    e \"\"\n";
+    match writeback::plan("game/tl/vietnamese/script.rpy", generated) {
+        Plan::Text { format, encoding } => {
+            assert_eq!(format, Format::Renpy);
+            assert!(!encoding.is_empty());
+        }
+        other => panic!("a generated Ren'Py file was not planned as text: {other:?}"),
+    }
+}
+
+/// A refused script still has to appear in the survey. A file dropped from it silently is the one
+/// outcome worse than one explained: a translator who cannot see the game's script listed will
+/// conclude the game keeps its dialogue somewhere this build already reads.
+#[test]
+fn a_refused_renpy_script_is_named_in_the_survey_rather_than_dropped() {
+    let dir = TempDir::new("renpy-survey");
+    let mut archive = Archive::read(&fixture()).unwrap();
+    archive.insert(
+        "game/script.rpy",
+        b"label start:\n    e \"Hello there.\"\n    return\n".to_vec(),
+    );
+    archive.insert(
+        "game/tl/vietnamese/script.rpy",
+        b"translate vietnamese start_a1b2c3:\n\n    # e \"Hello there.\"\n    e \"\"\n".to_vec(),
+    );
+    let project = Project::create(&dir.0, "game", &archive.write().unwrap()).unwrap();
+    let package = project.package().unwrap();
+
+    let refused = package
+        .opaque
+        .iter()
+        .find(|o| o.entry == "game/script.rpy")
+        .unwrap_or_else(|| panic!("the script vanished from the survey: {:?}", package.opaque));
+    assert!(refused.reason.contains("Ren'Py"), "{}", refused.reason);
+
+    assert!(
+        package
+            .readable
+            .iter()
+            .any(|r| r.entry == "game/tl/vietnamese/script.rpy" && r.format == "renpy"),
+        "the generated file was not offered: {:?}",
+        package.readable
+    );
+}
