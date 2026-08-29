@@ -15,6 +15,7 @@ use crate::build::{self, Branding, BuildReport};
 use crate::detect::{self, CapabilityManifest};
 use crate::graph::{self, ContentGraph};
 use crate::jar::{sha256_hex, Archive};
+use crate::suggest::{self, CandidateSet};
 use crate::validate::{validate, ValidationReport};
 use crate::vietnamese::{Glossary, TranslationMemory, TranslationStore};
 use serde::{Deserialize, Serialize};
@@ -275,6 +276,35 @@ impl Project {
 
     pub fn save_memory(&self, memory: &TranslationMemory) -> crate::Result<()> {
         write_json(&self.root.join("memory/memory.json"), memory)
+    }
+
+    /// Generates translation candidates from the project's memory and glossary (§22, step 9).
+    ///
+    /// Written to translations/candidates.json for review. Nothing is approved here; see
+    /// `suggest::apply_safe` for the narrow case that can be.
+    pub fn suggest(&self, fuzzy_threshold: f32) -> crate::Result<CandidateSet> {
+        let set = suggest::candidates(
+            &self.graph()?,
+            &self.memory()?,
+            &self.glossary()?,
+            &self.translations()?,
+            fuzzy_threshold,
+        );
+        write_json(&self.root.join("translations/candidates.json"), &set)?;
+        Ok(set)
+    }
+
+    pub fn candidates(&self) -> crate::Result<CandidateSet> {
+        read_json_or_default(&self.root.join("translations/candidates.json"))
+    }
+
+    /// Folds every approved translation back into the memory, so later projects reuse this work.
+    pub fn learn(&self) -> crate::Result<usize> {
+        let mut memory = self.memory()?;
+        suggest::learn(&self.graph()?, &self.translations()?, &mut memory);
+        let count = memory.entries.len();
+        self.save_memory(&memory)?;
+        Ok(count)
     }
 
     /// Builds, validates, records and publishes (§22 steps 15-18, §23).

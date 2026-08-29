@@ -77,6 +77,41 @@ pub fn validate(
     report
 }
 
+/// Validates an archive on its own, with no original to compare against.
+///
+/// This is what can be said about a JAR handed over without its project: it is well formed, every
+/// class parses, it declares an entry point that exists, and its text decodes. It cannot tell
+/// whether anything was lost relative to the original - only `validate` can - so the two are kept
+/// separate rather than one function pretending to do both.
+pub fn inspect(archive: &Archive) -> ValidationReport {
+    let mut report = ValidationReport::default();
+    check_classes_parse(archive, &mut report);
+    check_entry_points(archive, &mut report);
+    check_class_text_decodes(archive, &mut report);
+    report
+}
+
+/// Mojibake check: a constant that no longer decodes as modified UTF-8 means a patch wrote raw
+/// bytes in some other encoding, which the JVM will reject or display as rubbish.
+fn check_class_text_decodes(archive: &Archive, report: &mut ValidationReport) {
+    for entry in archive.classes() {
+        let Ok(class) = ClassFile::parse(&entry.data) else {
+            continue; // already reported by check_classes_parse
+        };
+        for literal in class.string_literals() {
+            if literal.decoded.is_none() {
+                report.error(
+                    "encoding",
+                    format!(
+                        "{}: string constant {} is not valid modified UTF-8",
+                        entry.name, literal.utf8_index
+                    ),
+                );
+            }
+        }
+    }
+}
+
 /// Every entry in the original must still be present.
 fn check_nothing_lost(original: &Archive, built: &Archive, report: &mut ValidationReport) {
     for entry in original.entries() {

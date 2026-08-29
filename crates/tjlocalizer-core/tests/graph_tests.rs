@@ -100,3 +100,30 @@ fn skips_structural_pool_entries() {
         );
     }
 }
+
+/// The manifest is the archive's structure, not the game's text.
+///
+/// Offering `MIDlet-1: Sample Game,/icon.png,SampleGame` for translation invites a translator to
+/// rename the entry point, producing a build that installs and then will not start.
+#[test]
+fn the_manifest_is_never_offered_for_translation() {
+    let bytes = std::fs::read(concat!(env!("CARGO_MANIFEST_DIR"), "/tests/data/sample-game.jar"))
+        .expect("fixture missing - run tools/make-fixtures.sh");
+    let archive = tjlocalizer_core::jar::Archive::read(&bytes).unwrap();
+    let graph = tjlocalizer_core::graph::extract(&archive);
+
+    for node in &graph.nodes {
+        assert!(
+            !node.source_text.starts_with("MIDlet-")
+                && !node.source_text.starts_with("MicroEdition-")
+                && !node.source_text.starts_with("Manifest-Version"),
+            "manifest line offered as game text: {:?}",
+            node.source_text
+        );
+    }
+
+    // The resource text that is real game content is still there.
+    assert!(graph
+        .translatable()
+        .any(|n| n.source_text == "Green Field"));
+}

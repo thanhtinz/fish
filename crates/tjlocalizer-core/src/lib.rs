@@ -14,6 +14,7 @@ pub mod error;
 pub mod graph;
 pub mod jar;
 pub mod project;
+pub mod suggest;
 pub mod validate;
 pub mod vietnamese;
 

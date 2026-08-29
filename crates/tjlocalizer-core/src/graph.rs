@@ -135,7 +135,7 @@ pub fn extract(archive: &Archive) -> ContentGraph {
     }
 
     for entry in archive.entries() {
-        if entry.is_class() || !encoding::looks_like_text(&entry.data) {
+        if entry.is_class() || is_archive_metadata(&entry.name) || !encoding::looks_like_text(&entry.data) {
             continue;
         }
         let Some(candidate) = encoding::best(&entry.data, 0.5) else {
@@ -178,6 +178,24 @@ pub fn extract(archive: &Archive) -> ContentGraph {
     }
 
     ContentGraph { nodes }
+}
+
+/// Archive structure that must never be offered as game text.
+///
+/// The manifest and JAD are text files, so a plain "does this decode?" test happily hands a
+/// translator lines like `MIDlet-1: Sample Game,/icon.png,SampleGame` - and translating one
+/// renames the entry point, breaking a game that then installs and refuses to start. These files
+/// are the archive's structure and are written by the manifest code path, not the text one.
+/// Signature files are excluded for the same reason: they describe the archive, not the game.
+///
+/// This is a rule about the JAR format, not about any particular game, which is why it belongs
+/// here rather than in a profile.
+fn is_archive_metadata(name: &str) -> bool {
+    let upper = name.to_uppercase();
+    upper.starts_with("META-INF/")
+        || upper.ends_with(".MF")
+        || upper.ends_with(".JAD")
+        || upper.ends_with(".SF")
 }
 
 fn make_node(source: TextSource, text: String, source_encoding: Option<String>) -> TextNode {
