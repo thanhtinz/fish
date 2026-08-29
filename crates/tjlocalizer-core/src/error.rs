@@ -6,6 +6,14 @@ use std::path::PathBuf;
 /// wrong" is not good enough to tell a malformed class apart from an unsupported one.
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
+    /// A resource in a binary format this build knows of but could not read.
+    ///
+    /// Separate from a parse failure in a format we own: this one usually means the file is a
+    /// version or variant nobody here has seen, and the reason has to reach the person holding
+    /// the game rather than being swallowed as "unsupported".
+    #[error("this file could not be read: {reason}")]
+    UnreadableResource { reason: String },
+
     #[error("not a Java class file: expected magic 0xCAFEBABE, found {found:#010x}")]
     NotAClassFile { found: u32 },
 

@@ -156,6 +156,23 @@ pub fn extract(archive: &Archive) -> ContentGraph {
     }
 
     for entry in archive.entries() {
+        // Unreal's string table is binary and never reaches the text path below, so it is read
+        // here by the one thing that understands it.
+        if entry.name.to_lowercase().ends_with(".locres") {
+            if let Ok(table) = crate::locres::Locres::parse(&entry.data) {
+                for found in table.entries() {
+                    nodes.push(make_node(
+                        TextSource::ResourceProperty {
+                            resource: entry.name.clone(),
+                            key: crate::locres::address(&found.namespace, &found.key),
+                        },
+                        found.text,
+                        None,
+                    ));
+                }
+            }
+            continue;
+        }
         if entry.is_class()
             || is_archive_metadata(&entry.name)
             || !encoding::looks_like_text(&entry.data)

@@ -160,6 +160,22 @@ fn survey(archive: &Archive) -> (Vec<ReadableResource>, Vec<OpaqueResource>) {
             });
             continue;
         }
+        // Read by the one thing that understands it rather than by the text path, which would
+        // see a binary file and pass over it.
+        if crate::locres::Locres::looks_like(&entry.data) {
+            match crate::locres::Locres::parse(&entry.data) {
+                Ok(table) => readable.push(ReadableResource {
+                    entry: entry.name.clone(),
+                    format: "unreal-locres".into(),
+                    fields: table.entries().len(),
+                }),
+                Err(e) => opaque.push(OpaqueResource {
+                    entry: entry.name.clone(),
+                    reason: e.to_string(),
+                }),
+            }
+            continue;
+        }
         if entry.is_class() || !crate::encoding::looks_like_text(&entry.data) {
             continue;
         }
@@ -202,9 +218,6 @@ fn known_opaque(name: &str) -> Option<&'static str> {
     if lower.ends_with(".xml") && !lower.contains("androidmanifest") {
         // A packaged APK compiles its XML; a source tree or an unpacked one does not.
         return None;
-    }
-    if lower.ends_with(".locres") {
-        return Some("Unreal Engine's compiled string table, a binary format");
     }
     if lower.ends_with(".assets") || lower.ends_with(".bundle") || lower.ends_with(".unity3d") {
         return Some("a Unity asset bundle, which needs its own reader");

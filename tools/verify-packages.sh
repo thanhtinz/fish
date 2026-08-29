@@ -26,6 +26,39 @@ with zipfile.ZipFile(work / "game.apk", "w") as z:
                '    <string name="shop">Shop</string>\n</resources>\n')
     z.writestr("assets/dialogue.json", '{"lines":[{"text":"You caught a fish!"}]}')
     z.writestr("assets/game.po", '# a comment\nmsgid "Quit"\nmsgstr ""\n')
+    z.writestr("assets/game.ini", '; menus\n[menu]\ntitle=Options\n')
+
+# An Unreal string table, written the way the engine writes one: a header, a table of namespaces
+# and keys, and the strings themselves at the end.
+def locres(entries):
+    def fstring(text):
+        if text.isascii():
+            return len(text.encode() + b"\0").to_bytes(4, "little", signed=True) + text.encode() + b"\0"
+        units = text.encode("utf-16-le") + b"\0\0"
+        return (-(len(units) // 2)).to_bytes(4, "little", signed=True) + units
+
+    body = len(entries).to_bytes(4, "little")          # entry count (version 3)
+    body += (1).to_bytes(4, "little")                  # one namespace
+    body += (0xAABBCCDD).to_bytes(4, "little") + fstring("Game")
+    body += len(entries).to_bytes(4, "little")
+    for i, (key, _) in enumerate(entries):
+        body += (0x11223344).to_bytes(4, "little") + fstring(key)
+        body += (0xDEADBEEF).to_bytes(4, "little")     # source hash
+        body += i.to_bytes(4, "little", signed=True)
+
+    magic = bytes([0x0E, 0x14, 0x74, 0x75, 0x67, 0x4A, 0x03, 0xFC,
+                   0x4A, 0x15, 0x90, 0x9D, 0xC3, 0x37, 0x7F, 0x1B])
+    head = magic + bytes([3])
+    out = head + (len(head) + 8 + len(body)).to_bytes(8, "little", signed=True) + body
+    out += len(entries).to_bytes(4, "little", signed=True)
+    for _, text in entries:
+        out += fstring(text) + (1).to_bytes(4, "little", signed=True)
+    return out
+
+with zipfile.ZipFile(work / "steam.zip", "w") as z:
+    z.writestr("Content/Localization/Game/en/Game.locres",
+               locres([("MENU_START", "Start Game"), ("MENU_QUIT", "Quit")]))
+    z.writestr("Content/dialogue.json", '{"lines":[{"text":"You caught a fish!"}]}')
 BUILD
 
 "$tj" import "$work/game.apk" --into "$work/p" --name game --source-language en > /dev/null
@@ -86,5 +119,56 @@ for entry in ("classes.dex", "resources.arsc", "AndroidManifest.xml"):
 print("strings.xml, dialogue.json and game.po all patched in place")
 CHECK
 
+# And a PC game's zip, which is where Unreal's compiled string table lives.
+"$tj" import "$work/steam.zip" --into "$work/steam" --name steam --source-language en > /dev/null
+"$tj" analyze "$work/steam" | tee "$work/steam-analyze"
+grep -q "unreal-locres" "$work/steam-analyze" \
+    || { echo "the Unreal string table was not read" >&2; exit 1; }
+
+"$tj" extract "$work/steam" > /dev/null
+python3 - "$work" <<'UNREAL'
+import sys, json, pathlib
+work = pathlib.Path(sys.argv[1])
+graph = json.load(open(work / "steam/content/graph.json"))
+wanted = {"Start Game": "Bắt đầu", "You caught a fish!": "Bạn câu được một con cá!"}
+approved = {n["id"]: wanted[n["source_text"]] for n in graph["nodes"]
+            if n["source_text"] in wanted}
+if len(approved) != len(wanted):
+    raise SystemExit(f"only {len(approved)} of {len(wanted)} strings were extracted")
+json.dump({"approved": approved}, open(work / "steam/translations/vi-vn.json", "w"),
+          ensure_ascii=False)
+UNREAL
+
+"$tj" build "$work/steam" --lang vi-VN > /dev/null
+python3 - "$work" <<'UNREALCHECK'
+import sys, zipfile, pathlib, struct
+work = pathlib.Path(sys.argv[1])
+built = next((work / "steam/output").glob("*"))
+data = zipfile.ZipFile(built).read("Content/Localization/Game/en/Game.locres")
+
+# Read the strings back with an independent reader: the point is that the file the game will load
+# holds the translation, not that this project agrees with itself.
+at = struct.unpack_from("<q", data, 17)[0]
+count = struct.unpack_from("<i", data, at)[0]
+pos, texts = at + 4, []
+for _ in range(count):
+    length = struct.unpack_from("<i", data, pos)[0]
+    pos += 4
+    if length >= 0:
+        texts.append(data[pos:pos + length - 1].decode())
+        pos += length
+    else:
+        units = -length
+        texts.append(data[pos:pos + units * 2 - 2].decode("utf-16-le"))
+        pos += units * 2
+    pos += 4  # reference count
+
+if "Bắt đầu" not in texts:
+    raise SystemExit(f"the translation is not in the built table: {texts}")
+if "Quit" not in texts:
+    raise SystemExit(f"an untranslated entry was lost: {texts}")
+print(f"the built .locres holds {texts}")
+UNREALCHECK
+
 echo "ok: an Android package was recognised, read, translated and rebuilt, and said what it"
-echo "    still needs from a person"
+echo "    still needs from a person; a PC game's Unreal string table went through as well"

@@ -110,6 +110,27 @@ pub fn apply(
                 .push(format!("{resource_name}: not in archive"));
             continue;
         };
+        if resource_name.to_lowercase().ends_with(".locres") {
+            let mut table = crate::locres::Locres::parse(&entry.data)?;
+            for (source, target) in &patches {
+                let TextSource::ResourceProperty { key, .. } = source else {
+                    continue;
+                };
+                if table.set_at(key, target) {
+                    report.resources_patched += 1;
+                } else {
+                    // An entry that has moved between versions of the game is not an error worth
+                    // stopping for, but it is a translation that will not appear - and silence
+                    // there reads as success.
+                    report
+                        .skipped
+                        .push(format!("{resource_name}: no entry {key}"));
+                }
+            }
+            archive.replace(resource_name, table.write());
+            continue;
+        }
+
         // Resources are rewritten as UTF-8 regardless of what they were read as: the game reads
         // them through its own loader, and any charset that could not represent Vietnamese is the
         // reason the text needed localizing in the first place.

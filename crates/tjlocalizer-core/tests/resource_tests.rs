@@ -223,3 +223,34 @@ fn a_minified_android_file_is_read_and_patched_too() {
         "<resources><string name=\"a\">one</string><string name=\"b\">hai</string></resources>"
     );
 }
+
+/// Two sections holding the same key is the ordinary case in an INI, and a reader that ignored
+/// sections would translate one of them and silently overwrite the other.
+#[test]
+fn ini_keys_are_qualified_by_their_section() {
+    let ini = "; the menus\n\
+               [menu]\n\
+               title=Start Game\n\
+               \n\
+               [shop]\n\
+               title=Shop\n";
+    assert_eq!(resource::detect("game.ini", ini), Format::Ini);
+
+    let fields = resource::read(Format::Ini, ini);
+    let keys: Vec<&str> = fields.iter().map(|f| f.key.as_str()).collect();
+    assert_eq!(keys, vec!["menu.title", "shop.title"]);
+
+    let written = resource::write(Format::Ini, ini, &patch(&[("shop.title", "Cửa hàng")]));
+    assert!(written.contains("[menu]\ntitle=Start Game"), "{written}");
+    assert!(written.contains("[shop]\ntitle=Cửa hàng"), "{written}");
+    assert!(
+        written.contains("; the menus"),
+        "the comment was lost:\n{written}"
+    );
+}
+
+/// A file of `key=value` with no sections at all is a properties file, whatever it is called.
+#[test]
+fn a_file_with_no_sections_is_not_read_as_an_ini() {
+    assert_eq!(resource::detect("config.ini", "a=1\nb=2\n"), Format::Lines);
+}

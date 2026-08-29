@@ -18,6 +18,7 @@ pub mod font;
 pub mod graph;
 pub mod jar;
 pub mod lang;
+pub mod locres;
 pub mod package;
 pub mod project;
 pub mod provider;
