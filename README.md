@@ -81,6 +81,18 @@ The tree is walked without opening anything; only files in a format this build r
 the version the patch was built from, keeps what it replaced, and refuses the whole patch rather
 than writing part of one.
 
+Reading the words painted into artwork with the game's own letters, being told what a game is, and
+looking at what a build changed:
+
+```sh
+tjlocalizer assets  projects/game --read --accept   # only where every shape matched
+tjlocalizer context projects/game --cast            # who the game names, and where
+tjlocalizer plugins projects/game                   # adapters, and what each claims here
+tjlocalizer regress projects/game --accept          # this is what it should look like
+tjlocalizer regress projects/game                   # what changed since?
+tjlocalizer play    projects/game --command emulator
+```
+
 Or in one pass:
 
 ```sh

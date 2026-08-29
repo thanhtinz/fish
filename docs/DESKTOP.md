@@ -58,7 +58,10 @@ be mistakable for a screenshot of it working.
 inferred; the target languages and their progress; the register picker, which shows what each
 profile does to the pronouns; the dictionary directions actually usable for this project's
 language pair, said plainly when there are none; the detected capabilities with their evidence;
-and the project's facts.
+and the project's facts. Below those: the cast the game names and how many lines were read from
+their surroundings rather than from their own shape (§10, §15), and the adapters this project
+carries with what each one claims and whether any of it matched this game (§20) - both shown only
+when there is something to show.
 
 A banner stays up while the source language is still a guess. A wrong one silently disables every
 dictionary, so it is worth interrupting for.
@@ -91,9 +94,11 @@ The tab does four things, and offers rather than decides at every one of them:
 - **What it looks like.** The sample text renders with both, at the size that ships, because
   which reads better is not a thing a count can answer.
 
-Composing writes the extended sheet into the project's `fonts/`. It does **not** install it:
-making a game use new glyphs means changing how it looks characters up, which is per-game. The
-tab says so where the button is, not in a footnote.
+Composing writes the extended sheet into the project's `fonts/`. Installing it is a rule, and the
+rule replaces the image - the same in every game. Telling the game the sheet grew taller is not,
+and the tab lists what *looks* like where the game records that: a class holding the sheet's row
+count, a string listing its characters in order. Found, not verified, and it says so where the
+button is rather than in a footnote.
 
 Coverage is reported in three states, not two: covered, missing, and *nobody has said*. A project
 whose font has never been declared has an unknown answer rather than a good one, and showing the
@@ -102,14 +107,22 @@ two the same way is how a localization ships with empty boxes where the accents 
 The Text tab also draws the selected row with the game's own glyphs, above the two widths, so a
 mark landing on the letter below it is visible while translating rather than after building.
 
-**Ảnh** - the images in the game, with what each one's shape suggests about words painted into
-it. Nothing here reads them; it shows them, and records what a person decides. From then on every
-build reports each marked image that still carries its original words, which is the only way that
-blind spot stays visible: no string check can see it, because the word was never a string.
+**Ảnh** - the images in the game, with what each one's shape suggests about words painted into it.
+Where the project knows the game's glyph sheet, **Đọc chữ bằng font game** reads the words straight
+off each picture by matching it against those same letters, fills in the ones where every shape
+matched, and says how many shapes matched nothing on the ones where they did not. Nothing is saved
+until a person presses the button. From then on every build reports each marked image that still
+carries its original words, which is the only way that blind spot stays visible: no string check
+can see it, because the word was never a string.
 
 **Đóng gói** - build one language or all of them, the validation report, the build history with
 rollback, and **Xuất file ra…**, which opens a native save dialog. Where the finished file goes is
 the user's business, not the tool's; the project directory is the tool's.
+
+Underneath: the drawing of every approved translation compared against the one somebody accepted,
+with what moved marked in red over it (§25). Six lines edited and sixty changed means something
+else moved - a font recomposed, a sheet's letters sitting a pixel lower - and no text report shows
+that.
 
 ## Files in and out
 
