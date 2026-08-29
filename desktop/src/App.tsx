@@ -176,11 +176,14 @@ export function App() {
   async function doExportBuild() {
     if (!project || !target?.outputPath) return;
     const suggested = target.outputPath.split(/[\\/]/).pop() ?? `${project.name}.jar`;
+    // The build keeps the kind it came in as, so the save dialog has to as well: offering to
+    // write an Android package as a .jar renames a file nothing will then open.
+    const extension = suggested.includes(".") ? suggested.split(".").pop()! : "jar";
     const destination = await pickSavePath(
-      "Xuất file JAR đã Việt hoá",
+      "Xuất file game đã Việt hoá",
       suggested,
-      "Java archive",
-      ["jar"],
+      project.package.label,
+      [extension],
     );
     if (!destination) return;
     // The save dialog already asked about overwriting, so passing true here does not skip a
@@ -316,7 +319,7 @@ export function App() {
           </div>
           <div className="foot">
             <button className="primary" disabled={busy !== null} onClick={doImport}>
-              Nhập file JAR…
+              Nhập file game…
             </button>
             <button disabled={busy !== null} onClick={doOpen}>
               Mở dự án có sẵn…
@@ -330,11 +333,11 @@ export function App() {
               <div className="inner">
                 <h2>Chưa mở dự án nào</h2>
                 <p>
-                  Nhập một file JAR để bắt đầu. Bản gốc được băm và giữ nguyên vẹn; mọi thứ khác
+                  Nhập một file game (.jar, .apk, .ipa, .zip) để bắt đầu. Bản gốc được băm và giữ nguyên vẹn; mọi thứ khác
                   đều dựng lại được từ nó.
                 </p>
                 <button className="primary" onClick={doImport}>
-                  Nhập file JAR…
+                  Nhập file game…
                 </button>
               </div>
             </div>

@@ -131,7 +131,7 @@ export function FontView({ path, say }: Props) {
               const found = await run("candidates", () => api.fontCandidates(path));
               if (found) {
                 setCandidates(found);
-                if (found.length === 0) say("Không tìm thấy ảnh PNG nào trong file JAR");
+                if (found.length === 0) say("Không tìm thấy ảnh PNG nào trong gói game");
               }
             }}
           >

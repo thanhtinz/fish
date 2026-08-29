@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import { EngineCard } from "./EngineCard";
 import type {
   CapabilityView,
@@ -305,6 +305,64 @@ export function OverviewView(props: Props) {
             onSaveKey={props.onSaveEngineKey}
             onPreview={props.onPreviewEngine}
           />
+
+          <div className="card">
+            <h3>Loại gói</h3>
+            <div className="sub">
+              Nhận ra từ thứ nằm bên trong, không phải từ đuôi file. JAR, APK, IPA hay một file
+              zip đều là kho nén giống nhau ở tầng dưới.
+            </div>
+            <div className="row" style={{ marginBottom: 10, gap: 9 }}>
+              <span className={p.package.canRepackage ? "pill ok" : "pill warn"}>
+                {p.package.label}
+              </span>
+              <span style={{ color: "var(--text-faint)", fontSize: 12 }}>
+                {p.package.evidence.join(" · ")}
+              </span>
+            </div>
+            {p.package.note && (
+              <p style={{ color: "var(--warn)", fontSize: 12.5, margin: "0 0 12px" }}>
+                Không đóng gói lại được ở đây: {p.package.note}. Văn bản vẫn đọc, dịch và xuất
+                được — chỉ là file kết quả cần bạn tự ký lại bằng khoá của mình.
+              </p>
+            )}
+
+            {p.package.readable.length > 0 && (
+              <>
+                <div style={{ fontSize: 12, color: "var(--text-dim)", marginBottom: 5 }}>
+                  Đọc được:
+                </div>
+                <dl className="facts" style={{ marginBottom: 12 }}>
+                  {p.package.readable.slice(0, 8).map((r) => (
+                    <Fragment key={r.entry}>
+                      <dt>{r.format}</dt>
+                      <dd>
+                        {r.entry} · {r.fields} chuỗi
+                      </dd>
+                    </Fragment>
+                  ))}
+                </dl>
+              </>
+            )}
+
+            {p.package.opaque.length > 0 && (
+              <>
+                <div style={{ fontSize: 12, color: "var(--text-dim)", marginBottom: 5 }}>
+                  Chưa đọc được — không phải game không có chữ ở đó:
+                </div>
+                <dl className="facts">
+                  {p.package.opaque.map((o) => (
+                    <Fragment key={o.entry}>
+                      <dt>{o.entry}</dt>
+                      <dd style={{ fontFamily: "inherit", color: "var(--text-faint)" }}>
+                        {o.reason}
+                      </dd>
+                    </Fragment>
+                  ))}
+                </dl>
+              </>
+            )}
+          </div>
 
           <div className="card">
             <h3>Khả năng phát hiện được</h3>

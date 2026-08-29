@@ -70,60 +70,101 @@ impl ValidationReport {
     }
 }
 
+/// Everything a full validation looks at.
+///
+/// A struct rather than nine arguments, and it became one when the ninth was needed: the checks
+/// have to know what kind of package this is. Half of them are rules about JAR files - a MIDlet
+/// entry point, a glyph sheet - and running those against an Android package produces errors
+/// about a format it is not in, which is how a person learns to ignore the report.
+pub struct Subject<'a> {
+    pub original: &'a Archive,
+    pub built: &'a Archive,
+    pub graph: &'a ContentGraph,
+    pub translations: &'a TranslationStore,
+    pub from: &'a Language,
+    pub to: &'a Language,
+    pub kind: crate::package::Kind,
+    /// What the game's font can draw, where anybody has established it.
+    pub font: Option<&'a crate::font::Coverage>,
+    /// How wide its letters are, where it draws from a sheet.
+    pub metrics: Option<&'a crate::font::metrics::Metrics>,
+}
+
+impl<'a> Subject<'a> {
+    /// The minimum: two archives, a graph, and the languages involved.
+    ///
+    /// Assumes a MIDlet, because that is what a caller with nothing else to say has - and the
+    /// checks it turns on are the ones this project started with.
+    pub fn new(
+        original: &'a Archive,
+        built: &'a Archive,
+        graph: &'a ContentGraph,
+        translations: &'a TranslationStore,
+        from: &'a Language,
+        to: &'a Language,
+    ) -> Self {
+        Subject {
+            original,
+            built,
+            graph,
+            translations,
+            from,
+            to,
+            kind: crate::package::Kind::Midlet,
+            font: None,
+            metrics: None,
+        }
+    }
+}
+
 /// Validates a built archive against the original it came from.
 ///
 /// The languages are needed because the translation checks are language-specific: what counts as
 /// too long, or as wrongly spaced, has no answer that holds for Vietnamese and Chinese at once.
-pub fn validate(
-    original: &Archive,
-    built: &Archive,
-    graph: &ContentGraph,
-    translations: &TranslationStore,
-    from: &Language,
-    to: &Language,
-) -> ValidationReport {
-    validate_with_font(original, built, graph, translations, from, to, None)
-}
-
-/// Validation including the glyph check, when the game's font has been established.
-#[allow(clippy::too_many_arguments)]
-pub fn validate_with_font(
-    original: &Archive,
-    built: &Archive,
-    graph: &ContentGraph,
-    translations: &TranslationStore,
-    from: &Language,
-    to: &Language,
-    font: Option<&crate::font::Coverage>,
-) -> ValidationReport {
-    validate_with_layout(original, built, graph, translations, from, to, font, None)
-}
-
-/// The same, plus what the game's own letters measure (§24).
-///
-/// Kept as a separate entry point rather than a wider one everywhere: measuring needs the sheet
-/// itself, not just what it covers, and a caller that only has coverage should not be made to
-/// pass `None` for something it has never heard of.
-#[allow(clippy::too_many_arguments)]
-pub fn validate_with_layout(
-    original: &Archive,
-    built: &Archive,
-    graph: &ContentGraph,
-    translations: &TranslationStore,
-    from: &Language,
-    to: &Language,
-    font: Option<&crate::font::Coverage>,
-    metrics: Option<&crate::font::metrics::Metrics>,
-) -> ValidationReport {
+pub fn validate(subject: &Subject) -> ValidationReport {
     let mut report = ValidationReport::default();
 
-    check_nothing_lost(original, built, &mut report);
-    check_classes_parse(built, &mut report);
-    check_entry_points(built, &mut report);
-    check_translations(graph, translations, from, to, &mut report);
-    check_font(font, graph, translations, &mut report);
-    check_layout(metrics, graph, translations, &mut report);
-    check_originals_preserved(original, built, &mut report);
+    check_nothing_lost(subject.original, subject.built, &mut report);
+    check_classes_parse(subject.built, &mut report);
+    check_translations(
+        subject.graph,
+        subject.translations,
+        subject.from,
+        subject.to,
+        &mut report,
+    );
+    check_layout(
+        subject.metrics,
+        subject.graph,
+        subject.translations,
+        &mut report,
+    );
+    check_originals_preserved(subject.original, subject.built, &mut report);
+
+    // Rules about the JAR format, asked only of JAR files. An Android package has no MIDlet entry
+    // point and draws with the platform's fonts; reporting both as missing would be reporting
+    // that it is not a J2ME game, which nobody needed telling.
+    if matches!(
+        subject.kind,
+        crate::package::Kind::Midlet | crate::package::Kind::JavaArchive
+    ) {
+        check_entry_points(subject.built, &mut report);
+        check_font(
+            subject.font,
+            subject.graph,
+            subject.translations,
+            &mut report,
+        );
+    } else if subject.font.is_some() {
+        // Unless somebody did establish a font for it, in which case they know something this
+        // does not and the check is theirs to have asked for.
+        check_font(
+            subject.font,
+            subject.graph,
+            subject.translations,
+            &mut report,
+        );
+    }
 
     report
 }

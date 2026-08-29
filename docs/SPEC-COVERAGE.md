@@ -7,12 +7,12 @@ are built, because a reader needs to know what is missing as much as what is the
 | --- | --- | --- | --- |
 | 1 | Product vision | n/a | |
 | 2 | No-hardcode architecture | **Built** | Enforced throughout; no game name, class name or resource path appears in the core. |
-| 3 | Genre and game scope | **Partial** | Anything whose text is in the constant pool or in text resources. Genre register is handled by style profiles; genre-specific *code* handling would come from plugins (§20), which are not built. |
+| 3 | Genre and game scope | **Partial** | Anything whose text is in a Java constant pool or in a text resource this build reads - which now covers Android, iOS and a good deal of what PC games ship. Genre register is handled by style profiles; genre-specific *code* handling would come from plugins (§20), which are not built. |
 | 4 | System architecture | **Built** | The pipeline in `docs/ARCHITECTURE.md`. |
 | 5 | Generic game model | **Partial** | `CapabilityManifest`, `ContentGraph`, language and register model. The character and relationship layer is typed but not populated. |
 | 6 | Capability detection | **Built** | `detect`: platform, text storage, resources, obfuscation, each with confidence and evidence. |
-| 7 | JAR/JAD analysis | **Built** | `jar`, including manifest and JAD parsing and 72-byte line wrapping. |
-| 8 | Resource and text extraction | **Built** | `graph`, with stable node ids and shape-based classification. |
+| 7 | Package analysis | **Built** | `jar` for the archive itself, including manifest and JAD parsing and 72-byte line wrapping; `package` identifies J2ME MIDlets, Java archives, Android APKs, iOS IPAs and plain zips from their contents, and says which can be rebuilt here and which need a signature this tool has no business holding. See `docs/PACKAGES.md`. |
+| 8 | Resource and text extraction | **Built** | `graph`, with stable node ids and shape-based classification, over `resource`: properties, Android `strings.xml`, Apple `.strings`, gettext `.po` and JSON, each written back in place so comments and formatting survive. |
 | 9 | Encoding and charset | **Built** | `encoding` (confidence-scored detection) plus modified UTF-8 in `classfile`. |
 | 10 | Context intelligence | **Partial** | Classification by shape, and dictionary domains matched against it. No cross-node inference. |
 | 11 | Vietnamese language engine | **Built** | Register profiles with pronoun sets, register-break detection, missing-diacritic and unconverted-Telex/VNI checks, plus the language-general quality checks. |

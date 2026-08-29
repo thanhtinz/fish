@@ -26,6 +26,16 @@ export interface ProjectSummary {
   needsExtract: boolean;
   nodeCount: number;
   translatableCount: number;
+  package: PackageView;
+}
+
+export interface PackageView {
+  label: string;
+  canRepackage: boolean;
+  note: string | null;
+  evidence: string[];
+  readable: { entry: string; format: string; fields: number }[];
+  opaque: { entry: string; reason: string }[];
 }
 
 export interface RecentView {

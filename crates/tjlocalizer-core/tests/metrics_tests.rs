@@ -107,7 +107,7 @@ mod layout_check {
     use tjlocalizer_core::jar::Archive;
     use tjlocalizer_core::lang::Language;
     use tjlocalizer_core::translation::TranslationStore;
-    use tjlocalizer_core::validate::validate_with_layout;
+    use tjlocalizer_core::validate::{validate, Subject};
 
     fn node(text: &str, context: ContextType) -> TextNode {
         TextNode {
@@ -150,16 +150,17 @@ mod layout_check {
         )
         .unwrap();
 
-        validate_with_layout(
-            &archive,
-            &archive,
-            &graph,
-            &translations,
-            &Language::new("en"),
-            &Language::new("vi-VN"),
-            None,
-            Some(&metrics),
-        )
+        validate(&Subject {
+            metrics: Some(&metrics),
+            ..Subject::new(
+                &archive,
+                &archive,
+                &graph,
+                &translations,
+                &Language::new("en"),
+                &Language::new("vi-VN"),
+            )
+        })
         .findings
         .into_iter()
         .filter(|f| f.check == "layout.width")

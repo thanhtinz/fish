@@ -55,11 +55,84 @@ pub struct ProjectSummary {
     pub needs_extract: bool,
     pub node_count: usize,
     pub translatable_count: usize,
+    /// What kind of package this is, and what cannot be done with it.
+    ///
+    /// Carried on the summary rather than fetched separately because it changes what the
+    /// interface may promise: an Android package can be translated and cannot be handed to
+    /// somebody as an installable file, and a person should learn that when they open the
+    /// project rather than when the build finishes.
+    pub package: PackageView,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PackageView {
+    pub label: String,
+    pub can_repackage: bool,
+    pub note: Option<String>,
+    pub evidence: Vec<String>,
+    pub readable: Vec<ReadableView>,
+    pub opaque: Vec<OpaqueView>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ReadableView {
+    pub entry: String,
+    pub format: String,
+    pub fields: usize,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OpaqueView {
+    pub entry: String,
+    pub reason: String,
+}
+
+impl Default for PackageView {
+    /// What to say about a package that could not be read at all.
+    fn default() -> Self {
+        PackageView {
+            label: "unknown".into(),
+            can_repackage: false,
+            note: None,
+            evidence: Vec::new(),
+            readable: Vec::new(),
+            opaque: Vec::new(),
+        }
+    }
 }
 
 impl ProjectSummary {
     pub fn of(project: &Project) -> Self {
         let profile = project.profile();
+        let package = project
+            .package()
+            .map(|found| PackageView {
+                label: found.kind.label().to_string(),
+                can_repackage: found.kind.can_repackage(),
+                note: found.kind.repackaging_note().map(str::to_string),
+                evidence: found.evidence,
+                readable: found
+                    .readable
+                    .into_iter()
+                    .map(|r| ReadableView {
+                        entry: r.entry,
+                        format: r.format,
+                        fields: r.fields,
+                    })
+                    .collect(),
+                opaque: found
+                    .opaque
+                    .into_iter()
+                    .map(|o| OpaqueView {
+                        entry: o.entry,
+                        reason: o.reason,
+                    })
+                    .collect(),
+            })
+            .unwrap_or_default();
         let graph = project.graph().ok();
         let (nodes, translatable) = match &graph {
             Some(g) => (g.nodes.len(), g.translatable().count()),
@@ -100,6 +173,7 @@ impl ProjectSummary {
             needs_extract: graph.is_none(),
             node_count: nodes,
             translatable_count: translatable,
+            package,
         }
     }
 }

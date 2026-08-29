@@ -39,10 +39,15 @@ async function call<T>(command: string, args?: Record<string, unknown>): Promise
 
 export async function pickJar(): Promise<string | null> {
   const { open } = await import("@tauri-apps/plugin-dialog");
+  // All of these are ZIP archives underneath, and which one it is is worked out from what is
+  // inside rather than from the extension - so the filter is a convenience, not a rule.
   const chosen = await open({
     multiple: false,
-    title: "Chọn file JAR của game",
-    filters: [{ name: "Java archive", extensions: ["jar"] }],
+    title: "Chọn file game (.jar, .apk, .ipa, .zip)",
+    filters: [
+      { name: "Game package", extensions: ["jar", "apk", "ipa", "zip"] },
+      { name: "Mọi file", extensions: ["*"] },
+    ],
   });
   return typeof chosen === "string" ? chosen : null;
 }

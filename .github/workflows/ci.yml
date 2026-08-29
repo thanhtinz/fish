@@ -126,3 +126,5 @@ jobs:
       - run: ./tools/verify-roundtrip.sh
       - run: ./tools/verify-cli.sh
       - run: ./tools/verify-font.sh
+
+      - run: ./tools/verify-packages.sh

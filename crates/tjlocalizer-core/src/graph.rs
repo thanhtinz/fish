@@ -171,33 +171,26 @@ pub fn extract(archive: &Archive) -> ContentGraph {
             .0
             .into_owned();
 
-        let is_properties = entry.extension() == "properties";
-        for (index, line) in decoded.lines().enumerate() {
-            let trimmed = line.trim();
-            if trimmed.is_empty() || trimmed.starts_with('#') || trimmed.starts_with('!') {
-                continue;
-            }
-            let (source, text) = if is_properties {
-                match trimmed.split_once('=') {
-                    Some((key, value)) if !value.trim().is_empty() => (
-                        TextSource::ResourceProperty {
-                            resource: entry.name.clone(),
-                            key: key.trim().to_string(),
-                        },
-                        value.trim().to_string(),
-                    ),
-                    _ => continue,
+        // Which format decides how the text is addressed, and addressing is what has to survive:
+        // a key still finds its value after somebody edits the file, and a line number does not.
+        let format = crate::resource::detect(&entry.name, &decoded);
+        for field in crate::resource::read(format, &decoded) {
+            let source = if format.keyed() {
+                TextSource::ResourceProperty {
+                    resource: entry.name.clone(),
+                    key: field.key.clone(),
                 }
             } else {
-                (
-                    TextSource::ResourceLine {
-                        resource: entry.name.clone(),
-                        line: index,
-                    },
-                    trimmed.to_string(),
-                )
+                TextSource::ResourceLine {
+                    resource: entry.name.clone(),
+                    line: field.key.parse().unwrap_or(0),
+                }
             };
-            nodes.push(make_node(source, text, Some(candidate.label.clone())));
+            nodes.push(make_node(
+                source,
+                field.value,
+                Some(candidate.label.clone()),
+            ));
         }
     }
 
@@ -220,6 +213,15 @@ fn is_archive_metadata(name: &str) -> bool {
         || upper.ends_with(".MF")
         || upper.ends_with(".JAD")
         || upper.ends_with(".SF")
+        // The same rule one platform over. An Android manifest holds the package name, the
+        // permissions and the class of every screen; it is the package's structure exactly as
+        // MANIFEST.MF is, and translating a line of it breaks an app that then installs and
+        // refuses to start.
+        || upper == "ANDROIDMANIFEST.XML"
+        // And an iOS bundle's, which holds the bundle identifier and the executable's name.
+        // InfoPlist.strings is the localizable one and is deliberately not excluded.
+        || upper.ends_with("/INFO.PLIST")
+        || upper == "INFO.PLIST"
 }
 
 fn make_node(source: TextSource, text: String, source_encoding: Option<String>) -> TextNode {

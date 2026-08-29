@@ -23,7 +23,7 @@ use crate::lang::Language;
 use crate::provider::ProviderConfig;
 use crate::suggest::{self, CandidateSet};
 use crate::translation::{Glossary, TranslationMemory, TranslationStore};
-use crate::validate::{validate_with_layout, ValidationReport};
+use crate::validate::ValidationReport;
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 
@@ -215,6 +215,19 @@ pub struct BuildRecord {
     pub validation: ValidationReport,
 }
 
+/// The extension an imported package should keep on disk.
+///
+/// An Android package stored as `.jar` is still an Android package, but nothing that opens it
+/// knows that, starting with the person who goes looking for it in a file manager.
+fn extension_of(archive: &Archive) -> &'static str {
+    match crate::package::detect(archive).kind {
+        crate::package::Kind::Apk => "apk",
+        crate::package::Kind::Ipa => "ipa",
+        crate::package::Kind::Zip => "zip",
+        _ => "jar",
+    }
+}
+
 /// An opened project directory.
 #[derive(Debug)]
 pub struct Project {
@@ -242,7 +255,7 @@ impl Project {
             std::fs::create_dir_all(root.join(dir))?;
         }
 
-        let jar_path = format!("original/{name}.jar");
+        let jar_path = format!("original/{name}.{}", extension_of(&archive));
         std::fs::write(root.join(&jar_path), jar)?;
 
         // Guessing the source language from the archive beats defaulting to English: a wrong
@@ -422,6 +435,11 @@ impl Project {
     }
 
     /// Detects capabilities and writes the manifest (§22, step 4).
+    /// What kind of package this is, and how far this tool can take it (§7).
+    pub fn package(&self) -> crate::Result<crate::package::Detected> {
+        Ok(crate::package::detect(&self.original()?))
+    }
+
     pub fn analyze(&self) -> crate::Result<CapabilityManifest> {
         let manifest = detect::detect(&self.original()?);
         write_json(&self.root.join("extracted/capabilities.json"), &manifest)?;
@@ -1095,16 +1113,29 @@ impl Project {
         // Measured from the sheet the game actually draws from, which is the composed one when a
         // rule installs it: the letters that ship are the letters whose widths matter.
         let metrics = self.font_metrics()?;
-        let mut validation = validate_with_layout(
-            &original,
-            &built,
-            &graph,
-            &translations,
-            self.source_language(),
-            &target.language,
-            font.as_ref(),
-            metrics.as_ref(),
-        );
+        let package = crate::package::detect(&original);
+        let mut validation = crate::validate::validate(&crate::validate::Subject {
+            original: &original,
+            built: &built,
+            graph: &graph,
+            translations: &translations,
+            from: self.source_language(),
+            to: &target.language,
+            kind: package.kind,
+            font: font.as_ref(),
+            metrics: metrics.as_ref(),
+        });
+
+        // A package this tool cannot sign is not a failure and not a success either. Producing it
+        // silently would hand somebody a file their device refuses to install, with nothing on
+        // screen saying why - so the reason travels with the build record.
+        if let Some(note) = package.kind.repackaging_note() {
+            validation.extend([crate::validate::Finding {
+                severity: crate::validate::Severity::Warning,
+                check: "package.signature".into(),
+                detail: format!("this is an {}: {note}", package.kind.label().to_lowercase()),
+            }]);
+        }
 
         // Run against the built archive, and after the rules: whether a redrawn image reached the
         // output is a fact about what will ship, not about what was intended.
@@ -1192,7 +1223,11 @@ impl Project {
 
     /// The localized artifact's file name for one target.
     pub fn output_name(&self, target: &Target) -> String {
-        format!("{}-{}.jar", self.profile.name, target.slug())
+        let extension = std::path::Path::new(&self.profile.source.jar)
+            .extension()
+            .map(|e| e.to_string_lossy().to_string())
+            .unwrap_or_else(|| "jar".into());
+        format!("{}-{}.{extension}", self.profile.name, target.slug())
     }
 
     /// Where the last build for a language was published, if it is there.

@@ -40,8 +40,13 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Command {
-    /// Import a JAR into a new project directory.
+    /// Import a game package into a new project directory.
+    ///
+    /// A J2ME or Java JAR, an Android APK, an iOS IPA, or a zip of files: all of them are ZIP
+    /// archives underneath, and which one it is is worked out from what is inside rather than
+    /// from the extension. `analyze` then says what can and cannot be done with it.
     Import {
+        /// The game: .jar, .apk, .ipa or .zip.
         jar: PathBuf,
         /// Where to create the project. Defaults to projects/<name>.
         #[arg(long)]
@@ -354,6 +359,44 @@ fn run(cli: Cli) -> Result<()> {
 
         Command::Analyze { project } => {
             let project = Project::open(&project)?;
+            let package = project.package()?;
+
+            println!("{}", package.kind.label());
+            for evidence in &package.evidence {
+                println!("  {evidence}");
+            }
+            match package.kind.repackaging_note() {
+                Some(note) => println!("  cannot be rebuilt here: {note}"),
+                None => println!("  can be rebuilt and packaged here"),
+            }
+
+            if !package.readable.is_empty() {
+                println!();
+                println!("text this build can read:");
+                for resource in package.readable.iter().take(20) {
+                    println!(
+                        "  {:<44} {:<16} {} string{}",
+                        resource.entry,
+                        resource.format,
+                        resource.fields,
+                        if resource.fields == 1 { "" } else { "s" }
+                    );
+                }
+                if package.readable.len() > 20 {
+                    println!("  ... and {} more", package.readable.len() - 20);
+                }
+            }
+            if !package.opaque.is_empty() {
+                println!();
+                // Named rather than passed over: a translator who cannot see that a game keeps
+                // half its dialogue somewhere unreadable will think the game is half translated.
+                println!("text this build cannot read:");
+                for resource in &package.opaque {
+                    println!("  {:<44} {}", resource.entry, resource.reason);
+                }
+            }
+            println!();
+
             let manifest = project.analyze()?;
             println!("{} capabilities:", manifest.capabilities.len());
             for capability in &manifest.capabilities {

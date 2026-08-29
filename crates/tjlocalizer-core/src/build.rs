@@ -114,32 +114,19 @@ pub fn apply(
         // them through its own loader, and any charset that could not represent Vietnamese is the
         // reason the text needed localizing in the first place.
         let text = String::from_utf8_lossy(&entry.data).into_owned();
-        let mut lines: Vec<String> = text.lines().map(|l| l.to_string()).collect();
+        let format = crate::resource::detect(resource_name, &text);
 
+        let mut wanted: BTreeMap<String, String> = BTreeMap::new();
         for (source, target) in patches {
-            match source {
-                TextSource::ResourceProperty { key, .. } => {
-                    for line in lines.iter_mut() {
-                        if let Some((k, _)) = line.split_once('=') {
-                            if k.trim() == key {
-                                *line = format!("{k}={target}");
-                                report.resources_patched += 1;
-                                break;
-                            }
-                        }
-                    }
-                }
-                TextSource::ResourceLine { line, .. } => {
-                    if let Some(slot) = lines.get_mut(*line) {
-                        *slot = (*target).to_string();
-                        report.resources_patched += 1;
-                    }
-                }
+            let key = match source {
+                TextSource::ResourceProperty { key, .. } => key.clone(),
+                TextSource::ResourceLine { line, .. } => line.to_string(),
                 TextSource::ClassConstant { .. } => unreachable!(),
-            }
+            };
+            wanted.insert(key, (*target).to_string());
         }
-        let mut rebuilt = lines.join("\n");
-        rebuilt.push('\n');
+        report.resources_patched += wanted.len();
+        let rebuilt = crate::resource::write(format, &text, &wanted);
         archive.replace(resource_name, rebuilt.into_bytes());
     }
 

@@ -5,7 +5,7 @@ use tjlocalizer_core::graph::{self, ContextType};
 use tjlocalizer_core::jar::{Archive, Manifest};
 use tjlocalizer_core::lang::Language;
 use tjlocalizer_core::translation::TranslationStore;
-use tjlocalizer_core::validate::{validate, Severity};
+use tjlocalizer_core::validate::{validate, Severity, Subject};
 
 fn original() -> Archive {
     let bytes = std::fs::read(concat!(
@@ -52,14 +52,14 @@ fn translates_rebuilds_and_validates() {
     assert!(report.resources_patched >= 2);
     assert_eq!(report.output_sha256.len(), 64);
 
-    let validation = validate(
+    let validation = validate(&Subject::new(
         &original,
         &built,
         &graph,
         &store,
         &Language::new("en"),
         &Language::new("vi-VN"),
-    );
+    ));
     for finding in validation.errors() {
         eprintln!("unexpected error: {} - {}", finding.check, finding.detail);
     }
@@ -154,14 +154,14 @@ fn validation_catches_a_lost_placeholder() {
     store.set(&node.id, "Sinh lực đầy đủ"); // both %d dropped
 
     let (built, _) = apply(&original, &graph, &store, &Branding::default()).unwrap();
-    let report = validate(
+    let report = validate(&Subject::new(
         &original,
         &built,
         &graph,
         &store,
         &Language::new("en"),
         &Language::new("vi-VN"),
-    );
+    ));
 
     assert!(
         !report.is_ok(),
@@ -193,14 +193,14 @@ fn validation_catches_a_missing_entry_point() {
     assert_eq!(manifest.midlet_classes(), vec!["SampleGame".to_string()]);
     assert!(built.remove("SampleGame.class"));
 
-    let report = validate(
+    let report = validate(&Subject::new(
         &original,
         &built,
         &graph,
         &TranslationStore::default(),
         &Language::new("en"),
         &Language::new("vi-VN"),
-    );
+    ));
     let entry_point = report
         .errors()
         .find(|f| f.check == "entry_point")
