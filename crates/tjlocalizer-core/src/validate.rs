@@ -1,0 +1,179 @@
+//! Post-build validation (specification §24).
+//!
+//! Checks run against the built artefact, not against the plan, because the failures that matter
+//! are the ones that survive the build: a class that no longer parses, a MIDlet entry point that
+//! disappeared, a placeholder lost in translation.
+
+use crate::classfile::ClassFile;
+use crate::graph::ContentGraph;
+use crate::jar::{Archive, Manifest};
+use crate::vietnamese::TranslationStore;
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Severity {
+    /// The output is broken and must not ship.
+    Error,
+    /// Worth a look, but the output is usable.
+    Warning,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Finding {
+    pub severity: Severity,
+    pub check: String,
+    pub detail: String,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct ValidationReport {
+    pub findings: Vec<Finding>,
+}
+
+impl ValidationReport {
+    pub fn is_ok(&self) -> bool {
+        !self.findings.iter().any(|f| f.severity == Severity::Error)
+    }
+
+    pub fn errors(&self) -> impl Iterator<Item = &Finding> {
+        self.findings
+            .iter()
+            .filter(|f| f.severity == Severity::Error)
+    }
+
+    fn error(&mut self, check: &str, detail: String) {
+        self.findings.push(Finding {
+            severity: Severity::Error,
+            check: check.to_string(),
+            detail,
+        });
+    }
+
+    fn warn(&mut self, check: &str, detail: String) {
+        self.findings.push(Finding {
+            severity: Severity::Warning,
+            check: check.to_string(),
+            detail,
+        });
+    }
+}
+
+/// Validates a built archive against the original it came from.
+pub fn validate(
+    original: &Archive,
+    built: &Archive,
+    graph: &ContentGraph,
+    translations: &TranslationStore,
+) -> ValidationReport {
+    let mut report = ValidationReport::default();
+
+    check_nothing_lost(original, built, &mut report);
+    check_classes_parse(built, &mut report);
+    check_entry_points(built, &mut report);
+    check_placeholders(graph, translations, &mut report);
+    check_originals_preserved(original, built, &mut report);
+
+    report
+}
+
+/// Every entry in the original must still be present.
+fn check_nothing_lost(original: &Archive, built: &Archive, report: &mut ValidationReport) {
+    for entry in original.entries() {
+        if built.get(&entry.name).is_none() {
+            report.error(
+                "resource",
+                format!("{} is missing from the build", entry.name),
+            );
+        }
+    }
+}
+
+/// Every class must still parse. This is the check that catches a bad patch.
+fn check_classes_parse(built: &Archive, report: &mut ValidationReport) {
+    for entry in built.classes() {
+        if let Err(e) = ClassFile::parse(&entry.data) {
+            report.error("class", format!("{} no longer parses: {e}", entry.name));
+        }
+    }
+}
+
+/// The MIDlet classes named in the manifest must exist in the archive.
+///
+/// This is the most common way a repackaged J2ME game fails: it installs and then will not start,
+/// with no diagnostic beyond a blank screen.
+fn check_entry_points(built: &Archive, report: &mut ValidationReport) {
+    let Some(entry) = built.get("META-INF/MANIFEST.MF") else {
+        report.error("manifest", "META-INF/MANIFEST.MF is missing".into());
+        return;
+    };
+    let manifest = Manifest::parse(&String::from_utf8_lossy(&entry.data));
+    let midlets = manifest.midlet_classes();
+    if midlets.is_empty() {
+        report.warn("manifest", "no MIDlet entry point declared".into());
+    }
+    for class in midlets {
+        let path = format!("{}.class", class.replace('.', "/"));
+        if built.get(&path).is_none() {
+            report.error(
+                "entry_point",
+                format!("MIDlet class {class} has no {path} in the archive"),
+            );
+        }
+    }
+}
+
+/// Placeholders present in the source must survive into the approved translation.
+fn check_placeholders(
+    graph: &ContentGraph,
+    translations: &TranslationStore,
+    report: &mut ValidationReport,
+) {
+    for node in &graph.nodes {
+        let Some(target) = translations.get(&node.id) else {
+            continue;
+        };
+        for issue in crate::vietnamese::check(&node.source_text, target, &node.constraints.placeholders) {
+            let severity = if issue.code == "placeholder" || issue.code == "empty" {
+                Severity::Error
+            } else {
+                Severity::Warning
+            };
+            report.findings.push(Finding {
+                severity,
+                check: format!("translation.{}", issue.code),
+                detail: format!("{:?}: {}", node.source_text, issue.detail),
+            });
+        }
+    }
+}
+
+/// The original manifest attributes must survive the build (specification §36).
+fn check_originals_preserved(
+    original: &Archive,
+    built: &Archive,
+    report: &mut ValidationReport,
+) {
+    let (Some(before), Some(after)) = (
+        original.get("META-INF/MANIFEST.MF"),
+        built.get("META-INF/MANIFEST.MF"),
+    ) else {
+        return;
+    };
+    let before = Manifest::parse(&String::from_utf8_lossy(&before.data));
+    let after = Manifest::parse(&String::from_utf8_lossy(&after.data));
+
+    for (key, value) in before.iter() {
+        match after.get(key) {
+            None => report.error(
+                "attribution",
+                format!("original manifest attribute {key} was removed"),
+            ),
+            Some(now) if now != value => report.error(
+                "attribution",
+                format!("original manifest attribute {key} was changed"),
+            ),
+            _ => {}
+        }
+    }
+}
