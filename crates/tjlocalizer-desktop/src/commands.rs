@@ -1100,3 +1100,54 @@ mod tests {
         }
     }
 }
+
+// ---------------------------------------------------------------------------------------------
+// Per-game patches (§19).
+//
+// Everything else the application does works on any JAR. These do not: they change one game,
+// because they were written for one game. So they are listed with what they would do and why
+// they might not, and nothing runs until somebody switches it on.
+// ---------------------------------------------------------------------------------------------
+
+#[tauri::command]
+pub fn rules(path: String) -> Reply<Vec<RuleView>> {
+    let project = open(&path)?;
+    Ok(project
+        .plan_rules()
+        .map_err(err)?
+        .into_iter()
+        .map(RuleView::from)
+        .collect())
+}
+
+/// Writes the rule that puts the composed sheet into the game.
+///
+/// Switched off, as every generated rule is. It also only covers the half of the job that is the
+/// same in every game - replacing the image - and its description says which half is missing,
+/// because a rule that swapped the artwork and stopped would leave the game drawing its old
+/// letters from a taller sheet.
+#[tauri::command]
+pub fn write_font_install_rule(path: String) -> Reply<Vec<RuleView>> {
+    let project = open(&path)?;
+    let rule = project.font_install_rule().map_err(err)?;
+    project.put_rule(rule).map_err(err)?;
+    rules(path)
+}
+
+#[tauri::command]
+pub fn set_rule_enabled(path: String, id: String, enabled: bool) -> Reply<Vec<RuleView>> {
+    let project = open(&path)?;
+    if !project.set_rule_enabled(&id, enabled).map_err(err)? {
+        return Err(format!("this project has no rule {id}"));
+    }
+    rules(path)
+}
+
+#[tauri::command]
+pub fn remove_rule(path: String, id: String) -> Reply<Vec<RuleView>> {
+    let project = open(&path)?;
+    if !project.remove_rule(&id).map_err(err)? {
+        return Err(format!("this project has no rule {id}"));
+    }
+    rules(path)
+}

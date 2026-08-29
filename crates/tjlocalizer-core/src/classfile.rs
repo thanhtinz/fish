@@ -212,6 +212,49 @@ impl ClassFile {
         out
     }
 
+    /// Every `CONSTANT_Integer` in the pool, with its index.
+    ///
+    /// Games keep layout numbers here - how many columns a glyph sheet has, how wide a cell is -
+    /// and those are the numbers a font swap has to change. Reading them is how a rule can say
+    /// "this game holds a 16 where I expect one" before it changes anything.
+    pub fn integers(&self) -> Vec<(u16, i32)> {
+        self.constants
+            .iter()
+            .enumerate()
+            .filter_map(|(i, c)| match c {
+                Constant::Other { tag: 3, payload } => {
+                    let bytes: [u8; 4] = payload.as_slice().try_into().ok()?;
+                    Some((i as u16, i32::from_be_bytes(bytes)))
+                }
+                _ => None,
+            })
+            .collect()
+    }
+
+    /// Replaces the value of a `CONSTANT_Integer`.
+    ///
+    /// Four bytes for four bytes, so nothing about the class's shape changes - the same reason
+    /// the pool can be rewritten at all. It is still a change to what the game computes, which is
+    /// why the rule engine will only do it where a rule said which value it expected to find.
+    pub fn set_integer(&mut self, index: u16, value: i32) -> Result<()> {
+        let count = self.constant_count();
+        let slot = self
+            .constants
+            .get_mut(index as usize)
+            .ok_or(Error::ConstantIndexOutOfRange { index, count })?;
+        match slot {
+            Constant::Other { tag: 3, payload } => {
+                *payload = value.to_be_bytes().to_vec();
+                Ok(())
+            }
+            other => Err(Error::ConstantTypeMismatch {
+                index,
+                expected: "Integer",
+                actual: other.kind(),
+            }),
+        }
+    }
+
     /// Replaces the bytes of a Utf8 entry.
     ///
     /// The new text can be any length: the pool is re-serialised on write, and because nothing

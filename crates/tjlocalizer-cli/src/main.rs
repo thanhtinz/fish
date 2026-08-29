@@ -235,6 +235,27 @@ enum Command {
         lang: Option<String>,
     },
 
+    /// The per-game patches a project holds, and whether they fit this game (§19).
+    ///
+    /// A rule is data, not code: it says what it expects to find in the game and what it would
+    /// change, and it refuses when the game is not what it was written for. Nothing runs until it
+    /// is switched on.
+    Rules {
+        project: PathBuf,
+        /// Write the rule that installs the composed font sheet into the game.
+        #[arg(long)]
+        install_font: bool,
+        /// Switch a rule on by id.
+        #[arg(long)]
+        enable: Option<String>,
+        /// Switch a rule off by id.
+        #[arg(long)]
+        disable: Option<String>,
+        /// Delete a rule by id.
+        #[arg(long)]
+        remove: Option<String>,
+    },
+
     /// Import, analyze, extract, propose, build and validate in one pass.
     Localize {
         jar: PathBuf,
@@ -905,6 +926,73 @@ fn run(cli: Cli) -> Result<()> {
             Ok(())
         }
 
+        Command::Rules {
+            project,
+            install_font,
+            enable,
+            disable,
+            remove,
+        } => {
+            let project = Project::open(&project)?;
+
+            if install_font {
+                let rule = project.font_install_rule()?;
+                let id = rule.id.clone();
+                project.put_rule(rule)?;
+                println!("wrote rule {id}, switched off");
+                println!("  it replaces the sheet.");
+                println!(
+                    "  Making the game read the new rows needs a change this cannot guess: add it"
+                );
+                println!(
+                    "  as setIntConstant or setStringConstant in rules/rules.json, then enable it."
+                );
+            }
+            for (id, state) in [(enable, true), (disable, false)] {
+                if let Some(id) = id {
+                    if !project.set_rule_enabled(&id, state)? {
+                        anyhow::bail!("this project has no rule {id}");
+                    }
+                    println!("{id} is now {}", if state { "on" } else { "off" });
+                }
+            }
+            if let Some(id) = remove {
+                if !project.remove_rule(&id)? {
+                    anyhow::bail!("this project has no rule {id}");
+                }
+                println!("removed {id}");
+            }
+
+            let plans = project.plan_rules()?;
+            if plans.is_empty() {
+                println!("no rules. `--install-font` writes the one this tool can generate.");
+                return Ok(());
+            }
+            for plan in &plans {
+                let state = if plan.ready() {
+                    "on, fits"
+                } else if plan.enabled {
+                    "on, does not fit"
+                } else {
+                    "off"
+                };
+                println!("{} [{state}]", plan.id);
+                if !plan.description.is_empty() {
+                    println!("  {}", plan.description);
+                }
+                for effect in &plan.effects {
+                    println!("  would {effect}");
+                }
+                for reason in &plan.unmet {
+                    println!("  blocked: {reason}");
+                }
+                if plan.effects.is_empty() && plan.unmet.is_empty() {
+                    println!("  nothing to do: it matches nothing in this game");
+                }
+            }
+            Ok(())
+        }
+
         Command::Localize {
             jar,
             into,
@@ -1211,6 +1299,26 @@ fn report_build(project: &Project, record: &BuildRecord) {
         record.report.classes_patched,
         record.report.resources_patched
     );
+    // A per-game patch that ran silently would be untraceable: somebody looking at a shipped
+    // build has to be able to see that its font was swapped.
+    if !record.rules.rules.is_empty() {
+        let plural =
+            |n: usize, one: &str, many: &str| format!("{n} {}", if n == 1 { one } else { many });
+        println!(
+            "  rules: {} ({}, {})",
+            record.rules.rules.join(", "),
+            plural(
+                record.rules.entries_replaced,
+                "entry replaced",
+                "entries replaced"
+            ),
+            plural(
+                record.rules.constants_changed,
+                "constant changed",
+                "constants changed"
+            )
+        );
+    }
     println!("  output/{name}");
     println!("  sha256 {}", record.report.output_sha256);
 }

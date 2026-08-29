@@ -168,6 +168,24 @@ because a test caught the second one ranking a 4-row reading of a 6-row sheet fi
 `font_candidates` ranks the archive's images by how much each looks like a glyph sheet, on the
 best grid's score, how little ink it carries, and how few colours it uses.
 
+## Installing it
+
+Composing writes artwork. Putting it in the game is a rule (§19), because which entry the game
+reads and how it maps characters to cells is per-game:
+
+```
+tjlocalizer rules <project> --install-font      # written, switched off
+tjlocalizer rules <project> --enable install-font
+```
+
+Once that rule is enabled *and* its conditions hold, two things change: the built archive carries
+the composed sheet, and the coverage the build is judged against becomes that sheet - otherwise
+installing a Vietnamese font would still fail the missing-glyph check.
+
+The generated rule covers replacing the image, which is the same in every game. Teaching the game
+that the sheet grew taller is not, and is left to a hand-written `setIntConstant` or
+`setStringConstant`. See `docs/RULES.md`.
+
 ## What it does not do
 
 **It does not install the font.** Making the game *use* the new glyphs means changing how it looks

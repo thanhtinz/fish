@@ -61,4 +61,40 @@ grep -q "composed 134 glyphs" "$work/compose" \
     || { echo "not every letter was composed" >&2; exit 1; }
 test -f "$work/p/fonts/extended.png" || { echo "no sheet was written" >&2; exit 1; }
 
-echo "ok: the missing glyphs were caught, the build refused, and 134 letters were composed"
+# Composing produces artwork. Until a rule puts it in the archive the game still ships its own
+# sheet - so the build must still refuse, or the tool would be calling a picture in a folder a fix.
+if "$tj" build "$work/p" --lang vi-VN > "$work/build2" 2>&1; then
+    echo "the build passed on a sheet that is not in the game" >&2
+    exit 1
+fi
+
+"$tj" rules "$work/p" --install-font | tee "$work/rule"
+grep -q "install-font \[off\]" "$work/rule" \
+    || { echo "a generated rule must start switched off" >&2; cat "$work/rule" >&2; exit 1; }
+
+if "$tj" build "$work/p" --lang vi-VN > "$work/build3" 2>&1; then
+    echo "an unenabled rule installed the font anyway" >&2
+    exit 1
+fi
+
+"$tj" rules "$work/p" --enable install-font > /dev/null
+"$tj" build "$work/p" --lang vi-VN | tee "$work/build4" \
+    || { echo "the build still failed with the font installed" >&2; cat "$work/build4" >&2; exit 1; }
+grep -q "rules: install-font" "$work/build4" \
+    || { echo "the build did not record the rule that ran" >&2; exit 1; }
+
+# The proof is in the file that ships, not in the report about it.
+python3 - "$work" <<'CHECK'
+import sys, zipfile, hashlib, pathlib
+work = pathlib.Path(sys.argv[1])
+built = next((work / "p/output").glob("*.jar"))
+shipped = zipfile.ZipFile(built).read("font.png")
+composed = (work / "p/fonts/extended.png").read_bytes()
+if shipped != composed:
+    raise SystemExit(f"the game shipped a different font.png ({len(shipped)} bytes)")
+print(f"shipped font.png is the composed sheet ({len(composed)} bytes, "
+      f"sha256 {hashlib.sha256(composed).hexdigest()[:12]})")
+CHECK
+
+echo "ok: the missing glyphs were caught, the build refused, 134 letters were composed,"
+echo "    and the game ships them only once a rule was written and switched on"

@@ -202,6 +202,9 @@ pub struct BuildRecord {
     pub source_sha256: String,
     pub translations_applied: usize,
     pub report: BuildReport,
+    /// The per-game patches that ran, if any (§19).
+    #[serde(default)]
+    pub rules: crate::rules::Applied,
     pub validation: ValidationReport,
 }
 
@@ -552,8 +555,64 @@ impl Project {
             covered.extend(font::vietnamese_required());
             return Ok(Some(Coverage::new(covered, "device font")));
         }
+        // A ready rule that installs the composed sheet changes the answer: the game will ship
+        // drawing from that sheet, so reporting the original's coverage would fail a build that
+        // is in fact fine. Only a rule that is switched on and whose conditions hold counts -
+        // one written for a different version of the artwork does not.
+        if let Some(order) = self.installed_font_order()? {
+            return Ok(Some(Coverage::new(
+                order,
+                format!("{} (with the composed sheet installed)", profile.entry),
+            )));
+        }
         let sheet = self.font_sheet()?;
         Ok(sheet.map(|s| Coverage::new(s.order.clone(), profile.entry.clone())))
+    }
+
+    /// The characters the game will draw once the rules have run, when a rule installs a sheet.
+    ///
+    /// Read from the sidecar written beside the composed image rather than from the image, because
+    /// what a sheet covers is which character sits in which cell, and no PNG records that.
+    fn installed_font_order(&self) -> crate::Result<Option<Vec<char>>> {
+        let Some(profile) = &self.profile.font else {
+            return Ok(None);
+        };
+        let rules = self.rules()?;
+        if rules.is_empty() {
+            return Ok(None);
+        }
+        let archive = self.original()?;
+
+        for rule in rules.iter().filter(|r| r.enabled) {
+            let installs = rule.then.iter().find_map(|action| match action {
+                crate::rules::Action::ReplaceEntry { entry, from } if *entry == profile.entry => {
+                    Some(from.clone())
+                }
+                _ => None,
+            });
+            let Some(from) = installs else { continue };
+
+            let fits = crate::rules::plan(std::slice::from_ref(rule), &archive, &self.root)?
+                .first()
+                .map(|p| p.ready())
+                .unwrap_or(false);
+            if !fits {
+                continue;
+            }
+
+            // The sidecar sits beside the image the rule installs, whatever it is called.
+            let sidecar = self.root.join(&from).with_extension("json");
+            let Ok(text) = std::fs::read_to_string(&sidecar) else {
+                continue;
+            };
+            let Ok(value) = serde_json::from_str::<serde_json::Value>(&text) else {
+                continue;
+            };
+            if let Some(order) = value.get("order").and_then(|o| o.as_str()) {
+                return Ok(Some(order.chars().collect()));
+            }
+        }
+        Ok(None)
     }
 
     /// The game's glyph sheet, read from the original archive.
@@ -708,6 +767,120 @@ impl Project {
         Ok(Some(path))
     }
 
+    /// The per-game patches this project holds (§19).
+    pub fn rules(&self) -> crate::Result<Vec<crate::rules::Rule>> {
+        crate::rules::load(&self.root)
+    }
+
+    pub fn save_rules(&self, rules: &[crate::rules::Rule]) -> crate::Result<()> {
+        crate::rules::save(&self.root, rules)
+    }
+
+    /// What each rule would do to this game, or why it cannot.
+    pub fn plan_rules(&self) -> crate::Result<Vec<crate::rules::RulePlan>> {
+        crate::rules::plan(&self.rules()?, &self.original()?, &self.root)
+    }
+
+    /// Adds or replaces one rule by id, leaving the others alone.
+    pub fn put_rule(&self, rule: crate::rules::Rule) -> crate::Result<()> {
+        let mut rules = self.rules()?;
+        match rules.iter_mut().find(|r| r.id == rule.id) {
+            Some(existing) => *existing = rule,
+            None => rules.push(rule),
+        }
+        self.save_rules(&rules)
+    }
+
+    pub fn remove_rule(&self, id: &str) -> crate::Result<bool> {
+        let mut rules = self.rules()?;
+        let before = rules.len();
+        rules.retain(|r| r.id != id);
+        let removed = rules.len() != before;
+        if removed {
+            self.save_rules(&rules)?;
+        }
+        Ok(removed)
+    }
+
+    pub fn set_rule_enabled(&self, id: &str, enabled: bool) -> crate::Result<bool> {
+        let mut rules = self.rules()?;
+        let Some(rule) = rules.iter_mut().find(|r| r.id == id) else {
+            return Ok(false);
+        };
+        rule.enabled = enabled;
+        self.save_rules(&rules)?;
+        Ok(true)
+    }
+
+    /// Writes the rule that puts the composed sheet into the game, as far as that can be known.
+    ///
+    /// Half a rule, honestly labelled. Replacing the image is the part that is the same in every
+    /// game, and the conditions make it refuse if the artwork is not the one that was measured.
+    /// The other part - teaching the game that the sheet now has more rows and which character
+    /// each new cell holds - lives in code that differs per game, so this fills in what it can
+    /// and leaves the rest for a person to add as `setIntConstant` or `setStringConstant`.
+    ///
+    /// It refuses to pretend otherwise. A rule that replaced the image and stopped would leave a
+    /// game drawing its old letters from a taller sheet, which is a display bug rather than a
+    /// missing feature, and much harder to see.
+    pub fn font_install_rule(&self) -> crate::Result<crate::rules::Rule> {
+        use crate::rules::{Action, Condition, Rule};
+
+        let profile = self
+            .profile
+            .font
+            .as_ref()
+            .ok_or_else(|| crate::Error::InvalidProject {
+                path: self.root.clone(),
+                reason: "say which image holds the font first".into(),
+            })?;
+        if profile.device_font || profile.entry.is_empty() {
+            return Err(crate::Error::InvalidProject {
+                path: self.root.clone(),
+                reason: "a game drawing with the device font has no sheet to install".into(),
+            });
+        }
+        let composed = self.root.join("fonts/extended.png");
+        if !composed.exists() {
+            return Err(crate::Error::InvalidProject {
+                path: self.root.clone(),
+                reason: "compose the font first - there is nothing to install yet".into(),
+            });
+        }
+
+        let original = self.original()?;
+        let current = original
+            .get(&profile.entry)
+            .ok_or_else(|| crate::Error::InvalidProject {
+                path: self.root.clone(),
+                reason: format!("the archive has no entry {}", profile.entry),
+            })?;
+
+        let mut rule = Rule::new(
+            "install-font",
+            format!(
+                "Replace {} with the sheet holding the Vietnamese letters. The game must also be told the sheet is taller and which character each new cell holds; that part is per-game and is not written here.",
+                profile.entry
+            ),
+        );
+        rule.when = vec![
+            // By hash rather than by name: a rule written against one version of the artwork must
+            // not run against another, because the composed sheet was measured from that one.
+            Condition::EntrySha256 {
+                entry: profile.entry.clone(),
+                sha256: sha256_hex(&current.data),
+            },
+            Condition::ProjectFile {
+                path: "fonts/extended.png".into(),
+            },
+        ];
+        rule.then = vec![Action::ReplaceEntry {
+            entry: profile.entry.clone(),
+            from: "fonts/extended.png".into(),
+        }];
+        Ok(rule)
+    }
+
     /// Generates translation candidates for one target (§22, step 9).
     pub fn suggest(
         &self,
@@ -748,8 +921,13 @@ impl Project {
         let graph = self.graph()?;
         let translations = self.translations(language)?;
 
-        let (built, report) =
+        let (mut built, report) =
             build::apply(&original, &graph, &translations, &self.profile.branding)?;
+
+        // Rules run last, on the archive the text has already been patched into. They are the
+        // per-game part of the work - installing a font sheet, changing a layout constant - and
+        // running them here means the validation below sees what will actually ship.
+        let rules = crate::rules::apply(&self.rules()?, &mut built, &self.root)?;
         let bytes = built.write()?;
         let font = self.font_coverage()?;
         let validation = validate_with_font(
@@ -776,6 +954,7 @@ impl Project {
             source_sha256: self.profile.source.sha256.clone(),
             translations_applied: translations.len(),
             report,
+            rules,
             validation,
         };
         write_json(&dir.join("build.json"), &record)?;

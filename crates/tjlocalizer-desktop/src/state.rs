@@ -630,3 +630,34 @@ pub struct SkippedGroupView {
     pub reason: String,
     pub letters: String,
 }
+
+/// One per-game patch, as the interface sees it (§19).
+///
+/// `ready` is computed in Rust rather than by the interface checking three fields, because it is
+/// the answer to "will this run?" and a display that got it wrong would tell somebody their font
+/// was installed when it was not.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RuleView {
+    pub id: String,
+    pub description: String,
+    pub enabled: bool,
+    pub ready: bool,
+    /// What it would change, in numbers read from this game.
+    pub effects: Vec<String>,
+    /// Why it cannot run. Empty when it fits.
+    pub unmet: Vec<String>,
+}
+
+impl From<tjlocalizer_core::rules::RulePlan> for RuleView {
+    fn from(plan: tjlocalizer_core::rules::RulePlan) -> Self {
+        RuleView {
+            ready: plan.ready(),
+            id: plan.id,
+            description: plan.description,
+            enabled: plan.enabled,
+            effects: plan.effects,
+            unmet: plan.unmet,
+        }
+    }
+}

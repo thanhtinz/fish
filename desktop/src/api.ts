@@ -20,6 +20,7 @@ import type {
   NodeView,
   ProjectSummary,
   RecentView,
+  RuleView,
   SheetCandidateView,
   StyleView,
 } from "./types";
@@ -178,4 +179,12 @@ export const api = {
 
   fontPreview: (path: string, text: string | null, scale: number | null) =>
     call<string>("font_preview", { path, text, scale }),
+
+  rules: (path: string) => call<RuleView[]>("rules", { path }),
+  writeFontInstallRule: (path: string) => call<RuleView[]>("write_font_install_rule", { path }),
+
+  setRuleEnabled: (path: string, id: string, enabled: boolean) =>
+    call<RuleView[]>("set_rule_enabled", { path, id, enabled }),
+
+  removeRule: (path: string, id: string) => call<RuleView[]>("remove_rule", { path, id }),
 };

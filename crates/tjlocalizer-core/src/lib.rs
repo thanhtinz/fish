@@ -21,6 +21,7 @@ pub mod project;
 pub mod provider;
 pub mod quality;
 pub mod register;
+pub mod rules;
 pub mod secrets;
 pub mod suggest;
 pub mod translate;

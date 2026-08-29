@@ -56,6 +56,10 @@ pub fn run() {
             commands::set_marks_font,
             commands::compose_font,
             commands::font_preview,
+            commands::rules,
+            commands::write_font_install_rule,
+            commands::set_rule_enabled,
+            commands::remove_rule,
         ])
         .run(tauri::generate_context!())
         .expect("the application failed to start");

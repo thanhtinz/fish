@@ -1,6 +1,12 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, pickFolder } from "./api";
-import type { CompositionView, FontScan, FontView as Font, SheetCandidateView } from "./types";
+import type {
+  CompositionView,
+  FontScan,
+  FontView as Font,
+  RuleView,
+  SheetCandidateView,
+} from "./types";
 
 interface Props {
   path: string;
@@ -27,11 +33,13 @@ export function FontView({ path, say }: Props) {
   const [preview, setPreview] = useState<string | null>(null);
   const [sample, setSample] = useState("Cá đã cắn câu\nBạn nhận được 5 vàng\nThoát trò chơi");
   const [order, setOrder] = useState("");
+  const [rules, setRules] = useState<RuleView[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
       setFont(await api.fontStatus(path));
+      setRules(await api.rules(path));
     } catch (e) {
       say(String(e), true);
     }
@@ -458,6 +466,90 @@ export function FontView({ path, say }: Props) {
                 />
               </>
             )}
+          </div>
+
+          <div className="card">
+            <h3>Gắn vào game</h3>
+            <div className="sub">
+              Đây là phần <b>riêng của từng game</b>: đổi ảnh font thì game nào cũng như nhau,
+              nhưng dạy game biết bảng chữ đã cao thêm và ô mới chứa chữ gì thì mỗi game một kiểu.
+              Công cụ viết sẵn phần giống nhau; phần còn lại phải người thêm vào — nên luật viết ra
+              luôn ở trạng thái <b>tắt</b>.
+            </div>
+            <div className="wrap" style={{ marginBottom: rules.length > 0 ? 14 : 0 }}>
+              <button
+                disabled={busy !== null}
+                onClick={async () => {
+                  const updated = await run("rule", () => api.writeFontInstallRule(path));
+                  if (updated) {
+                    setRules(updated);
+                    say("Đã viết luật install-font — đang tắt");
+                  }
+                }}
+              >
+                {busy === "rule" ? <span className="spin" /> : null} Viết luật cài font
+              </button>
+            </div>
+
+            {rules.map((r) => (
+              <div
+                key={r.id}
+                style={{ borderTop: "1px solid var(--line-soft)", padding: "11px 0 4px" }}
+              >
+                <div className="row">
+                  <span style={{ fontFamily: "var(--mono)", fontSize: 12.5, flex: 1 }}>{r.id}</span>
+                  <span className={r.ready ? "pill ok" : r.enabled ? "pill bad" : "pill"}>
+                    {r.ready ? "đang chạy" : r.enabled ? "bật, không khớp game" : "tắt"}
+                  </span>
+                  <button
+                    disabled={busy !== null}
+                    onClick={async () => {
+                      const updated = await run("toggle", () =>
+                        api.setRuleEnabled(path, r.id, !r.enabled),
+                      );
+                      if (updated) {
+                        setRules(updated);
+                        await load();
+                      }
+                    }}
+                  >
+                    {r.enabled ? "Tắt" : "Bật"}
+                  </button>
+                  <button
+                    disabled={busy !== null}
+                    onClick={async () => {
+                      const updated = await run("remove", () => api.removeRule(path, r.id));
+                      if (updated) {
+                        setRules(updated);
+                        await load();
+                      }
+                    }}
+                  >
+                    Xoá
+                  </button>
+                </div>
+                {r.description && (
+                  <div style={{ color: "var(--text-faint)", fontSize: 12, marginTop: 5 }}>
+                    {r.description}
+                  </div>
+                )}
+                {r.effects.map((e) => (
+                  <div key={e} style={{ fontSize: 12, marginTop: 4 }}>
+                    → {e}
+                  </div>
+                ))}
+                {r.unmet.map((u) => (
+                  <div key={u} style={{ color: "var(--bad)", fontSize: 12, marginTop: 4 }}>
+                    ✕ {u}
+                  </div>
+                ))}
+                {r.effects.length === 0 && r.unmet.length === 0 && (
+                  <div style={{ color: "var(--text-faint)", fontSize: 12, marginTop: 4 }}>
+                    Không khớp gì trong game này — luật sẽ không làm gì cả.
+                  </div>
+                )}
+              </div>
+            ))}
           </div>
         </>
       )}

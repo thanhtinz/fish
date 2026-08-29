@@ -220,3 +220,12 @@ export interface CompositionView {
   typeface: string | null;
   image: string;
 }
+
+export interface RuleView {
+  id: string;
+  description: string;
+  enabled: boolean;
+  ready: boolean;
+  effects: string[];
+  unmet: string[];
+}
