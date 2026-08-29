@@ -7,13 +7,44 @@ the words already drawn on, and no amount of translating strings touches them. A
 reported as fully translated, pass every check here, and still show a player an English START
 button - because that word was never a string.
 
-## What the tool does not do
+## Reading the words
 
-It does not read the images. There is no OCR, and a wrong reading would be worse than none: a
-translator handed "5TART" has to check the picture anyway, and one handed nothing at least knows
-they have to.
+A button label in a game is drawn with the game's font, and this project already has that font: a
+glyph sheet, every letter in it, pixel for pixel. So the question is not "what letter does this
+shape resemble" - which is what general OCR answers, and answers wrongly at twelve pixels - but
+"which of these ninety-five exact bitmaps is this shape", which has an answer that can be checked.
 
-## What it does
+```
+tjlocalizer assets <project> --read
+  btn_start.png  "START"
+      every shape matched, worst 0.98
+  logo.png  "����" - 4 shapes matched no letter
+```
+
+Each shape is cut out of the picture, cropped to its ink, and compared against every glyph of the
+sheet by intersection over union, allowing a pixel of drift in each direction because a letter
+resaved through a lossy step moves. Above 0.74 it is that letter; below, it is nothing. Letters
+that touch are split only where the blob is too wide to be one letter, and spaces are a gap
+noticeably wider than the gaps between the letters of the same line - both measured off the image
+rather than assumed, because a game draws on its own pitch.
+
+A reading where every shape matched can be accepted in one step:
+
+```
+tjlocalizer assets <project> --read --accept
+```
+
+A reading with a single unmatched shape in it cannot. `PLA?` is not a word and a person shown it
+will accept it anyway, so it is never offered as text - it is shown with the count of what did not
+match, and a person types what the picture says.
+
+This needs the project to know which image the game's font is (`tjlocalizer font <project>
+--candidates`). Without it there are no letters to match against, and the command says so rather
+than falling back to a general reader. Artwork lettered by hand, or in a font the game does not
+ship, or scaled or rotated, comes back unread - which is the same answer this tool gave before it
+could read anything at all.
+
+## What it does without reading
 
 It lists every image with what its shape suggests, as evidence a person can check by looking:
 
@@ -37,7 +68,8 @@ tjlocalizer assets <project> --mark start_btn.png --says "START"
 tjlocalizer assets <project> --mark start_btn.png --replacement assets/start_btn.png
 ```
 
-or the same in the application's **Ảnh** tab, where the images are shown rather than named.
+or the same in the application's **Ảnh** tab, where the images are shown rather than named and
+**Đọc chữ bằng font game** fills in what it could read.
 
 ## Why writing it down is the point
 
@@ -60,7 +92,6 @@ over something a person already decided.
 
 ## What is not here
 
-Reading the words, redrawing the image, and laying Vietnamese out inside the original's shape.
-The first needs OCR; the other two need a person who can draw. The font engine can render text in
-the game's own glyphs (`docs/FONTS.md`), which covers a button whose label is plain lettering, and
-nothing at all for a logo.
+Redrawing the image, and laying Vietnamese out inside the original's shape. Both need a person who
+can draw. The font engine can render text in the game's own glyphs (`docs/FONTS.md`), which covers
+a button whose label is plain lettering, and nothing at all for a logo.

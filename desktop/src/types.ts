@@ -255,6 +255,18 @@ export type Hint =
   | { kind: "fewColours"; colours: number; inkPercent: number }
   | { kind: "shapeOfALine"; width: number; height: number; bands: number };
 
+/** Chữ đọc được từ một ảnh, cùng với độ khớp. */
+export interface ReadingView {
+  entry: string;
+  text: string;
+  /** Mọi hình đều khớp một chữ cái trong font của game. */
+  complete: boolean;
+  /** Điểm khớp thấp nhất trong cả dòng, 0 đến 1. */
+  confidence: number;
+  /** Số hình không khớp chữ nào. */
+  unread: number;
+}
+
 export interface ImageAssetView {
   entry: string;
   width: number;

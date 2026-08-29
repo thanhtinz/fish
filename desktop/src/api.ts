@@ -18,6 +18,7 @@ import type {
   GlossView,
   GridView,
   ImageAssetView,
+  ReadingView,
   ImportReport,
   IngestView,
   InspectionView,
@@ -207,6 +208,9 @@ export const api = {
     call<string | null>("proof_sheet", { path, language, scale }),
 
   imageAssets: (path: string) => call<ImageAssetView[]>("image_assets", { path }),
+
+  readTextAssets: (path: string, entries: string[]) =>
+    call<ReadingView[]>("read_text_assets", { path, entries }),
 
   markTextAsset: (
     path: string,

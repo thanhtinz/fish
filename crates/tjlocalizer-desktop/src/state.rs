@@ -864,6 +864,23 @@ impl From<tjlocalizer_core::shorten::Alternative> for AlternativeView {
     }
 }
 
+/// What an image was read to say, and how well it matched (§17).
+///
+/// The score travels with the text because the text alone invites being believed. A reading with
+/// a shape in it that matched nothing is shown as such and cannot be accepted with one click.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct ReadingView {
+    pub entry: String,
+    pub text: String,
+    /// Every shape matched a letter of the game's own font.
+    pub complete: bool,
+    /// The worst glyph score in the reading, 0 to 1.
+    pub confidence: f32,
+    /// How many shapes matched no letter.
+    pub unread: usize,
+}
+
 /// One image in the game, with what its shape suggests and what a person decided about it.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]

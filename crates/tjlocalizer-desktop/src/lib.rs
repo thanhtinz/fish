@@ -71,6 +71,7 @@ pub fn run() {
             commands::shorter,
             commands::proof_sheet,
             commands::image_assets,
+            commands::read_text_assets,
             commands::mark_text_asset,
             commands::unmark_text_asset,
             commands::rules,

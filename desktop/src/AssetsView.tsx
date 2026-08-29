@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, pickFile } from "./api";
-import type { Hint, ImageAssetView } from "./types";
+import type { Hint, ImageAssetView, ReadingView } from "./types";
 
 interface Props {
   path: string;
@@ -14,9 +14,13 @@ interface Props {
  * check passes, and the player still sees an English START button - because that word was never
  * a string, it was part of a picture.
  *
- * Nothing here reads the images, and it does not pretend to. It shows them, says what about each
- * one resembles a label, and records what a person decides - after which the build reports every
- * marked image that still ships its original artwork.
+ * It shows them, says what about each one resembles a label, and records what a person decides -
+ * after which the build reports every marked image that still ships its original artwork.
+ *
+ * Where the project knows the game's glyph sheet, the words can be read straight off the picture
+ * by matching it against those same letters. A reading where every shape matched fills the box; a
+ * reading with an unmatched shape in it is shown as unread rather than offered, and either way
+ * nothing is saved until somebody presses the button.
  */
 /** The Vietnamese wording for one of the core's reasons. */
 function describe(hint: Hint): string {
@@ -35,6 +39,7 @@ export function AssetsView({ path, say }: Props) {
   const [onlySuspect, setOnlySuspect] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
   const [says, setSays] = useState<Record<string, string>>({});
+  const [readings, setReadings] = useState<Record<string, ReadingView>>({});
 
   const load = useCallback(async () => {
     try {
@@ -85,9 +90,10 @@ export function AssetsView({ path, say }: Props) {
           dịch xong hết, qua mọi kiểm tra, mà người chơi vẫn thấy nút "START" tiếng Anh.
         </div>
         <p style={{ color: "var(--text-faint)", fontSize: 12, margin: "0 0 12px" }}>
-          Công cụ <b>không đọc</b> chữ trong ảnh — đoán sai còn tệ hơn không đoán. Nó chỉ nói ảnh
-          nào <i>trông giống</i> có chữ; bạn nhìn rồi đánh dấu. Ảnh đã đánh dấu mà chưa có bản thay
-          thế sẽ được báo lại ở mỗi lần build.
+          Chữ trên nút bấm thường được vẽ bằng chính font của game, nên công cụ có thể{" "}
+          <b>đối chiếu từng hình với từng chữ cái trong font đó</b>. Hình nào khớp thì đọc ra, hình
+          nào không khớp thì báo là không đọc được — chứ không đoán bừa. Bạn nhìn lại rồi đánh dấu;
+          ảnh đã đánh dấu mà chưa có bản thay thế sẽ được báo lại ở mỗi lần build.
         </p>
         <div className="row" style={{ gap: 10 }}>
           <label className="row" style={{ gap: 6, fontSize: 12.5, whiteSpace: "nowrap" }}>
@@ -98,6 +104,25 @@ export function AssetsView({ path, say }: Props) {
             />
             Chỉ ảnh nghi có chữ
           </label>
+          <button
+            disabled={busy !== null}
+            onClick={async () => {
+              const read = await run("read", () => api.readTextAssets(path, []));
+              if (!read) return;
+              const found: Record<string, ReadingView> = {};
+              const filled: Record<string, string> = {};
+              for (const reading of read) {
+                found[reading.entry] = reading;
+                if (reading.complete) filled[reading.entry] = reading.text;
+              }
+              setReadings(found);
+              setSays({ ...filled, ...says });
+              const complete = read.filter((r) => r.complete).length;
+              say(`Đọc được ${complete}/${read.length} ảnh bằng font của game`);
+            }}
+          >
+            {busy === "read" ? "Đang đọc…" : "Đọc chữ bằng font game"}
+          </button>
           <span style={{ color: "var(--text-faint)", fontSize: 12, whiteSpace: "nowrap" }}>
             {shown.length}/{assets.length} ảnh · {marked.length} đã đánh dấu
           </span>
@@ -151,6 +176,22 @@ export function AssetsView({ path, say }: Props) {
                   · {describe(hint)}
                 </div>
               ))}
+
+              {readings[asset.entry] && (
+                <div style={{ fontSize: 11.5, marginTop: 5 }}>
+                  {readings[asset.entry].complete ? (
+                    <span style={{ color: "var(--text-dim)" }}>
+                      đọc được: <b>{readings[asset.entry].text}</b> (khớp thấp nhất{" "}
+                      {readings[asset.entry].confidence.toFixed(2)})
+                    </span>
+                  ) : (
+                    <span style={{ color: "var(--text-faint)" }}>
+                      {readings[asset.entry].unread} hình không khớp chữ nào trong font — phải tự
+                      đọc
+                    </span>
+                  )}
+                </div>
+              )}
 
               <div className="row" style={{ gap: 8, marginTop: 10, flexWrap: "wrap" }}>
                 <input

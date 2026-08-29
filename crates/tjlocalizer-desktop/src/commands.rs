@@ -1222,10 +1222,14 @@ mod tests {
 // ---------------------------------------------------------------------------------------------
 // Images with words painted into them (§17).
 //
-// Nothing here reads an image. A game's buttons are often artwork with the words already drawn
-// on, no amount of translating strings touches them, and a wrong reading would be worse than
-// none - so the images are shown, a person decides, and the decision is recorded where the build
-// can hold the project to it.
+// A game's buttons are often artwork with the words already drawn on, and no amount of
+// translating strings touches them - so the images are shown, a person decides, and the decision
+// is recorded where the build can hold the project to it.
+//
+// Where the project knows the game's glyph sheet, the words can be read out of the picture by
+// matching it against those same letters. What matches is offered; what does not is shown as
+// unread rather than guessed, and nothing is written into the project without somebody accepting
+// it.
 // ---------------------------------------------------------------------------------------------
 
 #[tauri::command]
@@ -1254,6 +1258,32 @@ pub fn image_assets(path: String) -> Reply<Vec<ImageAssetView>> {
                 colours: asset.colours,
                 hints: asset.hints,
             }
+        })
+        .collect())
+}
+
+/// Reads the words out of images with the game's own letters (§17).
+///
+/// An empty list means every image whose shape suggests a label; naming entries reads those
+/// whatever their shape.
+#[tauri::command]
+pub fn read_text_assets(path: String, entries: Vec<String>) -> Reply<Vec<ReadingView>> {
+    let project = open(&path)?;
+    let Some(readings) = project.read_text_assets(&entries).map_err(err)? else {
+        return Err(
+            "Chưa biết ảnh nào là font của game, nên không có chữ nào để đối chiếu. \
+                    Chọn font ở tab Font trước."
+                .into(),
+        );
+    };
+    Ok(readings
+        .into_iter()
+        .map(|reading| ReadingView {
+            complete: reading.is_complete(),
+            text: reading.text(),
+            confidence: reading.confidence,
+            unread: reading.unread,
+            entry: reading.entry,
         })
         .collect())
 }

@@ -321,10 +321,11 @@ enum Command {
 
     /// Images with words painted into them (§17).
     ///
-    /// There is no OCR here and a wrong reading would be worse than none, so nothing is read.
     /// Each image is listed with what its shape suggests, a person decides, and what they decide
     /// is written down - after which the build reports every marked image that still ships its
-    /// original artwork.
+    /// original artwork. Where the project knows the game's glyph sheet, `--read` matches the
+    /// picture against the game's own letters and says what it can read, refusing the shapes it
+    /// cannot rather than guessing them.
     Assets {
         project: PathBuf,
         /// Only the images whose shape suggests words.
@@ -342,6 +343,14 @@ enum Command {
         /// Forget an entry that was marked.
         #[arg(long)]
         unmark: Option<String>,
+        /// Read the words in the images with the game's own letters. Given an entry, only that
+        /// one; otherwise every image whose shape suggests a label.
+        #[arg(long, num_args = 0.., value_name = "ENTRY")]
+        read: Option<Vec<String>>,
+        /// Record what was read as what each image says. Only readings where every shape matched
+        /// are taken; the rest are left for a person.
+        #[arg(long, requires = "read")]
+        accept: bool,
     },
 
     /// Draw the translations as the game will draw them (§25).
@@ -1379,6 +1388,8 @@ fn run(cli: Cli) -> Result<()> {
             says,
             replacement,
             unmark,
+            read,
+            accept,
         } => {
             let mut project = Project::open(&project)?;
 
@@ -1413,6 +1424,58 @@ fn run(cli: Cli) -> Result<()> {
                     }
                 }
                 println!();
+            }
+
+            if let Some(entries) = read {
+                let Some(readings) = project.read_text_assets(&entries)? else {
+                    anyhow::bail!(
+                        "this project has not said which image the game's font is, so there are \
+                         no letters to read with: run `tjlocalizer font <project> --candidates`"
+                    );
+                };
+                if readings.is_empty() {
+                    println!("nothing to read");
+                    return Ok(());
+                }
+                for reading in &readings {
+                    println!(
+                        "  {}  {}",
+                        reading.entry,
+                        if reading.is_complete() {
+                            format!("{:?}", reading.text())
+                        } else {
+                            format!(
+                                "{:?} - {} shape{} matched no letter",
+                                reading.text(),
+                                reading.unread,
+                                if reading.unread == 1 { "" } else { "s" }
+                            )
+                        }
+                    );
+                    if reading.is_complete() {
+                        println!("      every shape matched, worst {:.2}", reading.confidence);
+                    }
+                }
+                if accept {
+                    let mut taken = 0usize;
+                    for reading in readings.iter().filter(|r| r.is_complete()) {
+                        let existing = project
+                            .profile()
+                            .text_assets
+                            .iter()
+                            .find(|a| a.entry == reading.entry)
+                            .cloned();
+                        project.mark_text_asset(tjlocalizer_core::assets::TextAsset {
+                            entry: reading.entry.clone(),
+                            says: reading.text(),
+                            replacement: existing.and_then(|a| a.replacement),
+                        })?;
+                        taken += 1;
+                    }
+                    println!();
+                    println!("{taken} recorded as carrying those words");
+                }
+                return Ok(());
             }
 
             let assets = project.image_assets()?;
@@ -1452,7 +1515,8 @@ fn run(cli: Cli) -> Result<()> {
                 }
             }
             println!();
-            println!("Nothing here read the images. Mark the ones that carry words:");
+            println!("Read them with the game's own letters, or mark them by hand:");
+            println!("  tjlocalizer assets <project> --read --accept");
             println!("  tjlocalizer assets <project> --mark <entry> --says \"START\"");
             Ok(())
         }

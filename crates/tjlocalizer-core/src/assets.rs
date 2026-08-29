@@ -5,12 +5,18 @@
 //! can be reported as fully translated, pass every check in this project, and still show a player
 //! an English START button.
 //!
-//! That blind spot is what this module is about. It cannot read the words - there is no OCR here,
-//! and a wrong reading would be worse than none - so it does not pretend to. It reports the shape
-//! of each image and what about that shape resembles a label, a person decides, and the decision
-//! is recorded so the rest of the tool can hold the project to it: an image marked as carrying
-//! text is a piece of unfinished work until something replaces it.
+//! That blind spot is what this module is about. It reports the shape of each image and what
+//! about that shape resembles a label, a person decides, and the decision is recorded so the rest
+//! of the tool can hold the project to it: an image marked as carrying text is a piece of
+//! unfinished work until something replaces it.
+//!
+//! Where the game ships its own glyph sheet, `ocr` reads the words out of the picture by matching
+//! them against that sheet letter for letter, and says so only when every shape matched. It is
+//! not general OCR and does not try to be; what it cannot match comes back unread.
 
+pub mod ocr;
+
+use crate::font::sheet::Sheet;
 use crate::jar::Archive;
 use crate::Result;
 use serde::{Deserialize, Serialize};
@@ -188,4 +194,38 @@ pub struct TextAsset {
     /// A redrawn version, relative to the project directory. Absent means still to do.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub replacement: Option<String>,
+}
+
+/// Read the words out of images, using the game's own letters (§17).
+///
+/// Only images something suggests are labels are read, because reading a background tile is
+/// minutes of work for a line of noise. A reading that did not match cleanly is still returned:
+/// the person deciding about the image is better off seeing that four of the six shapes matched
+/// than seeing nothing and assuming the tool did not look.
+pub fn read(archive: &Archive, sheet: &Sheet, entries: &[String]) -> Result<Vec<ocr::Reading>> {
+    let wanted: Vec<&str> = entries.iter().map(String::as_str).collect();
+    let mut readings = Vec::new();
+    for entry in archive.entries() {
+        if entry.extension() != "png" {
+            continue;
+        }
+        if !wanted.is_empty() && !wanted.contains(&entry.name.as_str()) {
+            continue;
+        }
+        let Ok(image) = crate::font::sheet::Image::decode_png(&entry.data) else {
+            continue;
+        };
+        if wanted.is_empty() {
+            // Nothing was asked for by name, so only the images that look like labels are read.
+            let Ok(asset) = inspect(&entry.name, &entry.data) else {
+                continue;
+            };
+            if !asset.worth_checking() {
+                continue;
+            }
+        }
+        readings.push(ocr::read(&entry.name, &image, sheet));
+    }
+    readings.sort_by(|a, b| a.entry.cmp(&b.entry));
+    Ok(readings)
 }

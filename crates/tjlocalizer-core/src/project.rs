@@ -1109,6 +1109,29 @@ impl Project {
         crate::assets::scan(&self.original()?)
     }
 
+    /// Reads the words out of images, with the game's own glyph sheet (§17).
+    ///
+    /// `None` when the project has not said which image the font is, or when the game uses the
+    /// device font: in both cases there are no letters to match against, which is a different
+    /// answer from "the images say nothing".
+    ///
+    /// Given no entries, every image whose shape suggests a label is read. Named entries are read
+    /// whatever their shape, because a person naming one has already decided it is worth looking
+    /// at and is owed an answer rather than a filter.
+    pub fn read_text_assets(
+        &self,
+        entries: &[String],
+    ) -> crate::Result<Option<Vec<crate::assets::ocr::Reading>>> {
+        let Some(sheet) = self.font_sheet()? else {
+            return Ok(None);
+        };
+        Ok(Some(crate::assets::read(
+            &self.original()?,
+            &sheet,
+            entries,
+        )?))
+    }
+
     /// Records that an image carries words, or updates what is known about one.
     pub fn mark_text_asset(&mut self, asset: crate::assets::TextAsset) -> crate::Result<()> {
         let archive = self.original()?;
