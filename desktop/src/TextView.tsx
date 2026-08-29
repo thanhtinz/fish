@@ -177,7 +177,6 @@ export function TextView({
           <label className="row" style={{ whiteSpace: "nowrap", cursor: "pointer" }}>
             <input
               type="checkbox"
-              style={{ width: "auto" }}
               checked={showTechnical}
               onChange={(e) => setShowTechnical(e.target.checked)}
             />

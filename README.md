@@ -102,6 +102,7 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for how the pieces fit,
 [docs/LANGUAGES.md](docs/LANGUAGES.md) for dictionaries and register,
 [docs/FONTS.md](docs/FONTS.md) for the glyph engine,
 [docs/RULES.md](docs/RULES.md) for the per-game patches,
+[docs/ASSETS.md](docs/ASSETS.md) for words painted into artwork,
 [docs/SPEC-COVERAGE.md](docs/SPEC-COVERAGE.md) for what is built and what is not, and
 [docs/LEGAL.md](docs/LEGAL.md) for the attribution boundary.
 

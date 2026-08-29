@@ -235,6 +235,31 @@ enum Command {
         lang: Option<String>,
     },
 
+    /// Images with words painted into them (§17).
+    ///
+    /// There is no OCR here and a wrong reading would be worse than none, so nothing is read.
+    /// Each image is listed with what its shape suggests, a person decides, and what they decide
+    /// is written down - after which the build reports every marked image that still ships its
+    /// original artwork.
+    Assets {
+        project: PathBuf,
+        /// Only the images whose shape suggests words.
+        #[arg(long)]
+        suspect: bool,
+        /// Record that this entry carries words.
+        #[arg(long)]
+        mark: Option<String>,
+        /// What it says, for whoever will redraw it.
+        #[arg(long)]
+        says: Option<String>,
+        /// A redrawn version, relative to the project directory.
+        #[arg(long)]
+        replacement: Option<String>,
+        /// Forget an entry that was marked.
+        #[arg(long)]
+        unmark: Option<String>,
+    },
+
     /// Draw the translations as the game will draw them (§25).
     ///
     /// Not an emulator: no menus, no backgrounds, no buttons. The text itself, in the game's own
@@ -940,6 +965,91 @@ fn run(cli: Cli) -> Result<()> {
             Ok(())
         }
 
+        Command::Assets {
+            project,
+            suspect,
+            mark,
+            says,
+            replacement,
+            unmark,
+        } => {
+            let mut project = Project::open(&project)?;
+
+            if let Some(entry) = mark {
+                project.mark_text_asset(tjlocalizer_core::assets::TextAsset {
+                    entry: entry.clone(),
+                    says: says.unwrap_or_default(),
+                    replacement: replacement.filter(|r| !r.trim().is_empty()),
+                })?;
+                println!("{entry} is recorded as carrying words");
+            }
+            if let Some(entry) = unmark {
+                if !project.unmark_text_asset(&entry)? {
+                    anyhow::bail!("{entry} was not marked");
+                }
+                println!("{entry} is no longer marked");
+            }
+
+            let marked: Vec<&tjlocalizer_core::assets::TextAsset> =
+                project.profile().text_assets.iter().collect();
+            if !marked.is_empty() {
+                println!("marked as carrying words:");
+                for asset in &marked {
+                    let state = match &asset.replacement {
+                        Some(path) => format!("redrawn as {path}"),
+                        None => "nothing to replace it yet".into(),
+                    };
+                    if asset.says.is_empty() {
+                        println!("  {} - {state}", asset.entry);
+                    } else {
+                        println!("  {} {:?} - {state}", asset.entry, asset.says);
+                    }
+                }
+                println!();
+            }
+
+            let assets = project.image_assets()?;
+            let shown: Vec<_> = assets
+                .iter()
+                .filter(|a| !suspect || a.worth_checking())
+                .collect();
+            if shown.is_empty() {
+                println!(
+                    "no images{}",
+                    if suspect {
+                        " that look like labels"
+                    } else {
+                        ""
+                    }
+                );
+                return Ok(());
+            }
+            println!("{} of {} images:", shown.len(), assets.len());
+            for asset in shown {
+                let known = project
+                    .profile()
+                    .text_assets
+                    .iter()
+                    .any(|t| t.entry == asset.entry);
+                println!(
+                    "  {}{}  {}x{}, {} colour{}",
+                    asset.entry,
+                    if known { " [marked]" } else { "" },
+                    asset.width,
+                    asset.height,
+                    asset.colours,
+                    if asset.colours == 1 { "" } else { "s" }
+                );
+                for hint in &asset.hints {
+                    println!("      {}", describe_hint(hint));
+                }
+            }
+            println!();
+            println!("Nothing here read the images. Mark the ones that carry words:");
+            println!("  tjlocalizer assets <project> --mark <entry> --says \"START\"");
+            Ok(())
+        }
+
         Command::Proof {
             project,
             lang,
@@ -1321,6 +1431,32 @@ fn report_graph(graph: &ContentGraph) {
     }
     for (context, count) in by_context {
         println!("  {context:<10} {count}");
+    }
+}
+
+/// The English wording for one reason an image might carry words.
+///
+/// The core reports the fact; each interface says it in its own language. This is the command
+/// line's, and the application has its own.
+fn describe_hint(hint: &tjlocalizer_core::assets::Hint) -> String {
+    use tjlocalizer_core::assets::Hint;
+    match hint {
+        Hint::NameSuggests { word } => format!("its name contains {word:?}"),
+        Hint::FewColours {
+            colours,
+            ink_percent,
+        } => format!(
+            "{colours} colour{} over {ink_percent}% of the image - lettering rather than a scene",
+            if *colours == 1 { "" } else { "s" }
+        ),
+        Hint::ShapeOfALine {
+            width,
+            height,
+            bands,
+        } => format!(
+            "{width}x{height} with {bands} band{} of ink - the shape of a line of writing",
+            if *bands == 1 { "" } else { "s" }
+        ),
     }
 }
 

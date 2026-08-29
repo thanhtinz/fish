@@ -701,3 +701,20 @@ impl From<tjlocalizer_core::shorten::Alternative> for AlternativeView {
         }
     }
 }
+
+/// One image in the game, with what its shape suggests and what a person decided about it.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ImageAssetView {
+    pub entry: String,
+    pub width: u32,
+    pub height: u32,
+    pub colours: usize,
+    pub hints: Vec<tjlocalizer_core::assets::Hint>,
+    /// The image itself, so the question "does this have words on it" can be answered by looking.
+    pub image: String,
+    /// Set once somebody has said this carries words.
+    pub says: Option<String>,
+    pub replacement: Option<String>,
+    pub marked: bool,
+}

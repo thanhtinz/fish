@@ -16,6 +16,7 @@ import type {
   FontView,
   GlossView,
   GridView,
+  ImageAssetView,
   ImportReport,
   LanguageView,
   NodeView,
@@ -189,6 +190,18 @@ export const api = {
 
   proofSheet: (path: string, language: string, scale: number | null) =>
     call<string | null>("proof_sheet", { path, language, scale }),
+
+  imageAssets: (path: string) => call<ImageAssetView[]>("image_assets", { path }),
+
+  markTextAsset: (
+    path: string,
+    entry: string,
+    says: string | null,
+    replacement: string | null,
+  ) => call<ImageAssetView[]>("mark_text_asset", { path, entry, says, replacement }),
+
+  unmarkTextAsset: (path: string, entry: string) =>
+    call<ImageAssetView[]>("unmark_text_asset", { path, entry }),
 
   rules: (path: string) => call<RuleView[]>("rules", { path }),
   writeFontInstallRule: (path: string) => call<RuleView[]>("write_font_install_rule", { path }),

@@ -237,3 +237,22 @@ export interface AlternativeView {
   width: number | null;
   why: string;
 }
+
+/** One reason an image might have words painted into it. The core states the fact; the
+ * interface words it, because the command line speaks English and this does not. */
+export type Hint =
+  | { kind: "nameSuggests"; word: string }
+  | { kind: "fewColours"; colours: number; inkPercent: number }
+  | { kind: "shapeOfALine"; width: number; height: number; bands: number };
+
+export interface ImageAssetView {
+  entry: string;
+  width: number;
+  height: number;
+  colours: number;
+  hints: Hint[];
+  image: string;
+  says: string | null;
+  replacement: string | null;
+  marked: boolean;
+}

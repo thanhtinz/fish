@@ -52,7 +52,7 @@ Opened in a plain browser, the interface renders a short note saying it needs th
 and nothing else. There is deliberately no stand-in data: a screenshot of the interface must never
 be mistakable for a screenshot of it working.
 
-## The four screens
+## The five screens
 
 **Tổng quan** - the pipeline in the order §22 runs it, with each step's state visible rather than
 inferred; the target languages and their progress; the register picker, which shows what each
@@ -101,6 +101,11 @@ two the same way is how a localization ships with empty boxes where the accents 
 
 The Text tab also draws the selected row with the game's own glyphs, above the two widths, so a
 mark landing on the letter below it is visible while translating rather than after building.
+
+**Ảnh** - the images in the game, with what each one's shape suggests about words painted into
+it. Nothing here reads them; it shows them, and records what a person decides. From then on every
+build reports each marked image that still carries its original words, which is the only way that
+blind spot stays visible: no string check can see it, because the word was never a string.
 
 **Đóng gói** - build one language or all of them, the validation report, the build history with
 rollback, and **Xuất file ra…**, which opens a native save dialog. Where the finished file goes is

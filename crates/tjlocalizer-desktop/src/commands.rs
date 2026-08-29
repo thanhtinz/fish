@@ -1159,6 +1159,72 @@ mod tests {
 }
 
 // ---------------------------------------------------------------------------------------------
+// Images with words painted into them (§17).
+//
+// Nothing here reads an image. A game's buttons are often artwork with the words already drawn
+// on, no amount of translating strings touches them, and a wrong reading would be worse than
+// none - so the images are shown, a person decides, and the decision is recorded where the build
+// can hold the project to it.
+// ---------------------------------------------------------------------------------------------
+
+#[tauri::command]
+pub fn image_assets(path: String) -> Reply<Vec<ImageAssetView>> {
+    let project = open(&path)?;
+    let archive = project.original().map_err(err)?;
+    let marked = project.profile().text_assets.clone();
+
+    Ok(project
+        .image_assets()
+        .map_err(err)?
+        .into_iter()
+        .map(|asset| {
+            let known = marked.iter().find(|t| t.entry == asset.entry);
+            ImageAssetView {
+                image: archive
+                    .get(&asset.entry)
+                    .map(|e| data_uri(&e.data))
+                    .unwrap_or_default(),
+                says: known.map(|t| t.says.clone()),
+                replacement: known.and_then(|t| t.replacement.clone()),
+                marked: known.is_some(),
+                entry: asset.entry,
+                width: asset.width,
+                height: asset.height,
+                colours: asset.colours,
+                hints: asset.hints,
+            }
+        })
+        .collect())
+}
+
+#[tauri::command]
+pub fn mark_text_asset(
+    path: String,
+    entry: String,
+    says: Option<String>,
+    replacement: Option<String>,
+) -> Reply<Vec<ImageAssetView>> {
+    let mut project = open(&path)?;
+    project
+        .mark_text_asset(tjlocalizer_core::assets::TextAsset {
+            entry,
+            says: says.unwrap_or_default(),
+            replacement: replacement.filter(|r| !r.trim().is_empty()),
+        })
+        .map_err(err)?;
+    image_assets(path)
+}
+
+#[tauri::command]
+pub fn unmark_text_asset(path: String, entry: String) -> Reply<Vec<ImageAssetView>> {
+    let mut project = open(&path)?;
+    if !project.unmark_text_asset(&entry).map_err(err)? {
+        return Err(format!("{entry} was not marked"));
+    }
+    image_assets(path)
+}
+
+// ---------------------------------------------------------------------------------------------
 // Per-game patches (§19).
 //
 // Everything else the application does works on any JAR. These do not: they change one game,

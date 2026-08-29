@@ -3,6 +3,7 @@ import { api, isDesktop, pickFile, pickFolder, pickJar, pickSavePath } from "./a
 import { OverviewView } from "./OverviewView";
 import { TextView } from "./TextView";
 import { BuildsView } from "./BuildView";
+import { AssetsView } from "./AssetsView";
 import { FontView } from "./FontView";
 import type {
   BuildView,
@@ -16,7 +17,7 @@ import type {
   StyleView,
 } from "./types";
 
-type Tab = "overview" | "text" | "font" | "build";
+type Tab = "overview" | "text" | "font" | "assets" | "build";
 
 export function App() {
   const [recents, setRecents] = useState<RecentView[]>([]);
@@ -360,6 +361,12 @@ export function App() {
                   Font
                 </button>
                 <button
+                  className={tab === "assets" ? "tab on" : "tab"}
+                  onClick={() => setTab("assets")}
+                >
+                  Ảnh
+                </button>
+                <button
                   className={tab === "build" ? "tab on" : "tab"}
                   onClick={() => setTab("build")}
                 >
@@ -492,6 +499,8 @@ export function App() {
                 )}
 
                 {tab === "font" && <FontView path={project.path} say={say} />}
+
+                {tab === "assets" && <AssetsView path={project.path} say={say} />}
 
                 {tab === "build" && (
                   <BuildsView

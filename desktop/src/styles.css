@@ -59,6 +59,10 @@ input, textarea, select {
   width: 100%;
   user-select: text;
 }
+/* Width 100% suits a text field and nothing else: a full-width checkbox pushes its own label off
+   the row. The one checkbox that existed before worked around this locally, which is how the
+   second one arrived broken. */
+input[type="checkbox"], input[type="radio"] { width: auto; }
 input:focus, textarea:focus, select:focus { outline: none; border-color: var(--accent); }
 textarea { resize: vertical; font-family: var(--mono); line-height: 1.55; }
 

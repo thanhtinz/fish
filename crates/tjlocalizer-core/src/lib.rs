@@ -6,6 +6,7 @@
 //! text - and everything game-specific is expressed as detected capabilities, project rules or
 //! plugins layered above it.
 
+pub mod assets;
 pub mod build;
 pub mod classfile;
 pub mod detect;

@@ -43,6 +43,16 @@ impl ValidationReport {
             .filter(|f| f.severity == Severity::Error)
     }
 
+    /// Adds findings produced by a check that needs more than the built archive to run.
+    ///
+    /// Some checks need the project directory - whether a redrawn image exists on disk, say - and
+    /// threading the project through every signature here would put a file system behind a module
+    /// whose whole point is that it only looks at the artefact. So those checks are functions that
+    /// return findings, and this is where they land.
+    pub fn extend(&mut self, findings: impl IntoIterator<Item = Finding>) {
+        self.findings.extend(findings);
+    }
+
     fn error(&mut self, check: &str, detail: String) {
         self.findings.push(Finding {
             severity: Severity::Error,
@@ -183,6 +193,77 @@ fn check_layout(
             );
         }
     }
+}
+
+/// Images somebody marked as carrying words, and whether anything was done about them (§17).
+///
+/// The whole reason for recording them: a translation can be complete, correct and validated, and
+/// still show a player an English START button, because the word was painted into the artwork
+/// rather than stored as a string. Nothing in this project can read those words. What it can do
+/// is refuse to let them be forgotten.
+///
+/// Warnings, not errors. Shipping with the original artwork is a normal decision - redrawing a
+/// logo is real work, and sometimes the answer is "not this release". An error would make the
+/// build refuse over something a person already decided.
+pub fn check_text_assets(
+    assets: &[crate::assets::TextAsset],
+    root: &std::path::Path,
+    built: &Archive,
+) -> Vec<Finding> {
+    let mut findings = Vec::new();
+
+    for asset in assets {
+        let says = if asset.says.is_empty() {
+            String::new()
+        } else {
+            format!(" (it says {:?})", asset.says)
+        };
+        let Some(replacement) = &asset.replacement else {
+            findings.push(Finding {
+                severity: Severity::Warning,
+                check: "asset.text".into(),
+                detail: format!(
+                    "{} has words painted into it{says} and nothing to replace it - the build will ship them untranslated",
+                    asset.entry
+                ),
+            });
+            continue;
+        };
+
+        let path = root.join(replacement);
+        let Ok(wanted) = std::fs::read(&path) else {
+            findings.push(Finding {
+                severity: Severity::Warning,
+                check: "asset.text".into(),
+                detail: format!(
+                    "{} names {replacement} as its replacement, and that file is not there",
+                    asset.entry
+                ),
+            });
+            continue;
+        };
+
+        // Having the redrawn file is not the same as shipping it. Installing an image is a rule
+        // (§19), and a rule that was written but never switched on leaves the artwork untouched
+        // while everything on screen says the work was done.
+        match built.get(&asset.entry) {
+            Some(shipped) if shipped.data == wanted => {}
+            Some(_) => findings.push(Finding {
+                severity: Severity::Warning,
+                check: "asset.text".into(),
+                detail: format!(
+                    "{} was redrawn as {replacement}, but the build still carries the original - a rule has to install it",
+                    asset.entry
+                ),
+            }),
+            None => findings.push(Finding {
+                severity: Severity::Warning,
+                check: "asset.text".into(),
+                detail: format!("{} is marked as carrying text but is not in the build", asset.entry),
+            }),
+        }
+    }
+    findings
 }
 
 /// Validates an archive on its own, with no original to compare against.

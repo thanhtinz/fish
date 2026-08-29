@@ -150,6 +150,13 @@ pub struct ProjectProfile {
     /// deliberately not here: this file is committed and sent to translators.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub provider: Option<ProviderConfig>,
+    /// Images somebody has decided carry words painted into them (§17).
+    ///
+    /// Empty means nobody has looked, which is not the same as "there are none" - and the
+    /// difference matters, because artwork with English on it survives a translation that every
+    /// check in this project passes.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub text_assets: Vec<crate::assets::TextAsset>,
     /// The game's glyph sheet, when it draws its own text (§16).
     ///
     /// Absent means "not established". It does not mean the game uses the device font: a game
@@ -260,6 +267,7 @@ impl Project {
             branding: Branding::default(),
             permission_reference: None,
             provider: None,
+            text_assets: Vec::new(),
             font: None,
         };
 
@@ -853,6 +861,42 @@ impl Project {
         Ok(Some(path))
     }
 
+    /// Every image in the game, with what its shape suggests about words painted into it (§17).
+    pub fn image_assets(&self) -> crate::Result<Vec<crate::assets::ImageAsset>> {
+        crate::assets::scan(&self.original()?)
+    }
+
+    /// Records that an image carries words, or updates what is known about one.
+    pub fn mark_text_asset(&mut self, asset: crate::assets::TextAsset) -> crate::Result<()> {
+        let archive = self.original()?;
+        if archive.get(&asset.entry).is_none() {
+            return Err(crate::Error::InvalidProject {
+                path: self.root.clone(),
+                reason: format!("the archive has no entry {}", asset.entry),
+            });
+        }
+        match self
+            .profile
+            .text_assets
+            .iter_mut()
+            .find(|a| a.entry == asset.entry)
+        {
+            Some(existing) => *existing = asset,
+            None => self.profile.text_assets.push(asset),
+        }
+        self.save()
+    }
+
+    pub fn unmark_text_asset(&mut self, entry: &str) -> crate::Result<bool> {
+        let before = self.profile.text_assets.len();
+        self.profile.text_assets.retain(|a| a.entry != entry);
+        let removed = self.profile.text_assets.len() != before;
+        if removed {
+            self.save()?;
+        }
+        Ok(removed)
+    }
+
     /// The per-game patches this project holds (§19).
     pub fn rules(&self) -> crate::Result<Vec<crate::rules::Rule>> {
         crate::rules::load(&self.root)
@@ -1051,7 +1095,7 @@ impl Project {
         // Measured from the sheet the game actually draws from, which is the composed one when a
         // rule installs it: the letters that ship are the letters whose widths matter.
         let metrics = self.font_metrics()?;
-        let validation = validate_with_layout(
+        let mut validation = validate_with_layout(
             &original,
             &built,
             &graph,
@@ -1061,6 +1105,14 @@ impl Project {
             font.as_ref(),
             metrics.as_ref(),
         );
+
+        // Run against the built archive, and after the rules: whether a redrawn image reached the
+        // output is a fact about what will ship, not about what was intended.
+        validation.extend(crate::validate::check_text_assets(
+            &self.profile.text_assets,
+            &self.root,
+            &built,
+        ));
 
         let revision = self.next_build_revision(target)?;
         let dir = self.builds_dir(target).join(format!("{revision:04}"));
