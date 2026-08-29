@@ -110,9 +110,75 @@ straight back up.
 
 ## An external engine
 
-`translate::Provider` is the seam. `DictionaryProvider` is the offline implementation, and no
-network provider is built in - one would send the game's text to a third party, which is the user's
-decision and their key to supply.
+`translate::Provider` is the seam; `DictionaryProvider` is the offline implementation and the
+default. `provider::HttpProvider` talks to an engine over the network, and it is **off unless
+switched on**. Nothing reaches the network while it is off - there is a test for that, because it
+is the guarantee the offline default rests on.
+
+No service is built in. Which one, at what price, under whose terms, is the user's decision. What
+is built in is the shape of the request for four API families, so configuring one is a URL and a
+key rather than a plugin:
+
+| Family | Notes |
+| --- | --- |
+| `openai-compatible` | OpenAI and everything that copied its `/chat/completions`, including local runtimes. The only family that can be **told** the register and terminology in words. |
+| `deepl` | `/v2/translate`, with sentence splitting off - game strings are fragments, and splitting them invents sentences. |
+| `google-v2` | Takes its key in the query string, not a header. |
+| `libretranslate` | Including a self-hosted one, where nothing leaves a network the user controls. |
+
+### What makes it a game translation rather than a correct one
+
+An engine that knows nothing about this game renders `装备` as "thiết bị", `Guild` as "hiệp hội",
+and addresses a wuxia player as "bạn". Every one of those is fluent, grammatical and wrong.
+
+So the project's terminology and register go **into** the request:
+
+```
+You are translating text from a video game, from English into Vietnamese.
+Reply with the translation only: no quotes, no explanation, no alternatives.
+Keep these placeholders exactly as they are, in the same number: %d.
+This string appears in the game's ui text. Keep it about as short as the original.
+Register: Kiếm hiệp / tiên hiệp: ta - ngươi, archaic and distant.
+This is interface text with no speaker: use no personal pronouns at all.
+Never write "bạn"; write "ngươi".
+Use these renderings exactly; they are settled for this game:
+  Guild = bang hội
+```
+
+And the same things are checked **coming back**, because no engine reliably follows a briefing:
+
+- A reply that **lost a placeholder is refused outright**, not flagged. Applying it would break the
+  game at runtime, and no amount of fluency makes that usable.
+- A reply that ignored a **settled glossary term** is offered with the disagreement named, and its
+  confidence drops. Flagged rather than rewritten: the sentence may have been built around the
+  wrong reading.
+- A reply that breaks the **register** is flagged the same way. This is the check that earns its
+  keep: a modern pronoun in a wuxia game passes every grammatical test there is.
+- Quotes the engine added despite being asked not to are stripped, because a quoted string patched
+  into a game shows the quotes.
+- A service that answers 200 with an error object reports the service's own wording rather than
+  "no translation".
+
+**No machine translation is ever auto-approved.** Fluent and wrong is the failure mode, and nothing
+in a reply distinguishes it from fluent and right. Confidence caps at 0.7 for a clean reply and
+0.4 for one with a warning, and `is_approvable` is false regardless.
+
+### Where the key lives
+
+Not in `project.json`, and nowhere under the project directory. A project is a folder people
+commit, zip up and send to a translator; a key in it leaks the first time anyone does any of that.
+It goes in the application's own configuration directory, in a file readable only by its owner
+(`0600` on Unix; on other platforms the permission call is a no-op and this document says so
+rather than implying protection that is not there).
+
+This is not a secret store. It is a file with tight permissions, which is what a desktop
+application can offer without a platform keychain.
+
+### Seeing what would go
+
+`tjlocalizer engine <project> --dry-run "some text"` prints the exact request without sending it,
+and the interface has the same thing behind **Xem thử request**. A user about to send their game's
+text to a third party should be able to see precisely what would go.
 
 ## What is not built
 

@@ -8,11 +8,14 @@ import type {
   BuildView,
   CapabilityView,
   DictionaryView,
+  EnginePreview,
+  EngineView,
   GlossView,
   ImportReport,
   LanguageView,
   NodeView,
   ProjectSummary,
+  RecentView,
   StyleView,
 } from "./types";
 
@@ -65,7 +68,7 @@ export async function pickSavePath(
 }
 
 export const api = {
-  recentProjects: () => call<ProjectSummary[]>("recent_projects"),
+  recentProjects: () => call<RecentView[]>("recent_projects"),
 
   importJar: (jarPath: string, into: string, name: string | null, targets: string[]) =>
     call<ProjectSummary>("import_jar", { jarPath, into, name, targets }),
@@ -132,4 +135,22 @@ export const api = {
   languages: () => call<LanguageView[]>("languages"),
   styles: (language: string | null) => call<StyleView[]>("styles", { language }),
   dictionaries: (path: string | null) => call<DictionaryView[]>("dictionaries", { path }),
+
+  engine: (path: string) => call<EngineView>("engine", { path }),
+
+  setEngine: (
+    path: string,
+    kind: string,
+    endpoint: string,
+    model: string | null,
+    enabled: boolean,
+  ) => call<EngineView>("set_engine", { path, kind, endpoint, model, enabled }),
+
+  setEngineKey: (path: string, key: string) => call<EngineView>("set_engine_key", { path, key }),
+
+  enginePreview: (path: string, language: string, text: string) =>
+    call<EnginePreview>("engine_preview", { path, language, text }),
+
+  engineTranslate: (path: string, language: string, nodeId: string) =>
+    call<GlossView | null>("engine_translate", { path, language, nodeId }),
 };

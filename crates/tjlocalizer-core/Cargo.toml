@@ -19,3 +19,4 @@ serde_json.workspace = true
 sha2.workspace = true
 zip.workspace = true
 encoding_rs.workspace = true
+ureq.workspace = true

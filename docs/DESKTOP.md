@@ -85,6 +85,20 @@ Everything a desktop application should let you choose a path for:
 | Nhập CSV… | read the translator's file back, matched by node id |
 | Nhập gói từ điển… | add a dictionary pack to the project |
 
+## The external engine
+
+A card in **Tổng quan** configures it, and it is off until someone turns it on. The card is
+written to be read before it is used: turning it on sends the game's text to somebody else's
+computer, which is a decision, and the interface's job is to make it one rather than a checkbox
+nobody read. It shows a red badge while enabled, states that the key is stored outside the project
+and why, and **Xem thử request** prints the exact request - with the key replaced by a placeholder,
+so a screenshot of it is safe.
+
+In **Văn bản**, the engine is asked one string at a time and only when the button is pressed. It
+appears only when an engine is configured, enabled and has a key, so pressing it can never reach
+the network by surprise. The reply arrives with whatever the checks found: a lost placeholder is a
+refusal, a broken register or an ignored glossary term is a warning beside the text.
+
 The CSV carries a byte-order mark, because Excel reads a CSV without one as the system's legacy
 encoding - which turns every Vietnamese diacritic and every Thai character into rubbish, and the
 translator's tool is Excel. Its quoting is written out and tested rather than pulled in: game text

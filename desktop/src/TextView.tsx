@@ -5,6 +5,7 @@ interface Props {
   nodes: NodeView[];
   onSetTranslation: (nodeId: string, target: string) => void;
   onGloss: (nodeId: string) => Promise<GlossView | null>;
+  onEngine: ((nodeId: string) => Promise<GlossView | null>) | null;
   onExport: () => void;
   onImport: () => void;
 }
@@ -18,7 +19,14 @@ type StatusFilter = "all" | "untranslated" | "translated" | "suggested" | "issue
  * to see that `/img/hud.png` was found and deliberately left alone, otherwise "where did that
  * string go?" has no answer.
  */
-export function TextView({ nodes, onSetTranslation, onGloss, onExport, onImport }: Props) {
+export function TextView({
+  nodes,
+  onSetTranslation,
+  onGloss,
+  onEngine,
+  onExport,
+  onImport,
+}: Props) {
   const [query, setQuery] = useState("");
   const [context, setContext] = useState("all");
   const [status, setStatus] = useState<StatusFilter>("all");
@@ -27,6 +35,8 @@ export function TextView({ nodes, onSetTranslation, onGloss, onExport, onImport 
   const [draft, setDraft] = useState<string>("");
   const [gloss, setGloss] = useState<GlossView | null>(null);
   const [glossing, setGlossing] = useState(false);
+  const [engine, setEngine] = useState<GlossView | null>(null);
+  const [asking, setAsking] = useState(false);
 
   const contexts = useMemo(
     () => Array.from(new Set(nodes.map((n) => n.context))).sort(),
@@ -55,6 +65,9 @@ export function TextView({ nodes, onSetTranslation, onGloss, onExport, onImport 
   useEffect(() => {
     let cancelled = false;
     setGloss(null);
+    // The engine result is cleared with the selection: it was about the previous string, and
+    // leaving it on screen beside a new one is how a translation lands on the wrong row.
+    setEngine(null);
     if (!selected) return;
     setGlossing(true);
     onGloss(selected)
@@ -286,6 +299,56 @@ export function TextView({ nodes, onSetTranslation, onGloss, onExport, onImport 
                 </div>
               )}
             </div>
+
+            {onEngine && (
+              <div className="block">
+                <h4>Máy dịch ngoài</h4>
+                {!engine ? (
+                  <>
+                    <button
+                      className="small"
+                      disabled={asking}
+                      onClick={async () => {
+                        setAsking(true);
+                        try {
+                          setEngine(await onEngine(current.id));
+                        } finally {
+                          setAsking(false);
+                        }
+                      }}
+                    >
+                      {asking ? <span className="spin" /> : null} Hỏi máy dịch về câu này
+                    </button>
+                    <div style={{ color: "var(--text-faint)", fontSize: 11.5, marginTop: 7, lineHeight: 1.6 }}>
+                      Gửi riêng câu này đi, khi anh bấm. Không có gì tự động gửi.
+                    </div>
+                  </>
+                ) : engine.completeness === "none" ? (
+                  <div className="banner bad">
+                    <span>{engine.notes.join(" · ")}</span>
+                  </div>
+                ) : (
+                  <div className="cand-box">
+                    <div className="row" style={{ flexWrap: "wrap" }}>
+                      <span className="pill">{engine.engine}</span>
+                      <span className={engine.notes.length === 0 ? "pill ok" : "pill warn"}>
+                        {engine.notes.length === 0 ? "qua kiểm tra" : `${engine.notes.length} cảnh báo`}
+                      </span>
+                      <span className="pill">{engine.confidence.toFixed(2)}</span>
+                    </div>
+                    <div className="t">{engine.text}</div>
+                    {engine.notes.map((n, k) => (
+                      <div className="issue" key={k}>
+                        <span>{n}</span>
+                      </div>
+                    ))}
+                    <button className="small" onClick={() => setDraft(engine.text)}>
+                      Dùng làm nháp
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
 
             <div className="block">
               <h4>Bản dịch</h4>

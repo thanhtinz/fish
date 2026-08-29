@@ -18,7 +18,7 @@ are built, because a reader needs to know what is missing as much as what is the
 | 11 | Vietnamese language engine | **Built** | Register profiles with pronoun sets, register-break detection, missing-diacritic and unconverted-Telex/VNI checks, plus the language-general quality checks. |
 | 12 | Dictionary | **Built** | 628 game-domain entries across eight directions, embedded; projects may add their own packs. See `docs/LANGUAGES.md`. |
 | 13 | Glossary and translation memory | **Built** | `vietnamese`: locked terms, exact and fuzzy memory, `suggest` for candidates. |
-| 14 | Natural dialogue engine | **Partial** | Register profiles decide the voice and are checked against every line. Sentence-level generation is not built and is not claimed - see `docs/LANGUAGES.md`. |
+| 14 | Natural dialogue engine | **Partial** | Register profiles decide the voice, are sent to an external engine as instructions, and are checked against every reply. Sentence-level generation is the external engine's, and its output is never auto-approved - see `docs/LANGUAGES.md`. |
 | 15 | Character and relationship model | **Partial** | `Speaker` and `Stance` select the voice; nothing yet infers them per line. |
 | 16 | Font engine | **Not built** | Vietnamese glyph generation for bitmap fonts. `bitmap_font_candidates` detection exists; nothing acts on it. |
 | 17 | Asset and OCR pipeline | **Not built** | |
@@ -33,10 +33,10 @@ are built, because a reader needs to know what is missing as much as what is the
 | 26 | Branding and attribution | **Built** | See `docs/LEGAL.md`. |
 | 27 | CLI and automation | **Built** | Every subcommand in the specification, plus `builds` and `rollback`. The same pipeline is driveable from the desktop application. |
 | 28 | Data model | **Partial** | project.json is schema 3: a source language and a list of targets, migrated from schema 2 on open. DictionaryStore and a register model exist; fonts, assets, rules and patches do not. |
-| 29 | Security | **Built** | Untrusted-input handling and archive limits; no extracted code is executed. |
+| 29 | Security | **Built** | Untrusted-input handling and archive limits; no extracted code is executed; the network engine is off by default and its key is stored outside the project in an owner-only file. |
 | 30 | Technology stack | **Built** | Rust core and CLI, Tauri desktop shell with a React and TypeScript interface, native file and save dialogs. |
 | 31 | Source structure | **Built** | Three crates (core, CLI, desktop) plus the interface under `desktop/`. |
-| 32 | API and extension contracts | **Partial** | `translate::Provider` is a stable seam for an external translation engine. The plugin boundary of §20 is not built. |
+| 32 | API and extension contracts | **Partial** | `translate::Provider` is a stable seam, with an HTTP implementation covering four API families. The plugin boundary of §20 is not built. |
 | 33 | Performance and scalability | **Partial** | Patches are grouped per class so each is parsed once; nothing has been profiled at scale. |
 | 34 | Roadmap | n/a | |
 | 35 | Definition of done | **Partial** | The P0 row - JAR/JAD, project, analyzer, build and repack - is done and JVM-verified. |

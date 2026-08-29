@@ -42,6 +42,11 @@ pub fn run() {
             commands::languages,
             commands::styles,
             commands::dictionaries,
+            commands::engine,
+            commands::set_engine,
+            commands::set_engine_key,
+            commands::engine_preview,
+            commands::engine_translate,
         ])
         .run(tauri::generate_context!())
         .expect("the application failed to start");

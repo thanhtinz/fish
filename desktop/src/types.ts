@@ -28,6 +28,12 @@ export interface ProjectSummary {
   translatableCount: number;
 }
 
+export interface RecentView {
+  path: string;
+  summary: ProjectSummary | null;
+  error: string | null;
+}
+
 export interface LanguageView {
   tag: string;
   name: string;
@@ -129,4 +135,26 @@ export interface CapabilityView {
   id: string;
   confidence: number;
   evidence: string[];
+}
+
+export interface EngineKindView {
+  id: string;
+  defaultEndpoint: string;
+  takesInstructions: boolean;
+}
+
+export interface EngineView {
+  configured: boolean;
+  enabled: boolean;
+  kind: string;
+  endpoint: string;
+  model: string | null;
+  hasKey: boolean;
+  kinds: EngineKindView[];
+}
+
+export interface EnginePreview {
+  url: string;
+  instructions: string;
+  body: string;
 }

@@ -15,7 +15,9 @@ use tjlocalizer_core::graph::ContentGraph;
 use tjlocalizer_core::jar::Archive;
 use tjlocalizer_core::lang::Language;
 use tjlocalizer_core::project::{BuildRecord, Project, Target};
+use tjlocalizer_core::provider::{Briefing, HttpProvider, ProviderConfig, ProviderKind};
 use tjlocalizer_core::register;
+use tjlocalizer_core::secrets::Keys;
 use tjlocalizer_core::suggest::{self, Origin};
 use tjlocalizer_core::translate::{self, Completeness, DictionaryProvider, Request};
 use tjlocalizer_core::validate::{inspect, Severity, ValidationReport};
@@ -86,6 +88,9 @@ enum Command {
         /// Also show what the offline dictionary engine would propose for untranslated strings.
         #[arg(long)]
         gloss: bool,
+        /// Also ask the configured external engine. Sends the untranslated strings to it.
+        #[arg(long)]
+        engine: bool,
     },
 
     /// Apply approved translations and repackage.
@@ -143,6 +148,34 @@ enum Command {
     Dictionaries {
         /// A project, to include its own packs. Omit for the built-in ones only.
         project: Option<PathBuf>,
+    },
+
+    /// Configure the external translation engine, or show what is configured.
+    ///
+    /// Off unless switched on. When on, the game's text is sent to whichever service is
+    /// configured; that is the user's decision and their key.
+    Engine {
+        project: PathBuf,
+        /// openai-compatible, deepl, google-v2 or libretranslate.
+        #[arg(long)]
+        kind: Option<String>,
+        #[arg(long)]
+        endpoint: Option<String>,
+        #[arg(long)]
+        model: Option<String>,
+        /// Store the key for this endpoint. Read from TJLOCALIZER_API_KEY when given as `-`.
+        #[arg(long)]
+        key: Option<String>,
+        /// Switch the engine on. Nothing reaches the network until this is done.
+        #[arg(long)]
+        enable: bool,
+        #[arg(long)]
+        disable: bool,
+        /// Show the exact request that would be sent for a string, without sending it.
+        #[arg(long)]
+        dry_run: Option<String>,
+        #[arg(long)]
+        lang: Option<String>,
     },
 
     /// List the register profiles this build ships.
@@ -267,6 +300,7 @@ fn run(cli: Cli) -> Result<()> {
             fuzzy_threshold,
             apply_safe,
             gloss,
+            engine,
         } => {
             let project = Project::open(&project)?;
             for language in languages(&project, lang.as_deref(), all)? {
@@ -299,8 +333,8 @@ fn run(cli: Cli) -> Result<()> {
                     println!("approved {applied} that restate an existing decision");
                 }
 
-                if gloss {
-                    show_glosses(&project, &language)?;
+                if gloss || engine {
+                    show_proposals(&project, &language, engine)?;
                 }
             }
             Ok(())
@@ -465,6 +499,122 @@ fn run(cli: Cli) -> Result<()> {
                     from.display_name(),
                     to.display_name()
                 );
+            }
+            Ok(())
+        }
+
+        Command::Engine {
+            project,
+            kind,
+            endpoint,
+            model,
+            key,
+            enable,
+            disable,
+            dry_run,
+            lang,
+        } => {
+            let mut project = Project::open(&project)?;
+            let mut config = project
+                .profile()
+                .provider
+                .clone()
+                .unwrap_or_else(ProviderConfig::default);
+
+            if let Some(kind) = kind {
+                config.kind = match kind.as_str() {
+                    "openai-compatible" => ProviderKind::OpenAiCompatible,
+                    "deepl" => ProviderKind::DeepL,
+                    "google-v2" => ProviderKind::GoogleV2,
+                    "libretranslate" => ProviderKind::LibreTranslate,
+                    other => bail!(
+                        "unknown engine {other:?}; try one of: {}",
+                        ProviderKind::all()
+                            .iter()
+                            .map(|k| k.id())
+                            .collect::<Vec<_>>()
+                            .join(", ")
+                    ),
+                };
+                config.endpoint = config.kind.default_endpoint().to_string();
+            }
+            if let Some(endpoint) = endpoint {
+                config.endpoint = endpoint;
+            }
+            if let Some(model) = model {
+                config.model = Some(model);
+            }
+            if enable {
+                config.enabled = true;
+            }
+            if disable {
+                config.enabled = false;
+            }
+
+            if let Some(key) = key {
+                // "-" means read it from the environment, so a key never has to appear in shell
+                // history or in a process listing.
+                let value = if key == "-" {
+                    std::env::var("TJLOCALIZER_API_KEY")
+                        .context("TJLOCALIZER_API_KEY is not set")?
+                } else {
+                    key
+                };
+                let mut keys = Keys::load(&config_dir());
+                keys.set(&config.endpoint, &value);
+                keys.save(&config_dir())?;
+                println!("key stored for {} (owner-readable only)", config.endpoint);
+            }
+
+            project.profile_mut().provider = Some(config.clone());
+            project.save()?;
+
+            println!("engine    {}", config.kind.id());
+            println!("endpoint  {}", config.endpoint);
+            if let Some(model) = &config.model {
+                println!("model     {model}");
+            }
+            println!(
+                "state     {}",
+                if config.enabled {
+                    "on - the game's text will be sent to this service"
+                } else {
+                    "off - nothing leaves this machine"
+                }
+            );
+            println!(
+                "key       {}",
+                if Keys::load(&config_dir()).has(&config.endpoint) {
+                    "stored"
+                } else {
+                    "not stored"
+                }
+            );
+
+            if let Some(text) = dry_run {
+                let language = one_language(&project, lang.as_deref())?;
+                let glossary = project.glossary(&language)?;
+                let style = project.style(&language);
+                let provider = HttpProvider::new(
+                    config,
+                    "<your key>".to_string(),
+                    Briefing {
+                        glossary: &glossary,
+                        style: style.as_ref(),
+                    },
+                );
+                let request = Request {
+                    source_text: text.clone(),
+                    from: project.source_language().clone(),
+                    to: language,
+                    context: "ui".into(),
+                    placeholders: tjlocalizer_core::graph::find_placeholders(&text),
+                    speaker: Default::default(),
+                    stance: Default::default(),
+                };
+                let call = provider.build_call(&request);
+                println!("\n--- would POST to {} ---", call.url);
+                println!("{}", call.body);
             }
             Ok(())
         }
@@ -644,28 +794,67 @@ fn import(
     Ok(project)
 }
 
-/// Shows what the offline dictionary engine makes of the strings nobody has translated.
+/// Shows what the engines make of the strings nobody has translated.
 ///
-/// Printed as glosses, never as translations: the engine resolves terms, and a stitched-together
-/// gloss of a sentence is a starting point for a person, not an answer.
-fn show_glosses(project: &Project, language: &Language) -> Result<()> {
+/// Printed as proposals, never as translations. The offline engine resolves terms; an external
+/// one writes sentences and is fluent whether or not it is right. Neither is ever approved here.
+fn show_proposals(project: &Project, language: &Language, use_engine: bool) -> Result<()> {
     let graph = project.graph()?;
     let approved = project.translations(language)?;
     let dictionary = project.dictionary()?;
     let glossary = project.glossary(language)?;
     let memory = project.memory(language)?;
-    let target = project
-        .target(language)
-        .context("the project has no such target")?;
-    let style = register::builtin(&target.style_profile);
+    let style = project.style(language);
 
-    let mut provider = DictionaryProvider::new(&dictionary, &glossary);
+    let mut offline = DictionaryProvider::new(&dictionary, &glossary);
     if let Some(style) = style.as_ref() {
-        provider = provider.with_style(style);
+        offline = offline.with_style(style);
     }
+
+    // The external engine is assembled only when asked for, so nothing can reach the network as
+    // a side effect of looking at glosses.
+    let online = if use_engine {
+        let config =
+            project.profile().provider.clone().context(
+                "no engine is configured - run `tjlocalizer engine <project> --kind ...`",
+            )?;
+        if !config.enabled {
+            bail!("the engine is switched off; pass --enable to `tjlocalizer engine` first");
+        }
+        let key = Keys::load(&config_dir())
+            .get(&config.endpoint)
+            .map(str::to_string)
+            .or_else(|| std::env::var("TJLOCALIZER_API_KEY").ok())
+            .context("no key stored for that endpoint")?;
+        eprintln!(
+            "sending {} untranslated strings to {} - this leaves your machine",
+            graph
+                .translatable()
+                .filter(|n| approved.get(&n.id).is_none())
+                .count(),
+            config.endpoint
+        );
+        Some(HttpProvider::new(
+            config,
+            key,
+            Briefing {
+                glossary: &glossary,
+                style: style.as_ref(),
+            },
+        ))
+    } else {
+        None
+    };
+
+    let mut providers: Vec<&dyn tjlocalizer_core::translate::Provider> = Vec::new();
+    if let Some(online) = online.as_ref() {
+        providers.push(online);
+    }
+    providers.push(&offline);
 
     let mut complete = 0usize;
     let mut partial = 0usize;
+    let mut refused = 0usize;
     let mut shown = 0usize;
 
     for node in graph.translatable() {
@@ -681,31 +870,49 @@ fn show_glosses(project: &Project, language: &Language) -> Result<()> {
             speaker: Default::default(),
             stance: Default::default(),
         };
-        let Some(proposal) = translate::propose(&request, &memory, &[&provider]) else {
+        let Some(proposal) = translate::propose(&request, &memory, &providers) else {
             continue;
         };
         match proposal.completeness {
             Completeness::Complete => complete += 1,
             Completeness::Partial => partial += 1,
-            Completeness::None => continue,
+            Completeness::None => {
+                refused += 1;
+                if shown < 12 {
+                    println!("  [{} refused] {:?}", proposal.engine, node.source_text);
+                    for note in &proposal.notes {
+                        println!("      {note}");
+                    }
+                    shown += 1;
+                }
+                continue;
+            }
         }
         if shown < 12 {
-            let mark = match proposal.completeness {
-                Completeness::Complete => "full",
-                _ => "part",
-            };
             println!(
-                "  [gloss {mark} {:.2}] {:?} -> {:?}",
-                proposal.confidence, node.source_text, proposal.target_text
+                "  [{} {:.2}] {:?} -> {:?}",
+                proposal.engine, proposal.confidence, node.source_text, proposal.target_text
             );
+            for note in &proposal.notes {
+                println!("      {note}");
+            }
             shown += 1;
         }
     }
     println!(
-        "dictionary glosses: {complete} fully resolved, {partial} partial - all need a person, \
+        "proposals: {complete} complete, {partial} partial, {refused} refused - all need a person, \
          none are approved automatically"
     );
     Ok(())
+}
+
+/// Where the application keeps its own settings, including keys.
+fn config_dir() -> PathBuf {
+    std::env::var_os("XDG_CONFIG_HOME")
+        .map(PathBuf::from)
+        .or_else(|| std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".config")))
+        .unwrap_or_else(|| PathBuf::from("."))
+        .join("com.thanhtinz.tjlocalizer")
 }
 
 fn read_archive(path: &Path) -> Result<Archive> {

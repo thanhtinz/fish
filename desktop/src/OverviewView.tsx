@@ -1,7 +1,10 @@
 import { useState } from "react";
+import { EngineCard } from "./EngineCard";
 import type {
   CapabilityView,
   DictionaryView,
+  EnginePreview,
+  EngineView,
   LanguageView,
   ProjectSummary,
   StyleView,
@@ -26,6 +29,10 @@ interface Props {
   onAddTarget: (tag: string) => void;
   onRemoveTarget: (tag: string) => void;
   onImportDictionary: () => void;
+  engine: EngineView | null;
+  onSaveEngine: (kind: string, endpoint: string, model: string | null, enabled: boolean) => void;
+  onSaveEngineKey: (key: string) => void;
+  onPreviewEngine: (text: string) => Promise<EnginePreview | null>;
 }
 
 /** The pipeline in the order §22 runs it, with each step's state visible rather than implied. */
@@ -290,6 +297,14 @@ export function OverviewView(props: Props) {
               </span>
             </div>
           </div>
+
+          <EngineCard
+            engine={props.engine}
+            busy={busy}
+            onSave={props.onSaveEngine}
+            onSaveKey={props.onSaveEngineKey}
+            onPreview={props.onPreviewEngine}
+          />
 
           <div className="card">
             <h3>Khả năng phát hiện được</h3>

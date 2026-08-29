@@ -17,6 +17,7 @@ use crate::dictionary::Dictionary;
 use crate::graph::{self, ContentGraph};
 use crate::jar::{sha256_hex, Archive};
 use crate::lang::Language;
+use crate::provider::ProviderConfig;
 use crate::suggest::{self, CandidateSet};
 use crate::translation::{Glossary, TranslationMemory, TranslationStore};
 use crate::validate::{validate, ValidationReport};
@@ -142,6 +143,10 @@ pub struct ProjectProfile {
     /// records what the user asserts, it does not adjudicate rights.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub permission_reference: Option<String>,
+    /// An external translation engine, if the user configured one. Off by default, and the key is
+    /// deliberately not here: this file is committed and sent to translators.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub provider: Option<ProviderConfig>,
 }
 
 /// One recorded build of one language, enough to reproduce or undo it.
@@ -212,6 +217,7 @@ impl Project {
             targets: vec![Target::new(Language::new("vi-VN"), "natural-dialogue")],
             branding: Branding::default(),
             permission_reference: None,
+            provider: None,
         };
 
         let mut project = Project { root, profile };
@@ -484,6 +490,12 @@ impl Project {
             dictionary.add(pack);
         }
         Ok(dictionary)
+    }
+
+    /// The register this project writes a language in, if this build ships that profile.
+    pub fn style(&self, language: &Language) -> Option<crate::register::StyleProfile> {
+        self.target(language)
+            .and_then(|t| crate::register::builtin(&t.style_profile))
     }
 
     /// Generates translation candidates for one target (§22, step 9).

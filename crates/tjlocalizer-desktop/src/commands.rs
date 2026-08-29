@@ -15,7 +15,10 @@ use tauri::Manager;
 use tjlocalizer_core::build::Branding;
 use tjlocalizer_core::lang::{known_languages, Language};
 use tjlocalizer_core::project::Project;
+use tjlocalizer_core::provider::{Briefing, HttpProvider, ProviderConfig, ProviderKind};
 use tjlocalizer_core::register;
+use tjlocalizer_core::secrets::Keys;
+use tjlocalizer_core::translate::Provider as _;
 use tjlocalizer_core::translate::{self, DictionaryProvider, Request};
 use tjlocalizer_core::{dictionary_data, suggest};
 
@@ -37,13 +40,29 @@ fn config_dir(app: &tauri::AppHandle) -> PathBuf {
         .unwrap_or_else(|_| PathBuf::from("."))
 }
 
+/// The projects the user has opened, including any that will not open.
+///
+/// A project that fails to load is listed with its reason rather than dropped. Dropping it is
+/// what a `filter_map` does, and the result is that a project quietly disappears from the list
+/// and the user concludes their work is gone - which is exactly what happened here once, when a
+/// settings field changed shape.
 #[tauri::command]
-pub fn recent_projects(app: tauri::AppHandle) -> Vec<ProjectSummary> {
+pub fn recent_projects(app: tauri::AppHandle) -> Vec<RecentView> {
     Recents::load(&config_dir(&app))
         .existing()
         .iter()
-        .filter_map(|p| Project::open(p).ok())
-        .map(|p| ProjectSummary::of(&p))
+        .map(|path| match Project::open(path) {
+            Ok(project) => RecentView {
+                path: path.clone(),
+                summary: Some(ProjectSummary::of(&project)),
+                error: None,
+            },
+            Err(e) => RecentView {
+                path: path.clone(),
+                summary: None,
+                error: Some(e.to_string()),
+            },
+        })
         .collect()
 }
 
@@ -543,6 +562,169 @@ pub fn dictionaries(path: Option<String>) -> Reply<Vec<DictionaryView>> {
             to: to.tag().to_string(),
         })
         .collect())
+}
+
+#[tauri::command]
+pub fn engine(app: tauri::AppHandle, path: String) -> Reply<EngineView> {
+    let project = open(&path)?;
+    let config = project.profile().provider.clone();
+    let keys = Keys::load(&config_dir(&app));
+    let current = config.clone().unwrap_or_default();
+    Ok(EngineView {
+        configured: config.is_some(),
+        enabled: current.enabled,
+        kind: current.kind.id().to_string(),
+        endpoint: current.endpoint.clone(),
+        model: current.model.clone(),
+        has_key: keys.has(&current.endpoint),
+        kinds: ProviderKind::all()
+            .iter()
+            .map(|k| EngineKindView {
+                id: k.id().to_string(),
+                default_endpoint: k.default_endpoint().to_string(),
+                takes_instructions: k.takes_instructions(),
+            })
+            .collect(),
+    })
+}
+
+#[tauri::command]
+pub fn set_engine(
+    app: tauri::AppHandle,
+    path: String,
+    kind: String,
+    endpoint: String,
+    model: Option<String>,
+    enabled: bool,
+) -> Reply<EngineView> {
+    let mut project = open(&path)?;
+    let kind = ProviderKind::all()
+        .into_iter()
+        .find(|k| k.id() == kind)
+        .ok_or_else(|| format!("unknown engine {kind:?}"))?;
+    project.profile_mut().provider = Some(ProviderConfig {
+        enabled,
+        kind,
+        endpoint,
+        model: model.filter(|m| !m.trim().is_empty()),
+        timeout_seconds: 30,
+    });
+    project.save().map_err(err)?;
+    engine(app, path)
+}
+
+/// Stores or clears the key for the configured endpoint.
+///
+/// Keyed by endpoint and kept outside the project, because a project is a folder people commit
+/// and send to translators.
+#[tauri::command]
+pub fn set_engine_key(app: tauri::AppHandle, path: String, key: String) -> Reply<EngineView> {
+    let project = open(&path)?;
+    let endpoint = project
+        .profile()
+        .provider
+        .as_ref()
+        .map(|p| p.endpoint.clone())
+        .ok_or("configure an engine first")?;
+    let dir = config_dir(&app);
+    let mut keys = Keys::load(&dir);
+    keys.set(&endpoint, &key);
+    keys.save(&dir).map_err(err)?;
+    engine(app, path)
+}
+
+/// The exact request that would go out for a string, without sending it.
+///
+/// The user is about to send their game's text to a third party. Being able to see precisely what
+/// would go is the difference between a decision and a leap.
+#[tauri::command]
+pub fn engine_preview(path: String, language: String, text: String) -> Reply<EnginePreview> {
+    let project = open(&path)?;
+    let language = Language::new(language);
+    let config = project
+        .profile()
+        .provider
+        .clone()
+        .ok_or("no engine is configured")?;
+    let glossary = project.glossary(&language).map_err(err)?;
+    let style = project.style(&language);
+
+    let provider = HttpProvider::new(
+        config,
+        "<your key>".to_string(),
+        Briefing {
+            glossary: &glossary,
+            style: style.as_ref(),
+        },
+    );
+    let request = Request {
+        source_text: text.clone(),
+        from: project.source_language().clone(),
+        to: language,
+        context: "ui".into(),
+        placeholders: tjlocalizer_core::graph::find_placeholders(&text),
+        speaker: Default::default(),
+        stance: Default::default(),
+    };
+    let call = provider.build_call(&request);
+    Ok(EnginePreview {
+        url: call.url,
+        instructions: provider.instructions(&request),
+        body: call.body,
+    })
+}
+
+/// Asks the configured engine about one string.
+///
+/// One at a time and only when asked: nothing reaches the network as a side effect of opening a
+/// row or running the offline pipeline.
+#[tauri::command]
+pub fn engine_translate(
+    app: tauri::AppHandle,
+    path: String,
+    language: String,
+    node_id: String,
+) -> Reply<Option<GlossView>> {
+    let project = open(&path)?;
+    let language = Language::new(language);
+    let config = project
+        .profile()
+        .provider
+        .clone()
+        .ok_or("no engine is configured")?;
+    if !config.enabled {
+        return Err("the engine is switched off".into());
+    }
+    let key = Keys::load(&config_dir(&app))
+        .get(&config.endpoint)
+        .map(str::to_string)
+        .ok_or("no key stored for that endpoint")?;
+
+    let graph = project.graph().map_err(err)?;
+    let Some(node) = graph.get(&node_id) else {
+        return Ok(None);
+    };
+    let glossary = project.glossary(&language).map_err(err)?;
+    let style = project.style(&language);
+
+    let provider = HttpProvider::new(
+        config,
+        key,
+        Briefing {
+            glossary: &glossary,
+            style: style.as_ref(),
+        },
+    );
+    let request = Request {
+        source_text: node.source_text.clone(),
+        from: project.source_language().clone(),
+        to: language,
+        context: format!("{:?}", node.context).to_lowercase(),
+        placeholders: node.constraints.placeholders.clone(),
+        speaker: Default::default(),
+        stance: Default::default(),
+    };
+    Ok(provider.propose(&request).map(|p| GlossView::of(&p)))
 }
 
 /// The register to start a language with.

@@ -7,16 +7,18 @@ import type {
   BuildView,
   CapabilityView,
   DictionaryView,
+  EngineView,
   LanguageView,
   NodeView,
   ProjectSummary,
+  RecentView,
   StyleView,
 } from "./types";
 
 type Tab = "overview" | "text" | "build";
 
 export function App() {
-  const [recents, setRecents] = useState<ProjectSummary[]>([]);
+  const [recents, setRecents] = useState<RecentView[]>([]);
   const [project, setProject] = useState<ProjectSummary | null>(null);
   const [language, setLanguage] = useState<string>("");
   const [capabilities, setCapabilities] = useState<CapabilityView[]>([]);
@@ -25,6 +27,7 @@ export function App() {
   const [languages, setLanguages] = useState<LanguageView[]>([]);
   const [styles, setStyles] = useState<StyleView[]>([]);
   const [dictionaries, setDictionaries] = useState<DictionaryView[]>([]);
+  const [engine, setEngineState] = useState<EngineView | null>(null);
   const [tab, setTab] = useState<Tab>("overview");
   const [busy, setBusy] = useState<string | null>(null);
   const [toast, setToast] = useState<{ text: string; bad: boolean } | null>(null);
@@ -56,6 +59,17 @@ export function App() {
   // only when that tab was open. React tracks hooks by call order, so switching tabs would have
   // shifted every hook after it.
   const projectPath = project?.path ?? "";
+  // Null unless an engine is configured and switched on, so the Text tab shows the button only
+  // when pressing it could do something - and never when pressing it would reach the network by
+  // surprise.
+  const engineFor = useCallback(
+    (nodeId: string) =>
+      projectPath && language && engine?.enabled && engine.hasKey
+        ? api.engineTranslate(projectPath, language, nodeId)
+        : Promise.resolve(null),
+    [projectPath, language, engine?.enabled, engine?.hasKey],
+  );
+
   const glossFor = useCallback(
     (nodeId: string) =>
       projectPath && language
@@ -77,6 +91,7 @@ export function App() {
       );
       setBuilds(first ? await api.builds(path, first).catch(() => []) : []);
       setDictionaries(await api.dictionaries(path).catch(() => []));
+      setEngineState(await api.engine(path).catch(() => null));
       setRecents(await api.recentProjects().catch(() => []));
     },
     [run],
@@ -264,11 +279,17 @@ export function App() {
               <button
                 key={r.path}
                 className={project?.path === r.path ? "proj on" : "proj"}
+                title={r.error ?? r.path}
                 onClick={() => loadProject(r.path)}
               >
-                <div className="n">{r.name}</div>
+                <div className="n">
+                  {r.summary?.name ?? r.path.split(/[\\/]/).pop()}
+                  {r.error && <span className="pill bad" style={{ marginLeft: 6 }}>lỗi</span>}
+                </div>
                 <div className="m">
-                  {r.targets.map((t) => t.tag).join(", ")} · {r.translatableCount} chuỗi
+                  {r.summary
+                    ? `${r.summary.targets.map((t) => t.tag).join(", ")} · ${r.summary.translatableCount} chuỗi`
+                    : r.error}
                 </div>
               </button>
             ))}
@@ -399,6 +420,31 @@ export function App() {
                       }
                     }}
                     onImportDictionary={doImportDictionary}
+                    engine={engine}
+                    onSaveEngine={async (kind, endpoint, model, enabled) => {
+                      const e = await run("save", () =>
+                        api.setEngine(project.path, kind, endpoint, model, enabled),
+                      );
+                      if (e) {
+                        setEngineState(e);
+                        say(
+                          e.enabled
+                            ? "Máy dịch đã bật — chữ trong game sẽ được gửi tới dịch vụ này"
+                            : "Máy dịch đã tắt",
+                          e.enabled,
+                        );
+                      }
+                    }}
+                    onSaveEngineKey={async (key) => {
+                      const e = await run("save", () => api.setEngineKey(project.path, key));
+                      if (e) {
+                        setEngineState(e);
+                        say("Đã lưu khoá, ngoài thư mục dự án");
+                      }
+                    }}
+                    onPreviewEngine={(text) =>
+                      api.enginePreview(project.path, language, text).catch(() => null)
+                    }
                   />
                 )}
 
@@ -406,6 +452,7 @@ export function App() {
                   <TextView
                     nodes={nodes}
                     onGloss={glossFor}
+                    onEngine={engine?.enabled && engine.hasKey ? engineFor : null}
                     onSetTranslation={async (nodeId, target) => {
                       await run("save", () =>
                         api.setTranslation(project.path, language, nodeId, target),

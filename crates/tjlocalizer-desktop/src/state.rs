@@ -28,6 +28,15 @@ pub struct TargetView {
     pub output_path: Option<String>,
 }
 
+/// One row of the recent list: a project, or the reason it will not open.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RecentView {
+    pub path: String,
+    pub summary: Option<ProjectSummary>,
+    pub error: Option<String>,
+}
+
 /// Enough about a project to list and reopen it without loading its content.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -171,6 +180,33 @@ impl GlossView {
             notes: proposal.notes.clone(),
         }
     }
+}
+
+/// The external engine's settings, as the interface sees them.
+///
+/// The key is never in here. What the interface needs to know is whether one is stored, not what
+/// it is - and a view model is the thing most likely to end up in a log or an error report.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EngineView {
+    pub configured: bool,
+    pub enabled: bool,
+    pub kind: String,
+    pub endpoint: String,
+    pub model: Option<String>,
+    pub has_key: bool,
+    /// The families this build can talk to, for the picker.
+    pub kinds: Vec<EngineKindView>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EngineKindView {
+    pub id: String,
+    pub default_endpoint: String,
+    /// Whether this family can be told the register and terminology in words. The others are
+    /// only checked on the way back, which the interface should say.
+    pub takes_instructions: bool,
 }
 
 /// A direction the dictionary covers, for the settings screen.
@@ -399,6 +435,15 @@ pub struct CapabilityView {
     pub id: String,
     pub confidence: f32,
     pub evidence: Vec<String>,
+}
+
+/// Exactly what a request to the engine would contain.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EnginePreview {
+    pub url: String,
+    pub instructions: String,
+    pub body: String,
 }
 
 /// What came back from a CSV a translator returned.
