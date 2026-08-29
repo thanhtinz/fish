@@ -177,6 +177,15 @@ pub struct FontProfile {
     /// True when the game uses the device font and can draw whatever the handset can.
     #[serde(default)]
     pub device_font: bool,
+    /// A folder of fonts to take diacritic shapes from.
+    ///
+    /// A path, not the fonts. They stay where their owner keeps them; nothing is copied into the
+    /// project, and the project can be shared without carrying somebody's typefaces along.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mark_library: Option<PathBuf>,
+    /// The font chosen from that folder, once one has been measured against this sheet.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub marks_from: Option<PathBuf>,
 }
 
 /// One recorded build of one language, enough to reproduce or undo it.
@@ -628,6 +637,42 @@ impl Project {
             }),
         )?;
         Ok(Some((path, report)))
+    }
+
+    /// Renders sample text with the drawn marks and with the chosen typeface, for comparison.
+    ///
+    /// Which reads better is not something a count can answer. A typeface supplying more marks is
+    /// not a typeface producing better ones - its diacritics are outlines rasterised small, and
+    /// the drawn ones are shapes designed for this size. So the choice is put in front of a person
+    /// at the size that ships.
+    pub fn preview_font(&self, text: &[&str], scale: u32) -> crate::Result<Option<PathBuf>> {
+        let Some(sheet) = self.font_sheet()? else {
+            return Ok(None);
+        };
+        let compositions = font::vietnamese_compositions();
+
+        let (drawn, _) = extend_with_marks(&sheet, &compositions, None)?;
+        let chosen = self
+            .profile
+            .font
+            .as_ref()
+            .and_then(|f| f.marks_from.clone())
+            .map(|path| MarkSource::from_path(&path))
+            .transpose()?;
+
+        let mut sheets: Vec<(&str, &font::sheet::Sheet)> = vec![("drawn", &drawn)];
+        let borrowed;
+        if let Some(source) = chosen.as_ref() {
+            borrowed = extend_with_marks(&sheet, &compositions, Some(source))?.0;
+            sheets.push(("typeface", &borrowed));
+        }
+
+        let image = font::sheet::preview(&sheets, text, scale);
+        let dir = self.root.join("fonts");
+        std::fs::create_dir_all(&dir)?;
+        let path = dir.join("preview.png");
+        std::fs::write(&path, image.encode_png()?)?;
+        Ok(Some(path))
     }
 
     /// Generates translation candidates for one target (§22, step 9).

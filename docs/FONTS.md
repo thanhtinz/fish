@@ -84,6 +84,26 @@ Vietnamese letters serves.
 **The font is read from where you keep it and never copied into the project.** A font is somebody's
 work under somebody's licence, and a localization tool has no business redistributing one.
 
+### Choosing from a folder
+
+Anyone who localizes into Vietnamese has a folder of fonts. Point at it and every font in it is
+measured against this game's own sheet:
+
+```sh
+tjlocalizer font projects/game --marks-library ~/fonts
+```
+
+```
+511 fonts readable, 451 cover all 134 Vietnamese letters
+Gotham-Ultra supplies 101/134 marks (75%)
+```
+
+Ranking is by measurement, not by name, because which font serves best depends on the cell size
+and nothing in the file says which. Measured over a real collection at a 12-pixel cell, the spread
+runs from 100 of 134 marks down to zero — and the fonts at the top are the heavy weights, whose
+marks survive being rasterised that small. The choice is remembered in project.json as a **path**;
+no font is copied in.
+
 ### Why it is not simply better
 
 A typeface's diacritics are drawn for reading sizes. Rasterised into the cells these games
@@ -105,8 +125,25 @@ glyph, against every cell already on the sheet including the game's own, so an i
 cannot make `á` a picture of `a` either. With that rule the same font yields 48 of 134 marks at
 12 px and about 101 at 24 px, with no identical pairs at any size.
 
-The report says which: "48 of 134 marks taken from …; the rest were drawn, because a borrowed one
+The report says which: "101 of 134 marks taken from …; the rest were drawn, because a borrowed one
 would have made two letters identical."
+
+### The count is not a quality score
+
+A font supplying more marks is not a font producing better ones, and it is worth being blunt about
+that because the number invites the opposite reading. Borrowed marks are outlines rasterised
+small; drawn ones are shapes designed for this size. Side by side at 12 pixels the drawn marks are
+often the more legible — thinner, but shaped, where a heavy typeface's marks arrive as blocks.
+
+So the tool renders both and leaves the judgement to a person, which is what §16 asks for:
+
+```sh
+tjlocalizer font projects/game --preview
+```
+
+`fonts/preview.png` holds each sample line at the real size and enlarged, with the drawn marks
+first and the borrowed ones below. **Look at the small rows.** The enlarged ones are there to see
+the shapes; the small ones are what ships.
 
 ## What it does not do
 

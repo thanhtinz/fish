@@ -15,6 +15,7 @@
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 
+pub mod library;
 pub mod outline;
 pub mod sheet;
 

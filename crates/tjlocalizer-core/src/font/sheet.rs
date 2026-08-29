@@ -680,3 +680,73 @@ fn draw_tone(
         }
     }
 }
+
+/// Draws a line of text with a sheet, the way a game would: look the character up, blit its cell.
+///
+/// Characters the sheet has no glyph for are left as a gap, because that is what the game shows.
+pub fn render_line(sheet: &Sheet, text: &str) -> Image {
+    let advance = sheet.grid.cell_width;
+    let mut image = Image::new(
+        advance * text.chars().count().max(1) as u32,
+        sheet.grid.cell_height,
+    );
+    for (i, c) in text.chars().enumerate() {
+        let Some(index) = sheet.index_of(c) else {
+            continue;
+        };
+        let (ox, oy) = sheet.grid.cell_origin(index);
+        for y in 0..sheet.grid.cell_height {
+            for x in 0..advance {
+                image.set(i as u32 * advance + x, y, sheet.image.get(ox + x, oy + y));
+            }
+        }
+    }
+    image
+}
+
+/// Nearest-neighbour enlargement, for looking at a sheet on a monitor.
+///
+/// Nearest neighbour rather than anything smoother: these are pixels, and smoothing them shows
+/// something the handset will never draw.
+pub fn scaled(image: &Image, scale: u32) -> Image {
+    let mut out = Image::new(image.width * scale, image.height * scale);
+    for y in 0..out.height {
+        for x in 0..out.width {
+            out.set(x, y, image.get(x / scale, y / scale));
+        }
+    }
+    out
+}
+
+/// Sample text stacked above a background, at the real size and enlarged.
+///
+/// A number cannot answer whether one set of marks reads better than another; only looking can.
+/// So this exists to be looked at, and shows both sizes because the real one is what ships and
+/// the enlarged one is what a person can actually see.
+pub fn preview(sheets: &[(&str, &Sheet)], lines: &[&str], scale: u32) -> Image {
+    let gap = 4u32;
+    let mut rendered: Vec<Image> = Vec::new();
+
+    for (_, sheet) in sheets {
+        for line in lines {
+            let line = render_line(sheet, line);
+            rendered.push(scaled(&line, 1));
+            rendered.push(scaled(&line, scale));
+        }
+    }
+
+    let width = rendered.iter().map(|i| i.width).max().unwrap_or(1);
+    let height: u32 = rendered.iter().map(|i| i.height + gap).sum();
+    let mut out = Image::new(width, height.max(1));
+
+    let mut y = 0u32;
+    for image in &rendered {
+        for iy in 0..image.height {
+            for ix in 0..image.width {
+                out.set(ix, y + iy, image.get(ix, iy));
+            }
+        }
+        y += image.height + gap;
+    }
+    out
+}

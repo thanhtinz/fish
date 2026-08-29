@@ -203,6 +203,21 @@ enum Command {
         /// Build a sheet with the missing Vietnamese letters composed from the game's own.
         #[arg(long)]
         compose: bool,
+        /// A folder of fonts to choose the diacritic shapes from.
+        ///
+        /// Every font in it is measured against this game's own sheet and the one supplying the
+        /// most usable marks wins. Which font that is depends on the cell size and cannot be told
+        /// from the file: at twelve pixels a heavy weight contributes twice what an elegant one
+        /// does, because its marks survive being rasterised that small.
+        #[arg(long)]
+        marks_library: Option<PathBuf>,
+
+        /// Render sample text both ways into fonts/preview.png, at the real size and enlarged.
+        ///
+        /// Whether borrowed marks read better than drawn ones is not something a count answers.
+        #[arg(long)]
+        preview: bool,
+
         /// Take the diacritic shapes from this font file rather than drawing them.
         ///
         /// The font is read from where it is and never copied into the project. A borrowed mark
@@ -668,6 +683,8 @@ fn run(cli: Cli) -> Result<()> {
             device_font,
             compose,
             marks_from,
+            marks_library,
+            preview,
         } => {
             let mut project = Project::open(&project)?;
 
@@ -677,6 +694,8 @@ fn run(cli: Cli) -> Result<()> {
                     grid: None,
                     order: String::new(),
                     device_font: true,
+                    mark_library: None,
+                    marks_from: None,
                 });
                 project.save()?;
             } else if let Some(entry) = sheet {
@@ -697,6 +716,7 @@ fn run(cli: Cli) -> Result<()> {
                 let image = tjlocalizer_core::font::sheet::Image::decode_png(&data.data)?;
                 let rows = image.height / cell_height;
 
+                let previous = project.profile().font.clone();
                 project.profile_mut().font = Some(FontProfile {
                     entry: entry.clone(),
                     grid: Some(Grid {
@@ -707,6 +727,9 @@ fn run(cli: Cli) -> Result<()> {
                     }),
                     order: String::new(),
                     device_font: false,
+                    // Kept: redeclaring the sheet should not lose the font folder.
+                    mark_library: previous.as_ref().and_then(|f| f.mark_library.clone()),
+                    marks_from: previous.and_then(|f| f.marks_from),
                 });
                 project.save()?;
                 println!(
@@ -756,8 +779,64 @@ fn run(cli: Cli) -> Result<()> {
                 }
             }
 
+            // Measured once and remembered, because scanning a real font folder takes seconds
+            // and the answer only changes when the sheet or the folder does.
+            if let Some(library) = &marks_library {
+                let sheet = project
+                    .font_sheet()?
+                    .context("declare a glyph sheet first, with --sheet")?;
+                println!(
+                    "measuring the fonts in {} against this sheet",
+                    library.display()
+                );
+                match tjlocalizer_core::font::library::best_for(&sheet, library)? {
+                    None => println!("  none of them supplies a usable mark at this size"),
+                    Some(fit) => {
+                        println!(
+                            "  {} supplies {}/{} marks ({:.0}%)",
+                            fit.name,
+                            fit.from_typeface,
+                            fit.composed,
+                            fit.share() * 100.0
+                        );
+                        if let Some(font) = project.profile_mut().font.as_mut() {
+                            font.mark_library = Some(library.clone());
+                            font.marks_from = Some(fit.path);
+                        }
+                        project.save()?;
+                    }
+                }
+            }
+
+            if preview {
+                let lines = [
+                    "Bat dau tro choi",
+                    "Bắt đầu trò chơi",
+                    "a ă â á à ả ã ạ ắ ằ ẳ ẵ ặ ấ ầ ẩ ẫ ậ",
+                    "e ê é è ẻ ẽ ẹ ế ề ể ễ ệ đ Đ ơ ư",
+                ];
+                match project.preview_font(&lines, 6)? {
+                    None => bail!("declare a glyph sheet first, with --sheet"),
+                    Some(path) => {
+                        println!("preview written to {}", path.display());
+                        println!(
+                            "  the drawn marks are on top; if a typeface was chosen its version \
+                             follows. Look at the small rows, not the large ones: the small ones \
+                             are the size that ships."
+                        );
+                    }
+                }
+            }
+
             if compose {
-                let marks = match &marks_from {
+                let chosen = marks_from.clone().or_else(|| {
+                    project
+                        .profile()
+                        .font
+                        .as_ref()
+                        .and_then(|f| f.marks_from.clone())
+                });
+                let marks = match &chosen {
                     Some(path) => {
                         let source = MarkSource::from_path(path)?;
                         if !source.covers_vietnamese() {
