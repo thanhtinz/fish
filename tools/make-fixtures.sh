@@ -28,6 +28,17 @@ MicroEdition-Profile: MIDP-2.0
 MF
 cp "$work/SampleGame.class" "$work/jar/"
 printf 'level.one.name=Green Field\nlevel.one.hint=Find the key\n' > "$work/jar/levels.properties"
-( cd "$work/jar" && zip -q -r -X "$out/sample-game.jar" . )
+
+# The fixture is committed and CI checks that regenerating it changes nothing, so it has to be
+# byte-reproducible. `zip` stores each entry's local mtime, so without a fixed timestamp and a
+# fixed timezone every run produces a different archive; `-r` also walks the directory in readdir
+# order, so the entries are listed explicitly instead. 1980-01-01 is the earliest a DOS timestamp
+# can express, and is what this project's own writer uses. TZ is pinned for the `touch` as well as
+# the `zip`: `touch -t` reads local time, so without it a contributor west of CI would stamp a
+# different instant and get a different archive.
+rm -f "$out/sample-game.jar"
+TZ=UTC find "$work/jar" -exec touch -t 198001010000 {} +
+( cd "$work/jar" && TZ=UTC zip -q -X "$out/sample-game.jar" \
+    META-INF/MANIFEST.MF SampleGame.class levels.properties )
 
 echo "wrote $out/SampleGame.class and $out/sample-game.jar"
