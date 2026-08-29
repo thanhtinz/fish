@@ -16,3 +16,15 @@ cargo run -q -p tjlocalizer-core --example patch_demo -- \
 echo "--- JVM output from the patched class:"
 # stdout.encoding, not file.encoding: since Java 19 the console stream follows the former.
 java -Dstdout.encoding=UTF-8 -cp "$work" SampleGame
+
+# The other kind of patch: one use of one string changed and the other left alone, which the
+# constant pool cannot express. Here the *code* is edited - a load instruction repointed at a new
+# constant - so a mistake about instruction lengths would produce a class the verifier rejects
+# rather than a wrong string.
+mkdir -p "$work/sites"
+cargo run -q -p tjlocalizer-core --example site_demo -- \
+    "$root/crates/tjlocalizer-core/tests/data/SampleGame.class" \
+    "$work/sites/SampleGame.class"
+
+echo "--- JVM output from the class whose code was patched:"
+java -Dstdout.encoding=UTF-8 -Xverify:all -cp "$work/sites" SampleGame

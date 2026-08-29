@@ -412,3 +412,85 @@ fn installing_the_composed_sheet_is_what_makes_the_build_pass_its_glyph_check() 
         .height;
     assert!(shipped_height > original_height);
 }
+
+/// The case the constant pool cannot express, said as a rule (§18, §19).
+///
+/// The fixture shows its quit label twice, from two methods. Rewriting the constant changes both;
+/// this changes one, and the test's whole point is that the other is still there afterwards.
+#[test]
+fn a_rule_can_change_one_use_of_a_string_and_leave_the_other() {
+    let dir = TempDir::new("site");
+    let mut archive = Archive::read(&fixture()).unwrap();
+
+    let mut rule = enabled(Rule::new(
+        "confirm",
+        "a different word in the confirm dialog",
+    ));
+    rule.when = vec![Condition::StringConstant {
+        class: "SampleGame.class".into(),
+        text: "Quit".into(),
+    }];
+    rule.then = vec![Action::SetStringAtSite {
+        class: "SampleGame.class".into(),
+        method: "confirm".into(),
+        from: "Quit".into(),
+        to: "Thoát khỏi trò chơi?".into(),
+    }];
+
+    // What it says it will do, before it does anything: both counts named, so a person can see
+    // that one use is changing and one is not.
+    let plan = &rules::plan(&[rule.clone()], &archive, &dir.0).unwrap()[0];
+    assert!(plan.ready(), "{plan:?}");
+    assert!(
+        plan.effects[0].contains("1 other use of \"Quit\" left alone"),
+        "{}",
+        plan.effects[0]
+    );
+
+    let applied = rules::apply(&[rule], &mut archive, &dir.0).unwrap();
+    assert_eq!(applied.rules, vec!["confirm"]);
+    assert_eq!(applied.constants_changed, 1);
+
+    let class = ClassFile::parse(&archive.get("SampleGame.class").unwrap().data).unwrap();
+    let sites = class.string_sites().unwrap();
+    assert_eq!(
+        sites
+            .iter()
+            .filter(|s| s.text.as_deref() == Some("Thoát khỏi trò chơi?"))
+            .map(|s| s.method.as_str())
+            .collect::<Vec<_>>(),
+        vec!["confirm"]
+    );
+    assert_eq!(
+        sites
+            .iter()
+            .filter(|s| s.text.as_deref() == Some("Quit"))
+            .map(|s| s.method.as_str())
+            .collect::<Vec<_>>(),
+        vec!["main"]
+    );
+}
+
+/// A method the game does not have is a rule that does nothing, and says so.
+#[test]
+fn a_site_rule_for_a_method_that_is_not_there_does_nothing() {
+    let dir = TempDir::new("site-missing");
+    let mut archive = Archive::read(&fixture()).unwrap();
+    let before = archive.get("SampleGame.class").unwrap().data.clone();
+
+    let mut rule = enabled(Rule::new("elsewhere", "a method this game does not have"));
+    rule.then = vec![Action::SetStringAtSite {
+        class: "SampleGame.class".into(),
+        method: "drawStatusBar".into(),
+        from: "Quit".into(),
+        to: "Thoát".into(),
+    }];
+
+    let plan = &rules::plan(&[rule.clone()], &archive, &dir.0).unwrap()[0];
+    assert!(plan.effects.is_empty());
+    assert!(!plan.ready(), "a rule with nothing to do is not ready");
+
+    let applied = rules::apply(&[rule], &mut archive, &dir.0).unwrap();
+    assert!(applied.rules.is_empty());
+    assert_eq!(archive.get("SampleGame.class").unwrap().data, before);
+}

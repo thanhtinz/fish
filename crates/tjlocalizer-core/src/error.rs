@@ -42,6 +42,16 @@ pub enum Error {
     #[error("a Utf8 constant may hold at most 65535 bytes, this one needs {len}")]
     Utf8TooLong { len: usize },
 
+    #[error("the class file's structure could not be walked: {reason}")]
+    MalformedClassBody { reason: String },
+
+    #[error(
+        "the pool is full for this instruction: `ldc` addresses 255 constants and this class \
+         already has {count}, so the site cannot be pointed at a new one without rewriting the \
+         instruction, which moves every jump in the method"
+    )]
+    PoolTooFullForSite { count: u16 },
+
     #[error("malformed modified UTF-8 at byte {offset}")]
     MalformedModifiedUtf8 { offset: usize },
 

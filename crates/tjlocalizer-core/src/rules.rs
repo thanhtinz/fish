@@ -11,9 +11,11 @@
 //! hold. A rule carried over from a different version of a game does not silently patch the wrong
 //! constant; it reports that the game does not look like what the rule was written for.
 //!
-//! What a rule may do is deliberately narrow: replace a resource, and change constants in the
-//! pool. Both are things this crate already does safely and has JVM-verified. A rule cannot add
-//! bytecode, and so cannot make a class fail verification.
+//! What a rule may do is deliberately narrow: replace a resource, change constants in the pool,
+//! and point one load instruction at a different constant. All three are things this crate does
+//! safely and has JVM-verified. A rule still cannot *add* bytecode - the third changes an operand
+//! and never a length, so every jump, exception range and stack map frame in the method stays
+//! exactly as the compiler left it.
 
 use crate::classfile::ClassFile;
 use crate::jar::{sha256_hex, Archive};
@@ -52,6 +54,22 @@ pub enum Action {
     /// Scoped to a class and to an exact previous value, because "change the 16 to 22" applied
     /// across a whole game changes sixteens that had nothing to do with the font.
     SetIntConstant { class: String, from: i32, to: i32 },
+    /// Changes what one method loads, without changing the string itself.
+    ///
+    /// The case the constant pool cannot express. A game shows `Back` on eleven screens from one
+    /// constant, and a translation that has to differ on one of them has nowhere to say so:
+    /// rewriting the constant changes all eleven. This adds a constant and repoints the load
+    /// instructions in one named method at it, so the other ten are untouched.
+    ///
+    /// Scoped to a method and to the exact text it expects to find, for the same reason every
+    /// other action is: a patch that applied wherever it fitted would find a `Back` that had
+    /// nothing to do with the screen it was written for.
+    SetStringAtSite {
+        class: String,
+        method: String,
+        from: String,
+        to: String,
+    },
     /// Changes a string literal in one class.
     ///
     /// This is how a font swap usually lands: a game that draws from a sheet often keeps the
@@ -68,9 +86,9 @@ impl Action {
     fn class(&self) -> Option<&str> {
         match self {
             Action::ReplaceEntry { .. } => None,
-            Action::SetIntConstant { class, .. } | Action::SetStringConstant { class, .. } => {
-                Some(class)
-            }
+            Action::SetIntConstant { class, .. }
+            | Action::SetStringConstant { class, .. }
+            | Action::SetStringAtSite { class, .. } => Some(class),
         }
     }
 }
@@ -242,6 +260,28 @@ pub fn apply(rules: &[Rule], archive: &mut Archive, root: &Path) -> Result<Appli
                             changed += 1;
                         }
                     }
+                    Action::SetStringAtSite {
+                        class: c,
+                        method,
+                        from,
+                        to,
+                    } if *c == class => {
+                        let sites: Vec<crate::classfile::CodeSite> = file
+                            .string_sites()?
+                            .into_iter()
+                            .filter(|s| s.method == *method && s.text.as_deref() == Some(from))
+                            .collect();
+                        if !sites.is_empty() {
+                            // One new constant for however many sites in the method load it: the
+                            // text is the same, it is only the other uses elsewhere that must not
+                            // move with it.
+                            let index = file.add_string(to)?;
+                            for site in &sites {
+                                file.point_site_at(site, index)?;
+                                changed += 1;
+                            }
+                        }
+                    }
                     _ => {}
                 }
             }
@@ -338,6 +378,36 @@ fn describe(action: &Action, archive: &Archive, root: &Path) -> Result<Vec<Strin
                     vec![]
                 } else {
                     vec![format!("in {class}, change {count} × {from} to {to}")]
+                }
+            }
+        },
+        Action::SetStringAtSite {
+            class,
+            method,
+            from,
+            to,
+        } => match read_class(archive, class)? {
+            None => vec![],
+            Some(file) => {
+                let count = file
+                    .string_sites()?
+                    .into_iter()
+                    .filter(|s| s.method == *method && s.text.as_deref() == Some(from.as_str()))
+                    .count();
+                let elsewhere = file
+                    .string_sites()?
+                    .into_iter()
+                    .filter(|s| s.method != *method && s.text.as_deref() == Some(from.as_str()))
+                    .count();
+                if count == 0 {
+                    vec![]
+                } else {
+                    vec![format!(
+                        "in {class}.{method}, load {to:?} instead of {from:?} at {count} place{} \
+                         ({elsewhere} other use{} of {from:?} left alone)",
+                        if count == 1 { "" } else { "s" },
+                        if elsewhere == 1 { "" } else { "s" }
+                    )]
                 }
             }
         },

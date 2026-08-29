@@ -36,22 +36,49 @@ refuses when it does not hold, so a rule carried over from another version of a 
 the game is not what it was written for rather than patching the wrong thing. `entrySha256` is the
 strictest and the right one for a file swap: it says *this is the image I measured*.
 
-`then` is what it would change. Three actions, deliberately:
+`then` is what it would change. Four actions, deliberately:
 
 | Action | What it does |
 | --- | --- |
 | `replaceEntry` | Puts a file from the project directory into the archive. |
 | `setIntConstant` | Changes every `CONSTANT_Integer` of one value, in one named class. |
 | `setStringConstant` | Changes a string literal, in one named class. |
+| `setStringAtSite` | Changes what one named *method* loads, leaving the string itself alone. |
 
-Both constant actions are scoped to a class **and** to an exact previous value. "Change the 16 to
+Every constant action is scoped to a class **and** to an exact previous value. "Change the 16 to
 22" applied across a whole game changes sixteens that had nothing to do with the font.
+
+### `setStringAtSite`, and why it exists
+
+A game shows `Back` on eleven screens from one constant. A translation that has to differ on one of
+them - because Vietnamese wants `Quay lại` in a menu and `Trở về` after a battle - has nowhere in
+the pool to say so: rewriting the constant changes all eleven.
+
+```json
+{
+  "kind": "setStringAtSite",
+  "class": "GameScreen.class", "method": "drawBattleEnd",
+  "from": "Back", "to": "Trở về"
+}
+```
+
+This adds a new constant and points the load instructions *in that one method* at it. The plan says
+both halves before it runs:
+
+```
+would in GameScreen.class.drawBattleEnd, load "Trở về" instead of "Back" at 1 place
+       (10 other uses of "Back" left alone)
+```
 
 ## What a rule cannot do
 
 It cannot add bytecode. Every action here is something this crate already does and has verified on
-a real JVM - rewriting the constant pool, replacing an entry - so no rule can make a class fail
-verification. A patch that needs new instructions is not expressible, on purpose.
+a real JVM - rewriting the constant pool, replacing an entry, repointing one load instruction - so
+no rule can make a class fail verification. `setStringAtSite` changes an operand and never a
+length, so every jump, exception range and stack map frame in the method stays exactly as the
+compiler left it; where a new constant would not fit the instruction's one-byte operand it is
+refused rather than widened, because widening moves everything after it. A patch that needs new
+instructions is not expressible, on purpose.
 
 ## Nothing runs because it was written
 
@@ -99,7 +126,8 @@ of the artwork changes neither.
 
 `--install-font` generates the part that is the same in every game: replace the image. The other
 part - teaching the game that the sheet now has more rows, and which character each new cell holds
-- is per-game code, and is left for a person to add as `setIntConstant` or `setStringConstant`.
+- is per-game code, and is left for a person to add as `setIntConstant`, `setStringConstant` or
+`setStringAtSite`.
 
 The generated rule's description says so, and the interface repeats it where the button is. A rule
 that swapped the artwork and stopped would leave a game drawing its old letters out of a taller
