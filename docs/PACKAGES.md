@@ -142,6 +142,26 @@ list says so rather than staying quiet - which matters most for Android, where a
 its text in code rather than in `strings.xml` will look, from the extracted text alone, like a
 game with almost nothing to translate.
 
+## A guess is not a finding
+
+Everything above is mechanical: a magic number, a table this build knows how to walk, a name on a
+list somebody wrote down. Turning on the analysis engine (see `LANGUAGES.md`) adds a second, softer
+kind of answer - Claude reading a listing of file names and saying which ones look like they hold
+text a player would read.
+
+The two are kept apart everywhere they appear:
+
+- Suggestions have their **own section** in `analyze` and in the Overview tab, with the reason and
+  the model that gave it. They never join the readable list.
+- Suggestions are stored in `content/suggestions.json`, not in the graph.
+- `writeback::plan` **never consults them**. What can be written back stays a decision made from
+  bytes, because a file written back on a guess is a destroyed file, and the build would report
+  success.
+
+The scan itself sends only names, sizes and what the mechanical check already concluded; asking
+about one file sends the first 2 KiB of that one file. Neither ever sends a package's contents
+wholesale.
+
 ## Rules that belong to one format
 
 Validation asks JAR questions only of JARs. A MIDlet entry point and a glyph sheet are rules about

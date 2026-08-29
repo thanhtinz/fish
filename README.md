@@ -75,6 +75,20 @@ A one-shot run over a game with no translation memory behind it approves almost 
 produces a working but largely untranslated archive. That is the honest outcome, and the CLI says
 so rather than reporting success.
 
+Asking Claude which files to look at, what an unknown file is, and what looks wrong with the
+translation - all off until switched on, and all of it suggestions rather than findings:
+
+```sh
+tjlocalizer claude  projects/game --key - --enable
+tjlocalizer analyze projects/game --with-claude    # sends file names, never contents
+tjlocalizer inspect projects/game assets/data.bin --dry-run
+tjlocalizer review  projects/game --lang vi-VN --dry-run
+```
+
+A scan sends file names, sizes and what the mechanical check already made of each. Asking about one
+file sends the first 2 KiB of that one file. `--dry-run` prints the whole request and sends
+nothing. See [docs/LANGUAGES.md](docs/LANGUAGES.md).
+
 ## What it will not do
 
 - **Translate on its own authority.** Candidates come from the project's own memory, glossary and

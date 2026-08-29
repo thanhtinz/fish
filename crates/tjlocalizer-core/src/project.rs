@@ -150,6 +150,10 @@ pub struct ProjectProfile {
     /// deliberately not here: this file is committed and sent to translators.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub provider: Option<ProviderConfig>,
+    /// How the analysis side is set up, if the user turned it on. Off by default, and like the
+    /// engine above it holds no key.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub claude: Option<crate::claude::Settings>,
     /// Images somebody has decided carry words painted into them (§17).
     ///
     /// Empty means nobody has looked, which is not the same as "there are none" - and the
@@ -280,6 +284,7 @@ impl Project {
             branding: Branding::default(),
             permission_reference: None,
             provider: None,
+            claude: None,
             text_assets: Vec::new(),
             font: None,
         };
@@ -453,6 +458,23 @@ impl Project {
         let graph = graph::extract(&self.original()?);
         write_json(&self.root.join("content/graph.json"), &graph)?;
         Ok(graph)
+    }
+
+    /// The last scan's suggestions, kept apart from anything the package survey established.
+    ///
+    /// Stored under `content/` beside the graph, and read back separately for the same reason it
+    /// is shown separately: a guess that got filed alongside a fact would, a week later, be
+    /// indistinguishable from one.
+    pub fn suggestions(&self) -> crate::Result<Option<crate::claude::Survey>> {
+        let path = self.root.join("content/suggestions.json");
+        if !path.exists() {
+            return Ok(None);
+        }
+        read_json(&path).map(Some)
+    }
+
+    pub fn save_suggestions(&self, survey: &crate::claude::Survey) -> crate::Result<()> {
+        write_json(&self.root.join("content/suggestions.json"), survey)
     }
 
     pub fn graph(&self) -> crate::Result<ContentGraph> {

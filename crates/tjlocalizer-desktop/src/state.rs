@@ -286,6 +286,46 @@ pub struct EngineKindView {
     pub takes_instructions: bool,
 }
 
+/// How the analysis side is set up, for the settings screen.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AnalystView {
+    pub enabled: bool,
+    pub endpoint: String,
+    pub model: String,
+    pub has_key: bool,
+    /// The models offered. The list is short and named rather than free text, because a mistyped
+    /// model is a failed call with an unhelpful message.
+    pub models: Vec<String>,
+}
+
+/// What a scan would send, shown before it is sent.
+///
+/// The file names, because that is what a person is consenting to - and the count of tokens, from
+/// the service rather than from characters divided by four.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ScanPreview {
+    pub paths: Vec<String>,
+    pub model: String,
+    /// None when the count could not be got. Shown as unknown rather than as a guess.
+    pub tokens: Option<u64>,
+    /// Why the count is missing, when it is.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub trouble: String,
+}
+
+/// One suggestion, and the fact that it is one.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SuggestionView {
+    pub path: String,
+    pub why: String,
+    pub confidence: f32,
+    /// The model that said so, so a stale suggestion can be told from a fresh one.
+    pub model: String,
+}
+
 /// A direction the dictionary covers, for the settings screen.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]

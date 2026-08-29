@@ -13,6 +13,7 @@ use crate::state::*;
 use std::path::{Path, PathBuf};
 use tauri::Manager;
 use tjlocalizer_core::build::Branding;
+use tjlocalizer_core::claude::{self, Analyst};
 use tjlocalizer_core::font::library;
 use tjlocalizer_core::font::outline::MarkSource;
 use tjlocalizer_core::lang::{known_languages, Language};
@@ -1273,4 +1274,250 @@ pub fn remove_rule(path: String, id: String) -> Reply<Vec<RuleView>> {
         return Err(format!("this project has no rule {id}"));
     }
     rules(path)
+}
+
+/// The models offered for analysis.
+///
+/// Named rather than free text: a mistyped model is a failed call whose message says nothing
+/// useful, and the choice that matters - a cheaper one for a large scan - is one of two.
+const MODELS: &[&str] = &["claude-opus-5", "claude-haiku-4-5"];
+
+#[tauri::command]
+pub fn analyst(app: tauri::AppHandle, path: String) -> Reply<AnalystView> {
+    let project = open(&path)?;
+    let settings = project.profile().claude.clone().unwrap_or_default();
+    Ok(AnalystView {
+        enabled: settings.enabled,
+        endpoint: claude::ENDPOINT.to_string(),
+        model: settings.model,
+        has_key: Keys::load(&config_dir(&app)).has(claude::ENDPOINT),
+        models: MODELS.iter().map(|m| m.to_string()).collect(),
+    })
+}
+
+#[tauri::command]
+pub fn set_analyst(
+    app: tauri::AppHandle,
+    path: String,
+    model: String,
+    enabled: bool,
+) -> Reply<AnalystView> {
+    let mut project = open(&path)?;
+    let mut settings = project.profile().claude.clone().unwrap_or_default();
+    settings.model = if model.trim().is_empty() {
+        claude::DEFAULT_MODEL.to_string()
+    } else {
+        model
+    };
+    settings.enabled = enabled;
+    project.profile_mut().claude = Some(settings);
+    project.save().map_err(err)?;
+    analyst(app, path)
+}
+
+/// Stores the key for the analysis endpoint.
+///
+/// The same endpoint the `anthropic` translation engine uses, and `secrets::Keys` is keyed by
+/// endpoint - so a key entered on either screen is found by both.
+#[tauri::command]
+pub fn set_analyst_key(app: tauri::AppHandle, path: String, key: String) -> Reply<AnalystView> {
+    let _ = open(&path)?;
+    let dir = config_dir(&app);
+    let mut keys = Keys::load(&dir);
+    keys.set(claude::ENDPOINT, &key);
+    keys.save(&dir).map_err(err)?;
+    analyst(app, path)
+}
+
+/// What a scan would send, without sending it.
+///
+/// The names, in full, because they are the thing being consented to. The token count comes from
+/// the service's own counting endpoint - which does mean one call, and it carries no file names
+/// this preview is not already showing.
+#[tauri::command]
+pub fn scan_preview(app: tauri::AppHandle, path: String) -> Reply<ScanPreview> {
+    let project = open(&path)?;
+    let settings = project.profile().claude.clone().unwrap_or_default();
+    let archive = project.original().map_err(err)?;
+    let facts = claude::facts(&archive);
+    let paths: Vec<String> = facts.iter().map(|f| f.path.clone()).collect();
+
+    let mut preview = ScanPreview {
+        paths,
+        model: settings.model.clone(),
+        tokens: None,
+        trouble: String::new(),
+    };
+
+    let key = Keys::load(&config_dir(&app))
+        .get(claude::ENDPOINT)
+        .map(|k| k.to_string());
+    match (settings.enabled, key) {
+        (true, Some(key)) => {
+            let analyst = Analyst::new(settings);
+            let mut total = 0;
+            for batch in facts.chunks(claude::BATCH) {
+                let call = analyst.survey_call(&key, batch);
+                match analyst.count(&key, &analyst.count_call(&key, &call)) {
+                    Ok(count) => total += count,
+                    Err(why) => {
+                        preview.trouble = why;
+                        return Ok(preview);
+                    }
+                }
+            }
+            preview.tokens = Some(total);
+        }
+        (false, _) => preview.trouble = claude::OFF.to_string(),
+        (_, None) => preview.trouble = "no key stored for this endpoint".to_string(),
+    }
+    Ok(preview)
+}
+
+/// Runs a scan and files what came back.
+///
+/// The result is stored apart from the package survey and returned apart from it, because a guess
+/// filed beside a finding becomes indistinguishable from one within a week.
+#[tauri::command]
+pub fn scan(app: tauri::AppHandle, path: String) -> Reply<Vec<SuggestionView>> {
+    let project = open(&path)?;
+    let settings = project.profile().claude.clone().unwrap_or_default();
+    if !settings.enabled {
+        return Err(claude::OFF.to_string());
+    }
+    let key = Keys::load(&config_dir(&app))
+        .get(claude::ENDPOINT)
+        .map(|k| k.to_string())
+        .ok_or("no key stored for this endpoint")?;
+
+    let archive = project.original().map_err(err)?;
+    let facts = claude::facts(&archive);
+    let analyst = Analyst::new(settings);
+    let (survey, trouble) = analyst.survey_all(&key, &facts);
+    // Nothing came back at all: say why rather than showing an empty list, which reads as "there
+    // is nothing here".
+    if survey.verdicts.is_empty() && !trouble.is_empty() {
+        return Err(trouble.join("; "));
+    }
+    project.save_suggestions(&survey).map_err(err)?;
+    Ok(suggestions_of(&survey))
+}
+
+/// The last scan's suggestions, without running one.
+#[tauri::command]
+pub fn suggestions(path: String) -> Reply<Vec<SuggestionView>> {
+    let project = open(&path)?;
+    Ok(project
+        .suggestions()
+        .map_err(err)?
+        .as_ref()
+        .map(suggestions_of)
+        .unwrap_or_default())
+}
+
+fn suggestions_of(survey: &tjlocalizer_core::claude::Survey) -> Vec<SuggestionView> {
+    let mut shown: Vec<SuggestionView> = survey
+        .verdicts
+        .iter()
+        .filter(|v| v.holds_text)
+        .map(|v| SuggestionView {
+            path: v.path.clone(),
+            why: v.why.clone(),
+            confidence: v.confidence,
+            model: survey.model.clone(),
+        })
+        .collect();
+    shown.sort_by(|a, b| b.confidence.total_cmp(&a.confidence));
+    shown
+}
+
+/// Asks what one entry is. The only command that sends any of a game's bytes.
+#[tauri::command]
+pub fn inspect_entry(
+    app: tauri::AppHandle,
+    path: String,
+    entry: String,
+) -> Reply<tjlocalizer_core::claude::Inspection> {
+    let project = open(&path)?;
+    let settings = project.profile().claude.clone().unwrap_or_default();
+    if !settings.enabled {
+        return Err(claude::OFF.to_string());
+    }
+    let key = Keys::load(&config_dir(&app))
+        .get(claude::ENDPOINT)
+        .map(|k| k.to_string())
+        .ok_or("no key stored for this endpoint")?;
+
+    let archive = project.original().map_err(err)?;
+    let found = archive
+        .get(&entry)
+        .ok_or_else(|| format!("no entry named {entry:?} in this package"))?;
+    Analyst::new(settings).inspect(&key, &claude::Sample::of(&entry, &found.data))
+}
+
+/// Asks what looks wrong with the approved translations of one language.
+///
+/// Sends the game's own text, so the interface asks first and says how many lines. What comes back
+/// are notes on rows; nothing here writes to a translation store.
+#[tauri::command]
+pub fn review_language(
+    app: tauri::AppHandle,
+    path: String,
+    language: String,
+    limit: usize,
+) -> Reply<Vec<tjlocalizer_core::claude::ReviewNote>> {
+    let project = open(&path)?;
+    let settings = project.profile().claude.clone().unwrap_or_default();
+    if !settings.enabled {
+        return Err(claude::OFF.to_string());
+    }
+    let key = Keys::load(&config_dir(&app))
+        .get(claude::ENDPOINT)
+        .map(|k| k.to_string())
+        .ok_or("no key stored for this endpoint")?;
+
+    let language = Language::new(&language);
+    let graph = project.graph().map_err(err)?;
+    let store = project.translations(&language).map_err(err)?;
+    let glossary = project.glossary(&language).map_err(err)?;
+    let style = project.style(&language);
+
+    let mut lines = Vec::new();
+    for node in graph.translatable() {
+        // The store holds only what a person approved, so being in it is the filter.
+        let Some(target) = store.get(&node.id) else {
+            continue;
+        };
+        lines.push(tjlocalizer_core::claude::ReviewLine {
+            node_id: node.id.clone(),
+            context: node.context.key().to_string(),
+            source: node.source_text.clone(),
+            target: target.to_string(),
+        });
+        if lines.len() >= limit.max(1) {
+            break;
+        }
+    }
+    if lines.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    // Only the terms that occur in what is being sent; the whole glossary would be a larger
+    // request saying no more.
+    let mut terms: Vec<(String, String)> = Vec::new();
+    for line in &lines {
+        for term in glossary.matches_in(&line.source) {
+            let pair = (term.source.clone(), term.target.clone());
+            if !terms.contains(&pair) {
+                terms.push(pair);
+            }
+        }
+    }
+
+    Analyst::new(settings).review(
+        &key,
+        &lines,
+        style.as_ref().map(|s| s.description.as_str()),
+        &terms,
+    )
 }

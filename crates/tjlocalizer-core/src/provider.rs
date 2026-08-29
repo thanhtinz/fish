@@ -48,6 +48,10 @@ pub enum ProviderKind {
     /// the user controls.
     #[serde(rename = "libretranslate", alias = "libre-translate")]
     LibreTranslate,
+    /// Anthropic's `/v1/messages`. The second family that can be told the register and the
+    /// terminology in words, and the same service the analysis side talks to - so a key entered
+    /// once serves both, because `secrets::Keys` is keyed by endpoint.
+    Anthropic,
 }
 
 impl ProviderKind {
@@ -57,13 +61,17 @@ impl ProviderKind {
             ProviderKind::DeepL => "deepl",
             ProviderKind::GoogleV2 => "google-v2",
             ProviderKind::LibreTranslate => "libretranslate",
+            ProviderKind::Anthropic => "anthropic",
         }
     }
 
     /// Whether the family can be given instructions in prose. Only these can be told the register
     /// to write in; for the others the glossary and register are checked on the way back only.
     pub fn takes_instructions(self) -> bool {
-        matches!(self, ProviderKind::OpenAiCompatible)
+        matches!(
+            self,
+            ProviderKind::OpenAiCompatible | ProviderKind::Anthropic
+        )
     }
 
     /// A sensible endpoint to start from. Editable: self-hosted deployments are the point.
@@ -73,6 +81,19 @@ impl ProviderKind {
             ProviderKind::DeepL => "https://api-free.deepl.com/v2/translate",
             ProviderKind::GoogleV2 => "https://translation.googleapis.com/language/translate/v2",
             ProviderKind::LibreTranslate => "http://localhost:5000/translate",
+            ProviderKind::Anthropic => crate::claude::ENDPOINT,
+        }
+    }
+
+    /// The model to use when the user has not named one.
+    ///
+    /// `None` for the families that do not have models - a translation service translates, and
+    /// offering a model box for one would be inventing a setting that does not exist.
+    pub fn default_model(self) -> Option<&'static str> {
+        match self {
+            ProviderKind::OpenAiCompatible => Some("gpt-4o-mini"),
+            ProviderKind::Anthropic => Some(crate::claude::DEFAULT_MODEL),
+            ProviderKind::DeepL | ProviderKind::GoogleV2 | ProviderKind::LibreTranslate => None,
         }
     }
 
@@ -82,6 +103,7 @@ impl ProviderKind {
             ProviderKind::DeepL,
             ProviderKind::GoogleV2,
             ProviderKind::LibreTranslate,
+            ProviderKind::Anthropic,
         ]
     }
 }
@@ -173,6 +195,14 @@ impl<'a> HttpProvider<'a> {
     ///
     /// Public so the interface can show it: a user about to send their game's text to a third
     /// party should be able to see exactly what would go.
+    /// The model this run will name, falling back to the family's default.
+    fn model(&self) -> String {
+        self.config
+            .model
+            .clone()
+            .unwrap_or_else(|| self.config.kind.default_model().unwrap_or_default().into())
+    }
+
     pub fn build_call(&self, request: &Request) -> HttpCall {
         let timeout = Duration::from_secs(self.config.timeout_seconds);
         let (headers, body) = match self.config.kind {
@@ -182,7 +212,7 @@ impl<'a> HttpProvider<'a> {
                     ("Authorization".into(), format!("Bearer {}", self.api_key)),
                 ],
                 serde_json::json!({
-                    "model": self.config.model.clone().unwrap_or_else(|| "gpt-4o-mini".into()),
+                    "model": self.model(),
                     // Zero temperature: the same line must not translate two ways in one game.
                     "temperature": 0.0,
                     "messages": [
@@ -228,6 +258,31 @@ impl<'a> HttpProvider<'a> {
                     "target": request.to.base(),
                     "format": "text",
                     "api_key": self.api_key,
+                })
+                .to_string(),
+            ),
+            ProviderKind::Anthropic => (
+                vec![
+                    ("Content-Type".into(), "application/json".into()),
+                    ("x-api-key".into(), self.api_key.clone()),
+                    (
+                        "anthropic-version".into(),
+                        crate::claude::API_VERSION.into(),
+                    ),
+                ],
+                serde_json::json!({
+                    "model": self.model(),
+                    // The instructions are the same for every string in a run, so they go in the
+                    // system block where they can be cached; only the string itself varies.
+                    "max_tokens": 4000,
+                    "system": [{
+                        "type": "text",
+                        "text": self.instructions(request),
+                        "cache_control": { "type": "ephemeral" }
+                    }],
+                    "messages": [
+                        { "role": "user", "content": request.source_text.clone() }
+                    ]
                 })
                 .to_string(),
             ),
@@ -333,6 +388,23 @@ impl<'a> HttpProvider<'a> {
                 .pointer("/data/translations/0/translatedText")
                 .and_then(|v| v.as_str()),
             ProviderKind::LibreTranslate => value.get("translatedText").and_then(|v| v.as_str()),
+            // Checked before the content is read, because a decline is a successful response
+            // whose content is not a translation.
+            ProviderKind::Anthropic => {
+                if value.get("stop_reason").and_then(|s| s.as_str()) == Some("refusal") {
+                    return Err("the model declined to translate this string".to_string());
+                }
+                value
+                    .get("content")
+                    .and_then(|c| c.as_array())
+                    .and_then(|blocks| {
+                        blocks
+                            .iter()
+                            .find(|b| b.get("type").and_then(|t| t.as_str()) == Some("text"))
+                    })
+                    .and_then(|b| b.get("text"))
+                    .and_then(|t| t.as_str())
+            }
         };
 
         text.map(tidy)
@@ -497,7 +569,7 @@ fn deepl_tag(language: &Language) -> String {
 }
 
 /// The real transport.
-fn send(call: HttpCall) -> Result<String, String> {
+pub(crate) fn send(call: HttpCall) -> Result<String, String> {
     let agent: ureq::Agent = ureq::Agent::config_builder()
         .timeout_global(Some(call.timeout))
         .build()

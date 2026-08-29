@@ -1,13 +1,18 @@
 import { Fragment, useState } from "react";
+import { AnalystCard } from "./AnalystCard";
 import { EngineCard } from "./EngineCard";
 import type {
+  AnalystView,
   CapabilityView,
   DictionaryView,
   EnginePreview,
   EngineView,
+  InspectionView,
   LanguageView,
   ProjectSummary,
+  ScanPreview,
   StyleView,
+  SuggestionView,
 } from "./types";
 
 interface Props {
@@ -33,6 +38,13 @@ interface Props {
   onSaveEngine: (kind: string, endpoint: string, model: string | null, enabled: boolean) => void;
   onSaveEngineKey: (key: string) => void;
   onPreviewEngine: (text: string) => Promise<EnginePreview | null>;
+  analyst: AnalystView | null;
+  suggestions: SuggestionView[];
+  onSaveAnalyst: (model: string, enabled: boolean) => void;
+  onSaveAnalystKey: (key: string) => void;
+  onPreviewScan: () => Promise<ScanPreview | null>;
+  onScan: () => void;
+  onInspect: (entry: string) => Promise<InspectionView | null>;
 }
 
 /** The pipeline in the order §22 runs it, with each step's state visible rather than implied. */
@@ -304,6 +316,17 @@ export function OverviewView(props: Props) {
             onSave={props.onSaveEngine}
             onSaveKey={props.onSaveEngineKey}
             onPreview={props.onPreviewEngine}
+          />
+
+          <AnalystCard
+            analyst={props.analyst}
+            suggestions={props.suggestions}
+            busy={busy}
+            onSave={props.onSaveAnalyst}
+            onSaveKey={props.onSaveAnalystKey}
+            onPreview={props.onPreviewScan}
+            onScan={props.onScan}
+            onInspect={props.onInspect}
           />
 
           <div className="card">

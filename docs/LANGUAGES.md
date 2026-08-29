@@ -126,7 +126,7 @@ switched on**. Nothing reaches the network while it is off - there is a test for
 is the guarantee the offline default rests on.
 
 No service is built in. Which one, at what price, under whose terms, is the user's decision. What
-is built in is the shape of the request for four API families, so configuring one is a URL and a
+is built in is the shape of the request for five API families, so configuring one is a URL and a
 key rather than a plugin:
 
 | Family | Notes |
@@ -135,6 +135,7 @@ key rather than a plugin:
 | `deepl` | `/v2/translate`, with sentence splitting off - game strings are fragments, and splitting them invents sentences. |
 | `google-v2` | Takes its key in the query string, not a header. |
 | `libretranslate` | Including a self-hosted one, where nothing leaves a network the user controls. |
+| `anthropic` | `/v1/messages`. The other family that can be **told** the register and terminology; the briefing goes in the `system` block with `cache_control`, because it is the same for every string in a run. Defaults to `claude-opus-5`. A decline arrives as a successful response with `stop_reason: "refusal"`, so that is checked before the content is read. |
 
 ### What makes it a game translation rather than a correct one
 
@@ -184,11 +185,60 @@ rather than implying protection that is not there).
 This is not a secret store. It is a file with tight permissions, which is what a desktop
 application can offer without a platform keychain.
 
+Keys are filed **by endpoint URL**, not by family. So the `anthropic` engine and the analysis side
+below share one key without either being told about the other: they name the same endpoint.
+
+**The command line and the application read different directories.** The CLI uses
+`$XDG_CONFIG_HOME/com.thanhtinz.tjlocalizer` (falling back to `~/.config`); the application uses
+Tauri's own `app_config_dir()`, which is that path on Linux but not on macOS or Windows. A key
+stored in the application is therefore not found by the CLI on macOS or Windows, and the symptom is
+"no key stored" on a machine where one plainly is. Store it in whichever of the two you use, or
+both. Unifying them would move a key file that already exists on somebody's machine, so it is
+written down here rather than changed quietly.
+
 ### Seeing what would go
 
 `tjlocalizer engine <project> --dry-run "some text"` prints the exact request without sending it,
 and the interface has the same thing behind **Xem thử request**. A user about to send their game's
 text to a third party should be able to see precisely what would go.
+
+## Asking Claude about the files, rather than about the words
+
+A separate seam, `claude::Analyst`, for the three questions the mechanical checks cannot answer:
+which files in a package look like they hold text, what an unknown file is, and what looks wrong
+with translations somebody has already approved. It is **off by default, and off means nothing is
+sent** - the same guarantee the engine above makes, kept by the same kind of test, which counts how
+many times the transport was reached.
+
+Three rules hold across all of it:
+
+**What goes out is bounded, and it is visible before it goes.** A scan sends *file names, sizes and
+what the mechanical check already made of each*. It does not send file contents. A sample - the
+first 2 KiB - of exactly one file goes only when somebody asks about that one file. `tjlocalizer
+analyze <project> --with-claude` prints the count first; `tjlocalizer inspect <project> <entry>
+--dry-run` and `tjlocalizer review <project> --dry-run` print the whole request and send nothing.
+The application shows the file list itself under **Xem trước sẽ gửi gì**.
+
+**The token count is measured, not estimated.** It comes from `POST /v1/messages/count_tokens`.
+Characters divided by four is a guess, and calling a guess an estimate is the kind of half-honesty
+this project does not do. When the count cannot be got, the interface says so instead of showing a
+number.
+
+**Nothing that comes back becomes a fact.** Suggestions are shown in their own section, labelled as
+guesses, with the model that made them named; they are stored in `content/suggestions.json`, apart
+from the graph. They never enter `package::survey`'s readable list and they are never consulted by
+`writeback::plan` - what a build writes back stays a mechanical decision, because writing a file
+back on a guess destroys it. Review results are **notes on rows, never edits**, the same rule that
+makes `Proposal::is_approvable()` false unconditionally.
+
+`review` is the one path that sends the game's own text and its translation, so it sits behind its
+own deliberate action and prints how many lines it would send before it sends them.
+
+There is **no `tools/verify-*.sh` for this**, unlike every other part of the project: it would need
+a real key and a real network, and continuous integration has neither. What is proved offline is
+proved thoroughly - `crates/tjlocalizer-core/tests/claude_tests.rs` asserts that nothing is sent
+while it is off, and that a fixture's own contents do not appear in a scan's request body - but no
+test here shows a real answer from a real service.
 
 ## What is not built
 

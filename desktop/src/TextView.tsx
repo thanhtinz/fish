@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import type { AlternativeView, GlossView, NodeView } from "./types";
+import type { AlternativeView, GlossView, NodeView, ReviewNoteView } from "./types";
 
 interface Props {
   nodes: NodeView[];
@@ -12,6 +12,12 @@ interface Props {
   onShorter: (nodeId: string) => Promise<AlternativeView[]>;
   onExport: () => void;
   onImport: () => void;
+  /// Notes from a review, by node id. Notes, never edits: the interface shows them beside a row
+  /// and a person decides, the same rule the machine translation seam follows.
+  reviewNotes: Record<string, ReviewNoteView[]>;
+  /// Null when the analysis engine is off or has no key, so the button is absent rather than
+  /// present and failing.
+  onReview: (() => void) | null;
 }
 
 type StatusFilter = "all" | "untranslated" | "translated" | "suggested" | "issues";
@@ -32,6 +38,8 @@ export function TextView({
   onShorter,
   onExport,
   onImport,
+  reviewNotes,
+  onReview,
 }: Props) {
   const [query, setQuery] = useState("");
   const [context, setContext] = useState("all");
@@ -191,6 +199,15 @@ export function TextView({
           <button className="small ghost" onClick={onImport} title="Nhập lại CSV người dịch gửi về">
             Nhập CSV…
           </button>
+          {onReview && (
+            <button
+              className="small ghost"
+              onClick={onReview}
+              title="Gửi các dòng đã duyệt cùng bản gốc để Claude soát. Kết quả là ghi chú, không sửa gì."
+            >
+              Nhờ Claude soát…
+            </button>
+          )}
         </div>
 
         <div className="rows">
@@ -217,6 +234,9 @@ export function TextView({
                 )}
                 {!n.target && n.candidate && (
                   <span className="pill">gợi ý</span>
+                )}
+                {(reviewNotes[n.id]?.length ?? 0) > 0 && (
+                  <span className="pill warn">{reviewNotes[n.id].length} ghi chú</span>
                 )}
               </div>
             </div>
@@ -523,6 +543,31 @@ export function TextView({
                 </button>
               </div>
             </div>
+
+            {(reviewNotes[current.id]?.length ?? 0) > 0 && (
+              <div className="block">
+                <h4>Claude soát</h4>
+                <div style={{ color: "var(--text-faint)", fontSize: 11.5, marginBottom: 8 }}>
+                  Ghi chú, không phải sửa đổi. Không dòng nào bên trên bị đổi vì mấy dòng này.
+                </div>
+                {reviewNotes[current.id].map((note, k) => (
+                  <div className="issue" key={k}>
+                    <span className="code">{note.kind}</span>
+                    <span>
+                      {note.detail}
+                      {note.suggestion && (
+                        <>
+                          <br />
+                          <span style={{ color: "var(--text-faint)" }}>
+                            Đề nghị: {note.suggestion}
+                          </span>
+                        </>
+                      )}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
 
             {current.issues.length > 0 && (
               <div className="block">

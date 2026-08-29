@@ -9,6 +9,7 @@
 pub mod assets;
 pub mod build;
 pub mod classfile;
+pub mod claude;
 pub mod detect;
 pub mod dictionary;
 pub mod dictionary_data;

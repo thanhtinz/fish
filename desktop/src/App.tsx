@@ -6,6 +6,7 @@ import { BuildsView } from "./BuildView";
 import { AssetsView } from "./AssetsView";
 import { FontView } from "./FontView";
 import type {
+  AnalystView,
   BuildView,
   CapabilityView,
   DictionaryView,
@@ -14,7 +15,9 @@ import type {
   NodeView,
   ProjectSummary,
   RecentView,
+  ReviewNoteView,
   StyleView,
+  SuggestionView,
 } from "./types";
 
 type Tab = "overview" | "text" | "font" | "assets" | "build";
@@ -30,6 +33,11 @@ export function App() {
   const [styles, setStyles] = useState<StyleView[]>([]);
   const [dictionaries, setDictionaries] = useState<DictionaryView[]>([]);
   const [engine, setEngineState] = useState<EngineView | null>(null);
+  const [analyst, setAnalystState] = useState<AnalystView | null>(null);
+  const [suggestions, setSuggestions] = useState<SuggestionView[]>([]);
+  // Kept in memory rather than on disk: a note is about one reading of one revision, and a stale
+  // note left lying beside a row that has since been rewritten is worse than no note.
+  const [reviewNotes, setReviewNotes] = useState<Record<string, ReviewNoteView[]>>({});
   const [tab, setTab] = useState<Tab>("overview");
   const [busy, setBusy] = useState<string | null>(null);
   const [toast, setToast] = useState<{ text: string; bad: boolean } | null>(null);
@@ -112,6 +120,8 @@ export function App() {
       setBuilds(first ? await api.builds(path, first).catch(() => []) : []);
       setDictionaries(await api.dictionaries(path).catch(() => []));
       setEngineState(await api.engine(path).catch(() => null));
+      setAnalystState(await api.analyst(path).catch(() => null));
+      setSuggestions(await api.suggestions(path).catch(() => []));
       setRecents(await api.recentProjects().catch(() => []));
     },
     [run],
@@ -480,6 +490,43 @@ export function App() {
                     onPreviewEngine={(text) =>
                       api.enginePreview(project.path, language, text).catch(() => null)
                     }
+                    analyst={analyst}
+                    suggestions={suggestions}
+                    onSaveAnalyst={async (model, enabled) => {
+                      const a = await run("save", () =>
+                        api.setAnalyst(project.path, model, enabled),
+                      );
+                      if (a) {
+                        setAnalystState(a);
+                        say(
+                          a.enabled
+                            ? "Đã bật — tên file sẽ được gửi khi anh bấm quét"
+                            : "Đã tắt — không có gì rời khỏi máy",
+                          a.enabled,
+                        );
+                      }
+                    }}
+                    onSaveAnalystKey={async (key) => {
+                      const a = await run("save", () => api.setAnalystKey(project.path, key));
+                      if (a) {
+                        setAnalystState(a);
+                        say("Đã lưu khoá, ngoài thư mục dự án");
+                      }
+                    }}
+                    onPreviewScan={() => api.scanPreview(project.path).catch(() => null)}
+                    onScan={async () => {
+                      const found = await run("scan", () => api.scan(project.path));
+                      if (found) {
+                        setSuggestions(found);
+                        say(`${found.length} gợi ý — phỏng đoán, không đổi gì phần lõi đã xác định`);
+                      }
+                    }}
+                    onInspect={(entry) =>
+                      api.inspectEntry(project.path, entry).catch((e) => {
+                        say(String(e), true);
+                        return null;
+                      })
+                    }
                   />
                 )}
 
@@ -498,6 +545,27 @@ export function App() {
                     onShorter={shorterFor}
                     onExport={doExportCsv}
                     onImport={doImportCsv}
+                    reviewNotes={reviewNotes}
+                    onReview={
+                      analyst?.enabled && analyst.hasKey
+                        ? async () => {
+                            const notes = await run("review", () =>
+                              api.reviewLanguage(project.path, language, 100),
+                            );
+                            if (!notes) return;
+                            const byNode: Record<string, ReviewNoteView[]> = {};
+                            for (const note of notes) {
+                              (byNode[note.nodeId] ??= []).push(note);
+                            }
+                            setReviewNotes(byNode);
+                            say(
+                              notes.length === 0
+                                ? "Không có gì bị nêu — với các dòng đã duyệt"
+                                : `${notes.length} ghi chú. Là ghi chú, không sửa gì.`,
+                            );
+                          }
+                        : null
+                    }
                   />
                 )}
 

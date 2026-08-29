@@ -10,6 +10,7 @@ use anyhow::{bail, Context, Result};
 use clap::{Parser, Subcommand};
 use std::path::{Path, PathBuf};
 use tjlocalizer_core::build::Branding;
+use tjlocalizer_core::claude::{self, Analyst};
 use tjlocalizer_core::dictionary::Dictionary;
 use tjlocalizer_core::font::outline::MarkSource;
 use tjlocalizer_core::font::sheet::Grid;
@@ -62,7 +63,62 @@ enum Command {
     },
 
     /// Detect what the game supports, and write the capability manifest.
-    Analyze { project: PathBuf },
+    Analyze {
+        project: PathBuf,
+        /// Also ask Claude which files look like they hold text.
+        ///
+        /// Sends file names, sizes and what the mechanical check made of each. It does not send
+        /// any file's contents. What comes back is shown separately and changes nothing.
+        #[arg(long)]
+        with_claude: bool,
+    },
+
+    /// Configure the analysis engine, or show what is configured.
+    ///
+    /// The same service as the `anthropic` translation engine, so a key stored for one is found
+    /// by the other. Off unless switched on, and off means nothing is sent.
+    Claude {
+        project: PathBuf,
+        /// The model to ask. claude-opus-5 by default; claude-haiku-4-5 for large scans.
+        #[arg(long)]
+        model: Option<String>,
+        /// Store the key for this endpoint. Read from TJLOCALIZER_API_KEY when given as `-`.
+        #[arg(long)]
+        key: Option<String>,
+        #[arg(long)]
+        enable: bool,
+        #[arg(long)]
+        disable: bool,
+    },
+
+    /// Ask what one file in the package is, and where its text sits.
+    ///
+    /// The only command that sends any of a game's bytes to a model: the first 2 KiB of the one
+    /// entry named, and nothing else.
+    Inspect {
+        project: PathBuf,
+        /// The archive entry to ask about.
+        entry: String,
+        /// Print what would be sent, and send nothing.
+        #[arg(long)]
+        dry_run: bool,
+    },
+
+    /// Ask Claude to read the approved translations and say what looks wrong.
+    ///
+    /// This sends the game's own text and its translation. It is a separate command for that
+    /// reason, and it prints how many lines would go before it sends them.
+    Review {
+        project: PathBuf,
+        #[arg(long)]
+        lang: Option<String>,
+        /// How many lines to send. The rest are left for a later run.
+        #[arg(long, default_value_t = 100)]
+        limit: usize,
+        /// Print what would be sent, and send nothing.
+        #[arg(long)]
+        dry_run: bool,
+    },
 
     /// Extract translatable text into the content graph.
     Extract { project: PathBuf },
@@ -163,7 +219,7 @@ enum Command {
     /// configured; that is the user's decision and their key.
     Engine {
         project: PathBuf,
-        /// openai-compatible, deepl, google-v2 or libretranslate.
+        /// openai-compatible, deepl, google-v2, libretranslate or anthropic.
         #[arg(long)]
         kind: Option<String>,
         #[arg(long)]
@@ -357,7 +413,10 @@ fn run(cli: Cli) -> Result<()> {
             Ok(())
         }
 
-        Command::Analyze { project } => {
+        Command::Analyze {
+            project,
+            with_claude,
+        } => {
             let project = Project::open(&project)?;
             let package = project.package()?;
 
@@ -411,6 +470,242 @@ fn run(cli: Cli) -> Result<()> {
                     capability.confidence,
                     capability.evidence.join(", ")
                 );
+            }
+
+            if with_claude {
+                let settings = claude_settings(&project)?;
+                let analyst = Analyst::new(settings.clone());
+                let archive = project.original()?;
+                let facts = claude::facts(&archive);
+                let key = require_key(claude::ENDPOINT)?;
+
+                println!();
+                println!(
+                    "sending {} file names to {} - names, sizes and formats only, no contents",
+                    facts.len(),
+                    settings.model
+                );
+                let (survey, trouble) = analyst.survey_all(&key, &facts);
+                for why in &trouble {
+                    println!("  a batch did not answer: {why}");
+                }
+
+                // Kept apart from what the survey above established, on the page as on disk: a
+                // guess and a fact in one list become indistinguishable within a week.
+                let mut likely: Vec<_> = survey.verdicts.iter().filter(|v| v.holds_text).collect();
+                likely.sort_by(|a, b| b.confidence.total_cmp(&a.confidence));
+                println!();
+                println!("suggested by {} - guesses, not findings:", survey.model);
+                if likely.is_empty() {
+                    println!("  nothing suggested");
+                }
+                for verdict in likely {
+                    println!(
+                        "  {:<44} {:.0}%  {}",
+                        verdict.path,
+                        verdict.confidence * 100.0,
+                        verdict.why
+                    );
+                }
+                project.save_suggestions(&survey)?;
+            }
+            Ok(())
+        }
+
+        Command::Claude {
+            project,
+            model,
+            key,
+            enable,
+            disable,
+        } => {
+            let mut project = Project::open(&project)?;
+            let mut settings = project.profile().claude.clone().unwrap_or_default();
+            if let Some(model) = model {
+                settings.model = model;
+            }
+            if enable {
+                settings.enabled = true;
+            }
+            if disable {
+                settings.enabled = false;
+            }
+
+            if let Some(key) = key {
+                let value = if key == "-" {
+                    std::env::var("TJLOCALIZER_API_KEY")
+                        .context("TJLOCALIZER_API_KEY is not set")?
+                } else {
+                    key
+                };
+                let mut keys = Keys::load(&config_dir());
+                keys.set(claude::ENDPOINT, &value);
+                keys.save(&config_dir())?;
+                println!("key stored for {} (owner-readable only)", claude::ENDPOINT);
+            }
+
+            project.profile_mut().claude = Some(settings.clone());
+            project.save()?;
+
+            println!("endpoint  {}", claude::ENDPOINT);
+            println!("model     {}", settings.model);
+            println!(
+                "state     {}",
+                if settings.enabled {
+                    "on - file names will be sent when you ask for a scan"
+                } else {
+                    "off - nothing leaves this machine"
+                }
+            );
+            println!(
+                "key       {}",
+                if Keys::load(&config_dir()).has(claude::ENDPOINT) {
+                    "stored"
+                } else {
+                    "not stored"
+                }
+            );
+            Ok(())
+        }
+
+        Command::Inspect {
+            project,
+            entry,
+            dry_run,
+        } => {
+            let project = Project::open(&project)?;
+            let archive = project.original()?;
+            let found = archive
+                .get(&entry)
+                .with_context(|| format!("no entry named {entry:?} in this package"))?;
+            let sample = claude::Sample::of(&entry, &found.data);
+            // A dry run sends nothing, so it works while the engine is off - which is the state a
+            // person is in when they want to see what it would send.
+            let settings = if dry_run {
+                project.profile().claude.clone().unwrap_or_default()
+            } else {
+                claude_settings(&project)?
+            };
+            let analyst = Analyst::new(settings.clone());
+
+            if dry_run {
+                let call = analyst.inspect_call("<your key>", &sample);
+                println!(
+                    "would send the first {} bytes of {} and nothing else",
+                    claude::Sample::BYTES.min(found.data.len()),
+                    entry
+                );
+                println!("\n--- would POST to {} ---", call.url);
+                println!("{}", call.body);
+                return Ok(());
+            }
+
+            let key = require_key(claude::ENDPOINT)?;
+            println!(
+                "sending the first {} bytes of {} to {}",
+                claude::Sample::BYTES.min(found.data.len()),
+                entry,
+                settings.model
+            );
+            let inspection = analyst
+                .inspect(&key, &sample)
+                .map_err(|e| anyhow::anyhow!(e))?;
+            println!();
+            println!("format      {}", inspection.format);
+            println!("text sits   {}", inspection.where_text_is);
+            println!("addressing  {}", inspection.addressing);
+            // Printed last and never omitted: this is a guess about a binary format, and a
+            // confident wrong one costs somebody a corrupted file.
+            println!("caveat      {}", inspection.caveat);
+            Ok(())
+        }
+
+        Command::Review {
+            project,
+            lang,
+            limit,
+            dry_run,
+        } => {
+            let project = Project::open(&project)?;
+            let language = one_language(&project, lang.as_deref())?;
+            let graph = project.graph()?;
+            let store = project.translations(&language)?;
+            let glossary = project.glossary(&language)?;
+            let style = project.style(&language);
+
+            let mut lines = Vec::new();
+            for node in graph.translatable() {
+                // The store holds only what a person approved, so being in it is the filter.
+                let Some(target) = store.get(&node.id) else {
+                    continue;
+                };
+                lines.push(claude::ReviewLine {
+                    node_id: node.id.clone(),
+                    context: node.context.key().to_string(),
+                    source: node.source_text.clone(),
+                    target: target.to_string(),
+                });
+                if lines.len() >= limit {
+                    break;
+                }
+            }
+
+            if lines.is_empty() {
+                println!("nothing approved to review in {}", language.tag());
+                return Ok(());
+            }
+
+            // Only the terms that actually occur in what is being sent. The whole glossary would
+            // be a larger request saying no more.
+            let mut terms: Vec<(String, String)> = Vec::new();
+            for line in &lines {
+                for term in glossary.matches_in(&line.source) {
+                    let pair = (term.source.clone(), term.target.clone());
+                    if !terms.contains(&pair) {
+                        terms.push(pair);
+                    }
+                }
+            }
+            let register = style.as_ref().map(|s| s.description.clone());
+            let settings = if dry_run {
+                project.profile().claude.clone().unwrap_or_default()
+            } else {
+                claude_settings(&project)?
+            };
+            let analyst = Analyst::new(settings.clone());
+
+            // Said before anything goes, not after: this is the one path that sends the game's
+            // own text, and the number is what a person needs in order to consent to it.
+            println!(
+                "{} approved line{} of {} would be sent to {}, with their originals",
+                lines.len(),
+                if lines.len() == 1 { "" } else { "s" },
+                language.tag(),
+                settings.model
+            );
+
+            if dry_run {
+                let call = analyst.review_call("<your key>", &lines, register.as_deref(), &terms);
+                println!("\n--- would POST to {} ---", call.url);
+                println!("{}", call.body);
+                return Ok(());
+            }
+
+            let key = require_key(claude::ENDPOINT)?;
+            let notes = analyst
+                .review(&key, &lines, register.as_deref(), &terms)
+                .map_err(|e| anyhow::anyhow!(e))?;
+            println!();
+            if notes.is_empty() {
+                println!("nothing flagged");
+            }
+            for note in &notes {
+                println!("  [{}] {}", note.kind, note.node_id);
+                println!("      {}", note.detail);
+                if !note.suggestion.is_empty() {
+                    // A suggestion, printed as one. Nothing here writes to the store.
+                    println!("      suggested: {}", note.suggestion);
+                }
             }
             Ok(())
         }
@@ -685,13 +980,13 @@ fn run(cli: Cli) -> Result<()> {
                 .unwrap_or_else(ProviderConfig::default);
 
             if let Some(kind) = kind {
-                config.kind = match kind.as_str() {
-                    "openai-compatible" => ProviderKind::OpenAiCompatible,
-                    "deepl" => ProviderKind::DeepL,
-                    "google-v2" => ProviderKind::GoogleV2,
-                    "libretranslate" => ProviderKind::LibreTranslate,
-                    other => bail!(
-                        "unknown engine {other:?}; try one of: {}",
+                // Found by walking the list rather than by matching literals: a family added to
+                // `all()` used to appear in the application and not here, which is a difference
+                // nobody would think to look for.
+                config.kind = match ProviderKind::all().into_iter().find(|k| k.id() == kind) {
+                    Some(kind) => kind,
+                    None => bail!(
+                        "unknown engine {kind:?}; try one of: {}",
                         ProviderKind::all()
                             .iter()
                             .map(|k| k.id())
@@ -1454,6 +1749,29 @@ fn show_proposals(project: &Project, language: &Language, use_engine: bool) -> R
 }
 
 /// Where the application keeps its own settings, including keys.
+/// The analysis settings, or a refusal saying how to turn it on.
+///
+/// Refusing here rather than deeper down means the guarantee is visible at the top of every
+/// command: while this is off, no command below it has anything to send.
+fn claude_settings(project: &Project) -> Result<claude::Settings> {
+    let settings = project.profile().claude.clone().unwrap_or_default();
+    if !settings.enabled {
+        bail!(
+            "the analysis engine is off; turn it on with `tjlocalizer claude <project> --enable`"
+        );
+    }
+    Ok(settings)
+}
+
+fn require_key(endpoint: &str) -> Result<String> {
+    Keys::load(&config_dir())
+        .get(endpoint)
+        .map(|k| k.to_string())
+        .with_context(|| {
+            format!("no key stored for {endpoint}; store one with `tjlocalizer claude <project> --key -`")
+        })
+}
+
 fn config_dir() -> PathBuf {
     std::env::var_os("XDG_CONFIG_HOME")
         .map(PathBuf::from)

@@ -266,3 +266,45 @@ export interface ImageAssetView {
   replacement: string | null;
   marked: boolean;
 }
+
+/** How the analysis side is set up. */
+export interface AnalystView {
+  enabled: boolean;
+  endpoint: string;
+  model: string;
+  hasKey: boolean;
+  models: string[];
+}
+
+/** What a scan would send, shown before it is sent. */
+export interface ScanPreview {
+  paths: string[];
+  model: string;
+  /** Null when the count could not be got. Shown as unknown, never as a guess. */
+  tokens: number | null;
+  trouble?: string;
+}
+
+/** One suggestion, and the fact that it is one. */
+export interface SuggestionView {
+  path: string;
+  why: string;
+  confidence: number;
+  model: string;
+}
+
+/** What a model made of one file. */
+export interface InspectionView {
+  format: string;
+  whereTextIs: string;
+  addressing: string;
+  caveat: string;
+}
+
+/** One thing a model noticed about one translated line. Note, not edit. */
+export interface ReviewNoteView {
+  nodeId: string;
+  kind: string;
+  detail: string;
+  suggestion?: string;
+}

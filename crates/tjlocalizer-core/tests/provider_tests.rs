@@ -480,9 +480,116 @@ fn names_an_earlier_build_wrote_are_still_readable() {
         ("deep-l", ProviderKind::DeepL),
         ("libre-translate", ProviderKind::LibreTranslate),
         ("google-v2", ProviderKind::GoogleV2),
+        ("anthropic", ProviderKind::Anthropic),
     ] {
         let read: ProviderKind = serde_json::from_str(&format!("\"{written}\""))
             .unwrap_or_else(|e| panic!("a project written with {written:?} no longer opens: {e}"));
         assert_eq!(read, expected);
     }
+}
+
+/// Anthropic takes its key in `x-api-key`, and the instructions go in the system block.
+///
+/// The system block rather than the first message on purpose: the instructions are the same for
+/// every string in a run, so putting them where they can be cached is the difference between one
+/// bill and several.
+#[test]
+fn anthropic_carries_its_key_in_a_header_and_its_briefing_in_the_system_block() {
+    let glossary = glossary(vec![("Quit", "Thoát", false)]);
+    let provider = HttpProvider::new(
+        config(ProviderKind::Anthropic),
+        "K".into(),
+        Briefing {
+            glossary: &glossary,
+            style: None,
+        },
+    );
+    let call = provider.build_call(&request("Quit", "ui"));
+
+    assert_eq!(call.url, "https://api.anthropic.com/v1/messages");
+    assert!(call
+        .headers
+        .iter()
+        .any(|(n, v)| n == "x-api-key" && v == "K"));
+    assert!(call
+        .headers
+        .iter()
+        .any(|(n, v)| n == "anthropic-version" && v == "2023-06-01"));
+    assert!(!call.url.contains('K'), "the key must not be in the URL");
+
+    let body: serde_json::Value = serde_json::from_str(&call.body).unwrap();
+    let system = body.pointer("/system/0/text").unwrap().as_str().unwrap();
+    assert!(system.contains("Thoát"), "the glossary should reach it");
+    assert_eq!(
+        body.pointer("/system/0/cache_control/type").unwrap(),
+        "ephemeral"
+    );
+    assert_eq!(body.pointer("/messages/0/content").unwrap(), "Quit");
+}
+
+/// A family with a model named must send the name; one without must fall back to the family's own
+/// default rather than to an empty string, which reads as a service outage.
+#[test]
+fn a_family_with_no_model_named_uses_its_own_default() {
+    let glossary = Glossary::default();
+    let mut settings = config(ProviderKind::Anthropic);
+    settings.model = None;
+    let provider = HttpProvider::new(
+        settings,
+        "K".into(),
+        Briefing {
+            glossary: &glossary,
+            style: None,
+        },
+    );
+    let body: serde_json::Value =
+        serde_json::from_str(&provider.build_call(&request("Quit", "ui")).body).unwrap();
+    assert_eq!(body.get("model").unwrap(), "claude-opus-5");
+}
+
+/// A decline arrives as a successful response, so it is checked before the content is read.
+#[test]
+fn anthropic_reports_a_decline_rather_than_no_translation() {
+    let glossary = Glossary::default();
+    let provider = HttpProvider::new(
+        config(ProviderKind::Anthropic),
+        "K".into(),
+        Briefing {
+            glossary: &glossary,
+            style: None,
+        },
+    )
+    .with_transport(|_| Ok(r#"{"stop_reason":"refusal","content":[]}"#.to_string()));
+
+    // A refusal comes back as a proposal with no text and the reason attached, the same shape
+    // every other failure takes here - so it reaches a person rather than being read as silence.
+    let proposal = provider.propose(&request("Quit", "ui")).unwrap();
+    assert!(proposal.target_text.is_empty());
+    assert!(!proposal.is_approvable());
+    assert!(
+        proposal.notes.iter().any(|n| n.contains("declined")),
+        "{:?}",
+        proposal.notes
+    );
+}
+
+/// What comes back from Anthropic is still a proposal, and a proposal is never approvable.
+#[test]
+fn an_anthropic_translation_is_still_only_a_proposal() {
+    let glossary = Glossary::default();
+    let provider = HttpProvider::new(
+        config(ProviderKind::Anthropic),
+        "K".into(),
+        Briefing {
+            glossary: &glossary,
+            style: None,
+        },
+    )
+    .with_transport(|_| {
+        Ok(r#"{"stop_reason":"end_turn","content":[{"type":"text","text":"Thoát"}]}"#.to_string())
+    });
+
+    let proposal = provider.propose(&request("Quit", "ui")).unwrap();
+    assert_eq!(proposal.target_text, "Thoát");
+    assert!(!proposal.is_approvable());
 }

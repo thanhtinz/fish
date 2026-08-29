@@ -6,6 +6,7 @@
 
 import type {
   AlternativeView,
+  AnalystView,
   BuildView,
   CapabilityView,
   CompositionView,
@@ -18,13 +19,17 @@ import type {
   GridView,
   ImageAssetView,
   ImportReport,
+  InspectionView,
   LanguageView,
   NodeView,
   ProjectSummary,
   RecentView,
+  ReviewNoteView,
   RuleView,
+  ScanPreview,
   SheetCandidateView,
   StyleView,
+  SuggestionView,
 } from "./types";
 
 export const isDesktop = "__TAURI_INTERNALS__" in window;
@@ -215,4 +220,24 @@ export const api = {
     call<RuleView[]>("set_rule_enabled", { path, id, enabled }),
 
   removeRule: (path: string, id: string) => call<RuleView[]>("remove_rule", { path, id }),
+
+  analyst: (path: string) => call<AnalystView>("analyst", { path }),
+
+  setAnalyst: (path: string, model: string, enabled: boolean) =>
+    call<AnalystView>("set_analyst", { path, model, enabled }),
+
+  setAnalystKey: (path: string, key: string) =>
+    call<AnalystView>("set_analyst_key", { path, key }),
+
+  scanPreview: (path: string) => call<ScanPreview>("scan_preview", { path }),
+
+  scan: (path: string) => call<SuggestionView[]>("scan", { path }),
+
+  suggestions: (path: string) => call<SuggestionView[]>("suggestions", { path }),
+
+  inspectEntry: (path: string, entry: string) =>
+    call<InspectionView>("inspect_entry", { path, entry }),
+
+  reviewLanguage: (path: string, language: string, limit: number) =>
+    call<ReviewNoteView[]>("review_language", { path, language, limit }),
 };
