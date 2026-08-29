@@ -22,7 +22,10 @@ const MAGIC: u32 = 0xCAFE_BABE;
 pub enum Constant {
     /// Text. `raw` is modified UTF-8 as stored on disk; `decoded` is `None` when those bytes are
     /// not valid modified UTF-8, which is common in J2ME games that keep text in a custom charset.
-    Utf8 { raw: Vec<u8>, decoded: Option<String> },
+    Utf8 {
+        raw: Vec<u8>,
+        decoded: Option<String>,
+    },
     /// `CONSTANT_String`, pointing at the Utf8 entry holding the literal.
     StringRef { utf8_index: u16 },
     /// Any other tag, kept exactly as read.
@@ -128,13 +131,26 @@ impl ClassFile {
                     utf8_index: r.u2()?,
                 },
                 // Fixed-width payloads, kept opaque.
-                3 | 4 => Constant::Other { tag, payload: r.take(4)?.to_vec() },
-                5 | 6 => Constant::Other { tag, payload: r.take(8)?.to_vec() },
-                7 | 16 | 19 | 20 => Constant::Other { tag, payload: r.take(2)?.to_vec() },
-                9 | 10 | 11 | 12 | 17 | 18 => {
-                    Constant::Other { tag, payload: r.take(4)?.to_vec() }
-                }
-                15 => Constant::Other { tag, payload: r.take(3)?.to_vec() },
+                3 | 4 => Constant::Other {
+                    tag,
+                    payload: r.take(4)?.to_vec(),
+                },
+                5 | 6 => Constant::Other {
+                    tag,
+                    payload: r.take(8)?.to_vec(),
+                },
+                7 | 16 | 19 | 20 => Constant::Other {
+                    tag,
+                    payload: r.take(2)?.to_vec(),
+                },
+                9 | 10 | 11 | 12 | 17 | 18 => Constant::Other {
+                    tag,
+                    payload: r.take(4)?.to_vec(),
+                },
+                15 => Constant::Other {
+                    tag,
+                    payload: r.take(3)?.to_vec(),
+                },
                 _ => return Err(Error::UnknownConstantTag { tag, index }),
             };
 
@@ -183,8 +199,7 @@ impl ClassFile {
             let Constant::StringRef { utf8_index } = constant else {
                 continue;
             };
-            if let Some(Constant::Utf8 { raw, decoded }) =
-                self.constants.get(*utf8_index as usize)
+            if let Some(Constant::Utf8 { raw, decoded }) = self.constants.get(*utf8_index as usize)
             {
                 out.push(StringLiteral {
                     string_index: i as u16,
@@ -281,7 +296,9 @@ pub fn decode_modified_utf8(bytes: &[u8]) -> Result<String> {
             out.push(b as char);
             i += 1;
         } else if b & 0xE0 == 0xC0 {
-            let b2 = *bytes.get(i + 1).ok_or(Error::MalformedModifiedUtf8 { offset: i })?;
+            let b2 = *bytes
+                .get(i + 1)
+                .ok_or(Error::MalformedModifiedUtf8 { offset: i })?;
             if b2 & 0xC0 != 0x80 {
                 return Err(Error::MalformedModifiedUtf8 { offset: i + 1 });
             }
@@ -289,14 +306,17 @@ pub fn decode_modified_utf8(bytes: &[u8]) -> Result<String> {
             out.push(char::from_u32(code).ok_or(Error::MalformedModifiedUtf8 { offset: i })?);
             i += 2;
         } else if b & 0xF0 == 0xE0 {
-            let b2 = *bytes.get(i + 1).ok_or(Error::MalformedModifiedUtf8 { offset: i })?;
-            let b3 = *bytes.get(i + 2).ok_or(Error::MalformedModifiedUtf8 { offset: i })?;
+            let b2 = *bytes
+                .get(i + 1)
+                .ok_or(Error::MalformedModifiedUtf8 { offset: i })?;
+            let b3 = *bytes
+                .get(i + 2)
+                .ok_or(Error::MalformedModifiedUtf8 { offset: i })?;
             if b2 & 0xC0 != 0x80 || b3 & 0xC0 != 0x80 {
                 return Err(Error::MalformedModifiedUtf8 { offset: i + 1 });
             }
-            let code = (((b & 0x0F) as u32) << 12)
-                | (((b2 & 0x3F) as u32) << 6)
-                | ((b3 & 0x3F) as u32);
+            let code =
+                (((b & 0x0F) as u32) << 12) | (((b2 & 0x3F) as u32) << 6) | ((b3 & 0x3F) as u32);
             // Surrogates are legal here: a supplementary character is stored as an encoded pair.
             match char::from_u32(code) {
                 Some(c) => out.push(c),

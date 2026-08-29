@@ -317,7 +317,8 @@ impl Project {
         let graph = self.graph()?;
         let translations = self.translations()?;
 
-        let (built, report) = build::apply(&original, &graph, &translations, &self.profile.branding)?;
+        let (built, report) =
+            build::apply(&original, &graph, &translations, &self.profile.branding)?;
         let bytes = built.write()?;
         let validation = validate(&original, &built, &graph, &translations);
 
@@ -348,12 +349,11 @@ impl Project {
     /// itself be rolled back.
     pub fn rollback(&self, revision: u32) -> crate::Result<BuildRecord> {
         let dir = self.root.join("builds").join(format!("{revision:04}"));
-        let record: BuildRecord = read_json(&dir.join("build.json")).map_err(|_| {
-            crate::Error::InvalidProject {
+        let record: BuildRecord =
+            read_json(&dir.join("build.json")).map_err(|_| crate::Error::InvalidProject {
                 path: dir.clone(),
                 reason: format!("no build {revision} to roll back to"),
-            }
-        })?;
+            })?;
         let name = self.output_name();
         let bytes = std::fs::read(dir.join(&name))?;
         std::fs::write(self.root.join("output").join(&name), bytes)?;

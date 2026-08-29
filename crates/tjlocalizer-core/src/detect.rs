@@ -64,11 +64,23 @@ fn detect_platform(archive: &Archive, out: &mut CapabilityManifest) {
     let manifest = Manifest::parse(&String::from_utf8_lossy(&entry.data));
 
     if let Some(config) = manifest.get("MicroEdition-Configuration") {
-        let id = if config.contains("1.1") { "cldc11" } else { "cldc10" };
-        out.add(id, 1.0, vec![format!("MicroEdition-Configuration: {config}")]);
+        let id = if config.contains("1.1") {
+            "cldc11"
+        } else {
+            "cldc10"
+        };
+        out.add(
+            id,
+            1.0,
+            vec![format!("MicroEdition-Configuration: {config}")],
+        );
     }
     if let Some(profile) = manifest.get("MicroEdition-Profile") {
-        let id = if profile.contains("2.") { "midp2" } else { "midp1" };
+        let id = if profile.contains("2.") {
+            "midp2"
+        } else {
+            "midp1"
+        };
         out.add(id, 1.0, vec![format!("MicroEdition-Profile: {profile}")]);
     }
 
@@ -77,7 +89,10 @@ fn detect_platform(archive: &Archive, out: &mut CapabilityManifest) {
         out.add(
             "midlet_entry",
             1.0,
-            midlets.iter().map(|c| format!("MIDlet class: {c}")).collect(),
+            midlets
+                .iter()
+                .map(|c| format!("MIDlet class: {c}"))
+                .collect(),
         );
     }
 }
@@ -198,7 +213,9 @@ fn detect_obfuscation(archive: &Archive, out: &mut CapabilityManifest) {
         out.add(
             "obfuscated_names",
             (short_names as f32 / total as f32).min(1.0),
-            vec![format!("{short_names} of {total} classes have names of 2 characters or fewer")],
+            vec![format!(
+                "{short_names} of {total} classes have names of 2 characters or fewer"
+            )],
         );
     }
 }

@@ -168,7 +168,9 @@ fn check_placeholders(
         let Some(target) = translations.get(&node.id) else {
             continue;
         };
-        for issue in crate::vietnamese::check(&node.source_text, target, &node.constraints.placeholders) {
+        for issue in
+            crate::vietnamese::check(&node.source_text, target, &node.constraints.placeholders)
+        {
             let severity = if issue.code == "placeholder" || issue.code == "empty" {
                 Severity::Error
             } else {
@@ -184,11 +186,7 @@ fn check_placeholders(
 }
 
 /// The original manifest attributes must survive the build (specification §36).
-fn check_originals_preserved(
-    original: &Archive,
-    built: &Archive,
-    report: &mut ValidationReport,
-) {
+fn check_originals_preserved(original: &Archive, built: &Archive, report: &mut ValidationReport) {
     let (Some(before), Some(after)) = (
         original.get("META-INF/MANIFEST.MF"),
         built.get("META-INF/MANIFEST.MF"),

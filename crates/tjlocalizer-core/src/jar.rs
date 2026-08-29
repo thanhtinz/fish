@@ -103,7 +103,8 @@ impl Archive {
             }
 
             let mut data = Vec::with_capacity(declared.min(1 << 20) as usize);
-            file.take(limits.max_entry_size + 1).read_to_end(&mut data)?;
+            file.take(limits.max_entry_size + 1)
+                .read_to_end(&mut data)?;
             if data.len() as u64 > limits.max_entry_size {
                 return Err(Error::EntryTooLarge {
                     name,

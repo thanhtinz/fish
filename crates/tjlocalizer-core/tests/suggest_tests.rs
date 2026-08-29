@@ -1,6 +1,6 @@
 //! Translation candidates: what may be approved automatically and what may not.
 
-use tjlocalizer_core::graph::{ContentGraph, ContextType, Constraints, TextNode, TextSource};
+use tjlocalizer_core::graph::{Constraints, ContentGraph, ContextType, TextNode, TextSource};
 use tjlocalizer_core::suggest::{apply_safe, candidates, learn, Origin};
 use tjlocalizer_core::vietnamese::{Glossary, GlossaryEntry, TranslationMemory, TranslationStore};
 
@@ -63,7 +63,10 @@ fn a_fuzzy_memory_hit_is_offered_but_never_approved() {
         0.75,
     );
     assert_eq!(set.candidates.len(), 1);
-    assert!(matches!(set.candidates[0].origin, Origin::MemoryFuzzy { .. }));
+    assert!(matches!(
+        set.candidates[0].origin,
+        Origin::MemoryFuzzy { .. }
+    ));
     assert!(
         !set.candidates[0].auto_approvable,
         "a near-match is a suggestion; approving it is how a memory quietly corrupts a project"
@@ -88,7 +91,13 @@ fn a_locked_glossary_term_outranks_the_memory() {
         }],
     };
 
-    let set = candidates(&graph, &memory, &glossary, &TranslationStore::default(), 0.75);
+    let set = candidates(
+        &graph,
+        &memory,
+        &glossary,
+        &TranslationStore::default(),
+        0.75,
+    );
     assert_eq!(set.candidates[0].origin, Origin::GlossaryTerm);
     assert_eq!(set.candidates[0].target, "Nội lực");
     assert!(set.candidates[0].auto_approvable);
@@ -162,7 +171,13 @@ fn terms_inside_a_string_are_flagged_for_the_reviewer() {
     let mut memory = TranslationMemory::default();
     memory.remember("Restore Mana", "Hồi Nội lực", None);
 
-    let set = candidates(&graph, &memory, &glossary, &TranslationStore::default(), 0.75);
+    let set = candidates(
+        &graph,
+        &memory,
+        &glossary,
+        &TranslationStore::default(),
+        0.75,
+    );
     assert_eq!(set.candidates[0].terms, vec!["Mana".to_string()]);
 }
 
@@ -176,6 +191,12 @@ fn approved_work_is_folded_back_into_the_memory() {
     learn(&graph, &approved, &mut memory);
 
     assert_eq!(memory.entries.len(), 1);
-    assert_eq!(memory.exact("Start Game").unwrap().target, "Bắt đầu trò chơi");
-    assert!(memory.exact("Quit").is_none(), "untranslated nodes teach nothing");
+    assert_eq!(
+        memory.exact("Start Game").unwrap().target,
+        "Bắt đầu trò chơi"
+    );
+    assert!(
+        memory.exact("Quit").is_none(),
+        "untranslated nodes teach nothing"
+    );
 }

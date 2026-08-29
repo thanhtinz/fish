@@ -6,8 +6,12 @@ use tjlocalizer_core::classfile::ClassFile;
 
 fn main() -> anyhow::Result<()> {
     let mut args = std::env::args().skip(1);
-    let input = args.next().expect("usage: patch_demo <in.class> <out.class>");
-    let output = args.next().expect("usage: patch_demo <in.class> <out.class>");
+    let input = args
+        .next()
+        .expect("usage: patch_demo <in.class> <out.class>");
+    let output = args
+        .next()
+        .expect("usage: patch_demo <in.class> <out.class>");
 
     let translations: HashMap<&str, &str> = HashMap::from([
         ("Dragon Quest Online", "Truyền Kỳ Rồng Thiêng"),
@@ -23,7 +27,9 @@ fn main() -> anyhow::Result<()> {
     let mut class = ClassFile::parse(&std::fs::read(&input)?)?;
     let mut patched = 0;
     for literal in class.string_literals() {
-        let Some(text) = literal.decoded.as_deref() else { continue };
+        let Some(text) = literal.decoded.as_deref() else {
+            continue;
+        };
         if let Some(vi) = translations.get(text) {
             class.set_utf8_text(literal.utf8_index, vi)?;
             patched += 1;

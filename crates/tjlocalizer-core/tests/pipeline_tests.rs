@@ -7,8 +7,11 @@ use tjlocalizer_core::validate::{validate, Severity};
 use tjlocalizer_core::vietnamese::TranslationStore;
 
 fn original() -> Archive {
-    let bytes = std::fs::read(concat!(env!("CARGO_MANIFEST_DIR"), "/tests/data/sample-game.jar"))
-        .expect("fixture missing - run tools/make-fixtures.sh");
+    let bytes = std::fs::read(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/tests/data/sample-game.jar"
+    ))
+    .expect("fixture missing - run tools/make-fixtures.sh");
     Archive::read(&bytes).unwrap()
 }
 
@@ -37,7 +40,10 @@ fn translates_rebuilds_and_validates() {
     let original = original();
     let graph = graph::extract(&original);
     let store = translate_all(&graph);
-    assert!(store.len() >= 6, "fixture should yield several translations");
+    assert!(
+        store.len() >= 6,
+        "fixture should yield several translations"
+    );
 
     let (built, report) = apply(&original, &graph, &store, &Branding::default()).unwrap();
     assert!(report.classes_patched >= 1);
@@ -90,8 +96,13 @@ fn translated_text_is_present_and_english_is_gone() {
 fn branding_is_added_without_touching_the_original_manifest() {
     let original = original();
     let graph = graph::extract(&original);
-    let (built, _) =
-        apply(&original, &graph, &TranslationStore::default(), &Branding::default()).unwrap();
+    let (built, _) = apply(
+        &original,
+        &graph,
+        &TranslationStore::default(),
+        &Branding::default(),
+    )
+    .unwrap();
 
     assert!(built.get("META-INF/THANHTINZ.BRAND").is_some());
     assert!(built.get("META-INF/LOCALIZATION.MF").is_some());
@@ -137,7 +148,10 @@ fn validation_catches_a_lost_placeholder() {
     let (built, _) = apply(&original, &graph, &store, &Branding::default()).unwrap();
     let report = validate(&original, &built, &graph, &store);
 
-    assert!(!report.is_ok(), "a dropped placeholder must fail validation");
+    assert!(
+        !report.is_ok(),
+        "a dropped placeholder must fail validation"
+    );
     assert!(report
         .findings
         .iter()
@@ -148,8 +162,13 @@ fn validation_catches_a_lost_placeholder() {
 fn validation_catches_a_missing_entry_point() {
     let original = original();
     let graph = graph::extract(&original);
-    let (mut built, _) =
-        apply(&original, &graph, &TranslationStore::default(), &Branding::default()).unwrap();
+    let (mut built, _) = apply(
+        &original,
+        &graph,
+        &TranslationStore::default(),
+        &Branding::default(),
+    )
+    .unwrap();
 
     // The manifest still names SampleGame as the MIDlet, but the class is gone: the archive
     // installs and then fails to start. Without this check the build would be reported as clean.

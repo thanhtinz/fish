@@ -110,11 +110,10 @@ pub fn extract(archive: &Archive) -> ContentGraph {
                     // guess so it is at least visible, and record which charset produced it.
                     match encoding::best(&literal.raw, 0.5) {
                         Some(candidate) => {
-                            let (decoded, _, _) = encoding_rs::Encoding::for_label(
-                                candidate.label.as_bytes(),
-                            )
-                            .unwrap_or(encoding_rs::WINDOWS_1252)
-                            .decode(&literal.raw);
+                            let (decoded, _, _) =
+                                encoding_rs::Encoding::for_label(candidate.label.as_bytes())
+                                    .unwrap_or(encoding_rs::WINDOWS_1252)
+                                    .decode(&literal.raw);
                             (decoded.into_owned(), Some(candidate.label))
                         }
                         None => continue,
@@ -135,7 +134,10 @@ pub fn extract(archive: &Archive) -> ContentGraph {
     }
 
     for entry in archive.entries() {
-        if entry.is_class() || is_archive_metadata(&entry.name) || !encoding::looks_like_text(&entry.data) {
+        if entry.is_class()
+            || is_archive_metadata(&entry.name)
+            || !encoding::looks_like_text(&entry.data)
+        {
             continue;
         }
         let Some(candidate) = encoding::best(&entry.data, 0.5) else {
@@ -222,7 +224,9 @@ fn make_node(source: TextSource, text: String, source_encoding: Option<String>) 
 fn node_id(source: &TextSource, text: &str) -> String {
     let mut hasher = Sha256::new();
     match source {
-        TextSource::ClassConstant { class, utf8_index, .. } => {
+        TextSource::ClassConstant {
+            class, utf8_index, ..
+        } => {
             hasher.update(b"class\0");
             hasher.update(class.as_bytes());
             hasher.update(utf8_index.to_be_bytes());

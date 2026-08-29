@@ -4,8 +4,11 @@ use tjlocalizer_core::graph::{self, ContextType, TextSource};
 use tjlocalizer_core::jar::Archive;
 
 fn graph() -> tjlocalizer_core::graph::ContentGraph {
-    let bytes = std::fs::read(concat!(env!("CARGO_MANIFEST_DIR"), "/tests/data/sample-game.jar"))
-        .expect("fixture missing - run tools/make-fixtures.sh");
+    let bytes = std::fs::read(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/tests/data/sample-game.jar"
+    ))
+    .expect("fixture missing - run tools/make-fixtures.sh");
     graph::extract(&Archive::read(&bytes).unwrap())
 }
 
@@ -55,7 +58,10 @@ fn classifies_by_shape_not_by_game() {
     for (text, expected) in [
         ("Quit", ContextType::Ui),
         ("Start Game", ContextType::Ui),
-        ("You have arrived at last, traveller.", ContextType::Dialogue),
+        (
+            "You have arrived at last, traveller.",
+            ContextType::Dialogue,
+        ),
         ("HP: %d / %d", ContextType::Format),
         ("/img/hud.png", ContextType::Technical),
         ("com/example/Main", ContextType::Technical),
@@ -69,8 +75,14 @@ fn classifies_by_shape_not_by_game() {
 #[test]
 fn finds_placeholders_that_must_survive_translation() {
     assert_eq!(graph::find_placeholders("HP: %d / %d"), vec!["%d", "%d"]);
-    assert_eq!(graph::find_placeholders("Level {0} of {1}"), vec!["{0}", "{1}"]);
-    assert_eq!(graph::find_placeholders("%s gained %02d points"), vec!["%s", "%02d"]);
+    assert_eq!(
+        graph::find_placeholders("Level {0} of {1}"),
+        vec!["{0}", "{1}"]
+    );
+    assert_eq!(
+        graph::find_placeholders("%s gained %02d points"),
+        vec!["%s", "%02d"]
+    );
     // A literal percent sign is not a placeholder and must not be reported as one.
     assert!(graph::find_placeholders("100%% complete").is_empty());
     assert!(graph::find_placeholders("no placeholders here").is_empty());
@@ -93,7 +105,13 @@ fn skips_structural_pool_entries() {
     // Class names, descriptors and field names live in the same constant pool. If any of them
     // reached the graph a translator could rename them and break the class.
     let g = graph();
-    for forbidden in ["SampleGame", "java/lang/String", "main", "TITLE", "([Ljava/lang/String;)V"] {
+    for forbidden in [
+        "SampleGame",
+        "java/lang/String",
+        "main",
+        "TITLE",
+        "([Ljava/lang/String;)V",
+    ] {
         assert!(
             !g.nodes.iter().any(|n| n.source_text == forbidden),
             "{forbidden:?} must not be extracted"
@@ -107,8 +125,11 @@ fn skips_structural_pool_entries() {
 /// rename the entry point, producing a build that installs and then will not start.
 #[test]
 fn the_manifest_is_never_offered_for_translation() {
-    let bytes = std::fs::read(concat!(env!("CARGO_MANIFEST_DIR"), "/tests/data/sample-game.jar"))
-        .expect("fixture missing - run tools/make-fixtures.sh");
+    let bytes = std::fs::read(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/tests/data/sample-game.jar"
+    ))
+    .expect("fixture missing - run tools/make-fixtures.sh");
     let archive = tjlocalizer_core::jar::Archive::read(&bytes).unwrap();
     let graph = tjlocalizer_core::graph::extract(&archive);
 
@@ -123,7 +144,5 @@ fn the_manifest_is_never_offered_for_translation() {
     }
 
     // The resource text that is real game content is still there.
-    assert!(graph
-        .translatable()
-        .any(|n| n.source_text == "Green Field"));
+    assert!(graph.translatable().any(|n| n.source_text == "Green Field"));
 }

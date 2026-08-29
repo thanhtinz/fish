@@ -9,7 +9,9 @@ pub enum Error {
     #[error("not a Java class file: expected magic 0xCAFEBABE, found {found:#010x}")]
     NotAClassFile { found: u32 },
 
-    #[error("class file truncated: needed {needed} bytes at offset {offset}, {available} available")]
+    #[error(
+        "class file truncated: needed {needed} bytes at offset {offset}, {available} available"
+    )]
     Truncated {
         offset: usize,
         needed: usize,
@@ -39,11 +41,7 @@ pub enum Error {
     UnsafeEntryPath { name: String },
 
     #[error("archive entry '{name}' is {size} bytes, over the {limit} byte limit")]
-    EntryTooLarge {
-        name: String,
-        size: u64,
-        limit: u64,
-    },
+    EntryTooLarge { name: String, size: u64, limit: u64 },
 
     #[error("archive holds {count} entries, over the {limit} entry limit")]
     TooManyEntries { count: usize, limit: usize },

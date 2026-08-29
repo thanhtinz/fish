@@ -3,8 +3,11 @@
 use tjlocalizer_core::project::{Project, DIRECTORIES, SCHEMA_VERSION};
 
 fn fixture() -> Vec<u8> {
-    std::fs::read(concat!(env!("CARGO_MANIFEST_DIR"), "/tests/data/sample-game.jar"))
-        .expect("fixture missing - run tools/make-fixtures.sh")
+    std::fs::read(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/tests/data/sample-game.jar"
+    ))
+    .expect("fixture missing - run tools/make-fixtures.sh")
 }
 
 /// A temporary directory that cleans itself up, so the tests leave nothing behind.
@@ -65,7 +68,10 @@ fn reopening_gives_back_the_same_profile() {
     let (dir, project) = new_project("reopen");
     let reopened = Project::open(&dir.0).unwrap();
     assert_eq!(reopened.profile().name, project.profile().name);
-    assert_eq!(reopened.profile().source.sha256, project.profile().source.sha256);
+    assert_eq!(
+        reopened.profile().source.sha256,
+        project.profile().source.sha256
+    );
 }
 
 #[test]
@@ -84,7 +90,11 @@ fn saving_bumps_the_revision() {
 #[test]
 fn a_modified_original_is_reported_rather_than_used() {
     let (dir, project) = new_project("tampered");
-    std::fs::write(dir.0.join(&project.profile().source.jar), b"not a jar any more").unwrap();
+    std::fs::write(
+        dir.0.join(&project.profile().source.jar),
+        b"not a jar any more",
+    )
+    .unwrap();
 
     let err = Project::open(&dir.0).unwrap_err();
     let message = err.to_string();
@@ -100,7 +110,10 @@ fn a_newer_schema_is_refused_instead_of_half_read() {
         &format!("\"schemaVersion\": {SCHEMA_VERSION}"),
         &format!("\"schemaVersion\": {}", SCHEMA_VERSION + 1),
     );
-    assert_ne!(text, bumped, "the schema version should appear in project.json");
+    assert_ne!(
+        text, bumped,
+        "the schema version should appear in project.json"
+    );
     std::fs::write(&path, bumped).unwrap();
 
     let err = Project::open(&dir.0).unwrap_err();
@@ -172,7 +185,11 @@ fn build_records_what_it_produced_and_publishes_the_output() {
     assert_eq!(record.source_sha256, project.profile().source.sha256);
     assert_eq!(record.translations_applied, 1);
     assert_eq!(record.report.literals_patched, 1);
-    assert!(record.validation.is_ok(), "{:?}", record.validation.findings);
+    assert!(
+        record.validation.is_ok(),
+        "{:?}",
+        record.validation.findings
+    );
 
     let name = project.output_name();
     assert_eq!(name, "sample-game-vi-vn.jar");

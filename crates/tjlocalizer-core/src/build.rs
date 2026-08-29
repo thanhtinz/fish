@@ -67,7 +67,9 @@ pub fn apply(
             continue;
         }
         match &node.source {
-            TextSource::ClassConstant { class, utf8_index, .. } => {
+            TextSource::ClassConstant {
+                class, utf8_index, ..
+            } => {
                 by_class
                     .entry(class.as_str())
                     .or_default()
@@ -79,7 +81,10 @@ pub fn apply(
                     TextSource::ResourceLine { resource, .. } => resource.as_str(),
                     TextSource::ClassConstant { .. } => unreachable!(),
                 };
-                by_resource.entry(resource).or_default().push((source, target));
+                by_resource
+                    .entry(resource)
+                    .or_default()
+                    .push((source, target));
             }
         }
     }
@@ -100,7 +105,9 @@ pub fn apply(
 
     for (resource_name, patches) in by_resource {
         let Some(entry) = archive.get(resource_name) else {
-            report.skipped.push(format!("{resource_name}: not in archive"));
+            report
+                .skipped
+                .push(format!("{resource_name}: not in archive"));
             continue;
         };
         // Resources are rewritten as UTF-8 regardless of what they were read as: the game reads

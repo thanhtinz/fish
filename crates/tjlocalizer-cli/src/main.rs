@@ -116,9 +116,16 @@ fn run(cli: Cli) -> Result<()> {
             target,
         } => {
             let project = import(&jar, into, name, &target)?;
-            println!("imported {} into {}", jar.display(), project.root().display());
+            println!(
+                "imported {} into {}",
+                jar.display(),
+                project.root().display()
+            );
             println!("  sha256 {}", project.profile().source.sha256);
-            println!("  target {}", project.profile().localization.target_language);
+            println!(
+                "  target {}",
+                project.profile().localization.target_language
+            );
             Ok(())
         }
 
@@ -168,7 +175,10 @@ fn run(cli: Cli) -> Result<()> {
                 );
             }
             if set.candidates.len() > 20 {
-                println!("  ... {} more in translations/candidates.json", set.candidates.len() - 20);
+                println!(
+                    "  ... {} more in translations/candidates.json",
+                    set.candidates.len() - 20
+                );
             }
 
             if apply_safe {
@@ -248,7 +258,11 @@ fn run(cli: Cli) -> Result<()> {
                     record.revision,
                     record.report.literals_patched,
                     record.report.resources_patched,
-                    if record.validation.is_ok() { "ok  " } else { "FAIL" },
+                    if record.validation.is_ok() {
+                        "ok  "
+                    } else {
+                        "FAIL"
+                    },
                     record.report.output_sha256
                 );
             }

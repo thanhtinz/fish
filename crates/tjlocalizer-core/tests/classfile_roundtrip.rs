@@ -3,8 +3,11 @@
 use tjlocalizer_core::classfile::{decode_modified_utf8, encode_modified_utf8, ClassFile};
 
 fn fixture() -> Vec<u8> {
-    std::fs::read(concat!(env!("CARGO_MANIFEST_DIR"), "/tests/data/SampleGame.class"))
-        .expect("fixture missing - run tools/make-fixtures.sh")
+    std::fs::read(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/tests/data/SampleGame.class"
+    ))
+    .expect("fixture missing - run tools/make-fixtures.sh")
 }
 
 #[test]
@@ -32,7 +35,10 @@ fn finds_only_displayable_literals() {
         "/img/hud.png",
         "装备",
     ] {
-        assert!(literals.contains(&expected.to_string()), "missing {expected:?}");
+        assert!(
+            literals.contains(&expected.to_string()),
+            "missing {expected:?}"
+        );
     }
 
     // The pool is full of class names, field names and type descriptors. None of them are
@@ -51,7 +57,11 @@ fn rewriting_a_literal_leaves_the_rest_byte_identical() {
     let class = ClassFile::parse(&original).unwrap();
     // Writing back without changes must reproduce the input exactly, or the parser is losing
     // information and no patch it produces can be trusted.
-    assert_eq!(class.write().unwrap(), original, "unmodified round-trip differs");
+    assert_eq!(
+        class.write().unwrap(),
+        original,
+        "unmodified round-trip differs"
+    );
 }
 
 #[test]
@@ -71,7 +81,10 @@ fn longer_translations_fit() {
         .unwrap();
 
     let rewritten = class.write().unwrap();
-    assert!(rewritten.len() > fixture().len(), "patched class did not grow");
+    assert!(
+        rewritten.len() > fixture().len(),
+        "patched class did not grow"
+    );
 
     let reparsed = ClassFile::parse(&rewritten).unwrap();
     let literals: Vec<String> = reparsed
@@ -95,7 +108,11 @@ fn modified_utf8_round_trips_vietnamese() {
         "",
     ] {
         let encoded = encode_modified_utf8(text);
-        assert_eq!(decode_modified_utf8(&encoded).unwrap(), text, "failed for {text:?}");
+        assert_eq!(
+            decode_modified_utf8(&encoded).unwrap(),
+            text,
+            "failed for {text:?}"
+        );
     }
 }
 

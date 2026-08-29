@@ -4,8 +4,11 @@ use std::io::{Cursor, Write};
 use tjlocalizer_core::jar::{Archive, ArchiveLimits, Manifest};
 
 fn fixture_jar() -> Vec<u8> {
-    std::fs::read(concat!(env!("CARGO_MANIFEST_DIR"), "/tests/data/sample-game.jar"))
-        .expect("fixture missing - run tools/make-fixtures.sh")
+    std::fs::read(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/tests/data/sample-game.jar"
+    ))
+    .expect("fixture missing - run tools/make-fixtures.sh")
 }
 
 /// Builds an archive containing exactly the given entries, bypassing any path checks a normal
@@ -76,7 +79,10 @@ fn refuses_an_oversized_entry() {
     // A zip bomb compresses to almost nothing, so the limit has to bite on the uncompressed
     // size. This entry is 4 KiB of zeroes: tiny on disk, over the limit once expanded.
     assert!(Archive::read_with_limits(&bytes, &limits).is_err());
-    assert!(Archive::read(&bytes).is_ok(), "the default limit should allow 4 KiB");
+    assert!(
+        Archive::read(&bytes).is_ok(),
+        "the default limit should allow 4 KiB"
+    );
 }
 
 #[test]
@@ -84,8 +90,10 @@ fn refuses_too_many_entries() {
     let entries: Vec<(String, Vec<u8>)> = (0..50)
         .map(|i| (format!("f{i}.txt"), b"x".to_vec()))
         .collect();
-    let borrowed: Vec<(&str, Vec<u8>)> =
-        entries.iter().map(|(n, d)| (n.as_str(), d.clone())).collect();
+    let borrowed: Vec<(&str, Vec<u8>)> = entries
+        .iter()
+        .map(|(n, d)| (n.as_str(), d.clone()))
+        .collect();
     let bytes = craft(&borrowed);
     let limits = ArchiveLimits {
         max_entries: 10,
@@ -134,7 +142,10 @@ fn manifest_wrapping_never_splits_a_character() {
     manifest.set("Manifest-Version", "1.0");
     // Long non-ASCII value: naive byte-wise wrapping cuts a multi-byte character in half and the
     // device shows mojibake.
-    manifest.set("MIDlet-Name", "Trò chơi phiêu lưu kỳ ảo của Thanhtinz bản tiếng Việt hoàn chỉnh");
+    manifest.set(
+        "MIDlet-Name",
+        "Trò chơi phiêu lưu kỳ ảo của Thanhtinz bản tiếng Việt hoàn chỉnh",
+    );
     let rendered = manifest.render();
     assert!(rendered.is_char_boundary(rendered.len()));
     assert_eq!(
