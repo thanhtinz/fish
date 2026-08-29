@@ -244,7 +244,9 @@ test here shows a real answer from a real service.
 
 - Register modelling for any language but Vietnamese.
 - Grammar beyond spacing, length, script and placeholder checks.
-- A speaker and relationship model that assigns a stance per line automatically (§15). The types
-  exist and default to neutral; nothing populates them yet.
+- A stance assigned per line automatically (§15). The speaker *is* inferred where the game writes
+  its speech as `Name: line`, and reaches every translation request; a stance is offered per
+  character with the words behind it and never applied, because choosing between `ngươi` and `bạn`
+  governs every line that character speaks. See `docs/CONTEXT.md`.
 - Segmentation for Thai and Japanese, which run words together. Dictionary matching works on those
   scripts because it does not need word boundaries, but a length or word-count rule would.

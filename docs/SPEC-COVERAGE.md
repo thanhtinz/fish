@@ -3,6 +3,10 @@
 Against *Thanhtinz JAR Localizer Professional Spec v2*. Sections are listed whether or not they
 are built, because a reader needs to know what is missing as much as what is there.
 
+Every section is now built. That is a statement about the specification, not a claim that nothing
+is left: several rows are built *around a deliberate refusal*, and those refusals are the most
+important thing on this page. They are collected at the bottom.
+
 | § | Section | State | Notes |
 | --- | --- | --- | --- |
 | 1 | Product vision | n/a | |
@@ -39,7 +43,7 @@ are built, because a reader needs to know what is missing as much as what is the
 | 32 | API and extension contracts | **Built** | `translate::Provider` is a stable seam, with an HTTP implementation covering four API families, and the plugin boundary of §20 is a second: a declarative contract, versioned by what it may name, that cannot reach past what the core already does. |
 | 33 | Performance and scalability | **Built** | Patches are grouped per class so each is parsed once, the dictionary is indexed rather than walked per question, and `tools/bench.sh` times every step a person waits through against a synthetic game of a quarter of a million strings. It scales linearly there, and the one step that did not - proposing translations, at 5.6 seconds for 40,000 lines - is now eighteen times faster. Memory at directory-game scale is not profiled and `docs/PERFORMANCE.md` says so. |
 | 34 | Roadmap | n/a | |
-| 35 | Definition of done | **Partial** | The P0 row - JAR/JAD, project, analyzer, build and repack - is done and JVM-verified. |
+| 35 | Definition of done | **Built** | Every row: JAR/JAD, project, analyzer, build and repack (P0, JVM-verified); resources, encodings, dictionary, register, validation and the desktop application (P1); fonts, assets, rules, plugins, bytecode sites, context and visual regression (P2). What each one does *not* do is stated in its own row above rather than left to be discovered. |
 
 ## What "built" means here
 
@@ -52,3 +56,35 @@ the standard used above.
 Where a row says **Built** for something involving language, read `docs/LANGUAGES.md` first: it
 states plainly what the dictionary and register layers do and do not do, and the boundary matters
 more than the checkmark.
+
+## What is deliberately not here
+
+Each of these could be added and each would make the tool worse. They are listed together so that
+"every section is built" cannot be read as "it does everything".
+
+**General OCR.** Words are read out of artwork by matching the picture against the game's own
+glyph sheet, letter for letter, and a reading with one unmatched shape in it is not offered at
+all. A model that returned `5TART` for a twelve-pixel button would produce text a translator has
+to check against the picture anyway - and would be believed the one time nobody checks.
+
+**An emulator.** Nothing here runs a game. `play` launches the emulator its owner already has,
+from the command they wrote down; the drawings this tool compares are drawings of text, and they
+say nothing about menus, backgrounds or timing.
+
+**Plugins that run.** A plugin is data. It arrives beside the archive, by the same route, from the
+same kind of stranger; a plugin format that could execute would make "open this game" mean "run
+this program", and every guarantee in §29 would be worth nothing.
+
+**Bytecode that grows.** One load instruction can be pointed at a different constant. Nothing can
+add an instruction, and a constant an `ldc` cannot reach is refused rather than widened, because
+a method whose jumps are one byte out fails verification in a way nobody can debug from a
+translated string.
+
+**Automatic register.** A character's stance is offered with the words behind it and never
+applied. Vietnamese has no neutral second person, so choosing between `ngươi` and `bạn` governs
+every line that character speaks - and a decision inferred from the word "please" is not a
+decision.
+
+**Auto-approval of anything inferred.** An exact memory hit or a locked glossary term restates a
+decision somebody already made. Everything else stays a proposal, including everything an external
+engine returns.

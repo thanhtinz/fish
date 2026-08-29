@@ -83,6 +83,23 @@ earn their place:
   plain "is this text?" check happily offers `MIDlet-1: Game,/icon.png,Main` for translation, and
   translating it renames the entry point.
 
+### `context` — what a line is for, and who says it
+
+`graph` classifies a string on its own, which for `Yes` settles nothing: two characters and no
+punctuation make it a button, and it is also half the answers in any conversation. `context` reads
+the company a string keeps - the keys beside it, the strings either side of it in the same class,
+a name and a colon in front of it - and produces readings, each carrying its evidence, plus the
+cast of characters the game names. A string that settled its own case is never overruled. See
+[CONTEXT.md](CONTEXT.md).
+
+### `plugin` — being told what a game is
+
+The core knows formats and never games, which is what lets it open a game nobody here has seen and
+also its limit. A plugin is JSON in the project's `plugins/` directory naming what to look for and
+what to conclude: capabilities, files to read as a format this build already writes, glyph sheets,
+rules, terms. Data and only data - nothing in it is loaded or executed, because a plugin arrives
+by the same route the untrusted archive did. See [PLUGINS.md](PLUGINS.md).
+
 ### `lang` — language identity
 
 Tags read by their parts (`vi-VN` is `vi` in region `VN`; `zh-Hans` is `zh` in script `Hans`),
@@ -143,6 +160,21 @@ points still exist, placeholders survived, original manifest attributes preserve
 `inspect` is the weaker check for a JAR handed over without its project: well formed, classes
 parse, entry point exists, text decodes. It cannot tell whether anything was lost. The two are
 separate functions rather than one pretending to do both.
+
+### `assets` and `assets::ocr` — words painted into pictures
+
+A button label is often artwork with the word already drawn on, and no amount of translating
+strings touches it. Every image is inventoried with evidence about whether it looks like a label,
+and where the project knows the game's glyph sheet the words are read straight off the picture by
+matching each shape against the game's own letters. A reading with one unmatched shape in it is
+never offered as text. See [ASSETS.md](ASSETS.md).
+
+### `regress` — what a build changed
+
+No emulator is shipped. What is here is the drawing of every approved translation in the game's own
+glyphs, kept and compared against the next one pixel for pixel, and a launcher for the emulator a
+person already has - from the command they wrote in their own project, never one read out of a
+game. See [REGRESSION.md](REGRESSION.md).
 
 ### `project` — the on-disk workspace
 

@@ -1200,8 +1200,9 @@ impl Project {
     /// them, and writes it into the project's `fonts/` directory.
     ///
     /// It does not install the sheet. Making the game *use* the new glyphs means changing how it
-    /// looks them up, which is per-game and belongs to the rule engine (§19) - not built. This
-    /// produces the artwork and says so.
+    /// looks them up, which is per-game and belongs to the rule engine (§19); `font_install_rule`
+    /// writes what it can and `font_lookup_candidates` looks for the rest. This produces the
+    /// artwork and says so.
     pub fn compose_font(
         &self,
         marks: Option<&MarkSource>,

@@ -145,8 +145,15 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for how the pieces fit,
 
 The pipeline works end to end and is verified against a real JVM: the test suite localizes a
 `javac`-produced class with Vietnamese text longer than the original, and the JVM loads, verifies
-and runs the result. The desktop application is checked the same way - a script boots the real
-binary and confirms it opens and renders, because compiling proves neither. Several large parts of the specification are not built yet -
-`docs/SPEC-COVERAGE.md` lists them plainly rather than leaving them to be discovered.
+and runs the result - including a class whose *code* was patched, where a mistake about
+instruction lengths would produce something the verifier rejects rather than a wrong string. The
+desktop application is checked the same way: a script boots the real binary and confirms it opens
+and renders, because compiling proves neither.
+
+Every section of the specification is now built. That is a statement about the specification
+rather than a claim that the tool does everything: several parts are built around a deliberate
+refusal - no general OCR, no emulator, no plugin that runs, no bytecode that grows, no register
+chosen automatically - and `docs/SPEC-COVERAGE.md` collects those refusals at the bottom, with the
+reason for each.
 
 Localization by Thanhtinz. © 2026 Thanhtinz.
