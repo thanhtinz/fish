@@ -111,6 +111,8 @@ export interface NodeView {
   sourceEncoding: string | null;
   candidate: CandidateView | null;
   issues: IssueView[];
+  sourceWidth?: number;
+  targetWidth?: number;
 }
 
 export interface FindingView {

@@ -83,6 +83,12 @@ fi
 grep -q "rules: install-font" "$work/build4" \
     || { echo "the build did not record the rule that ran" >&2; exit 1; }
 
+# And with the sheet in the game, its own letters can be measured: this label draws far wider
+# than the English it replaces, which no character count would have caught, because the sheet is
+# proportional and Vietnamese diacritics cost almost no width at all.
+grep -q "layout.width" "$work/build4" \
+    || { echo "the label that outgrew its button was not reported" >&2; cat "$work/build4" >&2; exit 1; }
+
 # The proof is in the file that ships, not in the report about it.
 python3 - "$work" <<'CHECK'
 import sys, zipfile, hashlib, pathlib

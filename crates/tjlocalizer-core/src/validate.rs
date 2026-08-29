@@ -5,7 +5,7 @@
 //! disappeared, a placeholder lost in translation.
 
 use crate::classfile::ClassFile;
-use crate::graph::ContentGraph;
+use crate::graph::{ContentGraph, ContextType};
 use crate::jar::{Archive, Manifest};
 use crate::lang::Language;
 use crate::translation::TranslationStore;
@@ -86,6 +86,25 @@ pub fn validate_with_font(
     to: &Language,
     font: Option<&crate::font::Coverage>,
 ) -> ValidationReport {
+    validate_with_layout(original, built, graph, translations, from, to, font, None)
+}
+
+/// The same, plus what the game's own letters measure (§24).
+///
+/// Kept as a separate entry point rather than a wider one everywhere: measuring needs the sheet
+/// itself, not just what it covers, and a caller that only has coverage should not be made to
+/// pass `None` for something it has never heard of.
+#[allow(clippy::too_many_arguments)]
+pub fn validate_with_layout(
+    original: &Archive,
+    built: &Archive,
+    graph: &ContentGraph,
+    translations: &TranslationStore,
+    from: &Language,
+    to: &Language,
+    font: Option<&crate::font::Coverage>,
+    metrics: Option<&crate::font::metrics::Metrics>,
+) -> ValidationReport {
     let mut report = ValidationReport::default();
 
     check_nothing_lost(original, built, &mut report);
@@ -93,9 +112,77 @@ pub fn validate_with_font(
     check_entry_points(built, &mut report);
     check_translations(graph, translations, from, to, &mut report);
     check_font(font, graph, translations, &mut report);
+    check_layout(metrics, graph, translations, &mut report);
     check_originals_preserved(original, built, &mut report);
 
     report
+}
+
+/// Interface text that will not fit where the original fitted.
+///
+/// The check nobody can do from a character count, and the one that matters most for Vietnamese:
+/// a translation gains letters and diacritics, and a button sized for "Exit" was not sized for
+/// "Thoát trò chơi".
+///
+/// Three deliberate limits, because the alternative is a check people learn to ignore:
+///
+/// - **Only interface text.** Dialogue and story wrap; a long line there is a line, not a bug.
+/// - **Only proportional sheets.** Where every letter is the width of its cell, this measurement
+///   is the character count in different units, and `check_translations` already made that point.
+/// - **A warning, never an error.** Nothing here knows how wide the button is. What it knows is
+///   that the original fitted, so a translation much wider than it is a risk - which is a weaker
+///   claim than "this overflows", and the one the data supports.
+///
+/// The threshold is its own number rather than the language's `expansion_limit`. That one is a
+/// character-count heuristic, set loose (three times) because character counts across scripts are
+/// a blunt instrument. Pixels are not blunt: a label half again as wide as the one the layout was
+/// drawn for is past what ordinary padding absorbs, and a limit of three would let almost
+/// everything through and make this check decoration.
+const WIDTH_LIMIT: f32 = 1.5;
+fn check_layout(
+    metrics: Option<&crate::font::metrics::Metrics>,
+    graph: &ContentGraph,
+    translations: &TranslationStore,
+    report: &mut ValidationReport,
+) {
+    let Some(metrics) = metrics else { return };
+    if metrics.monospaced {
+        return;
+    }
+
+    for node in &graph.nodes {
+        if node.context != ContextType::Ui {
+            continue;
+        }
+        let Some(target) = translations.get(&node.id) else {
+            continue;
+        };
+        // A string the sheet cannot draw has a bigger problem, and `check_font` reports it. A
+        // second complaint about the same string, in pixels invented for glyphs that are not
+        // there, would only bury the first.
+        let (Some(before), Some(after)) =
+            (metrics.measure(&node.source_text), metrics.measure(target))
+        else {
+            continue;
+        };
+        if before == 0 {
+            continue;
+        }
+
+        let grown = after as f32 / before as f32;
+        // The few pixels a short label gains are not what overflows a screen, and flagging them
+        // would bury the cases that do.
+        if grown > WIDTH_LIMIT && after.saturating_sub(before) >= metrics.cell_width {
+            report.warn(
+                "layout.width",
+                format!(
+                    "{target:?} draws {after} pixels wide against {before} for {:?} - it may not \
+                     fit where the original did",
+                    node.source_text
+                ),
+            );
+        }
+    }
 }
 
 /// Validates an archive on its own, with no original to compare against.

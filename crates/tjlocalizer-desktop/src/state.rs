@@ -300,6 +300,15 @@ pub struct NodeView {
     /// Quality problems in the current translation, if there is one. Recomputed on every read so
     /// the interface can never show a stale green row.
     pub issues: Vec<IssueView>,
+    /// How wide the original and the translation draw, in the game's own pixels.
+    ///
+    /// Only set when the game draws from a proportional sheet. On a fixed-pitch one this is the
+    /// character count in other units, and showing it would suggest the tool knows something it
+    /// does not.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub source_width: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub target_width: Option<u32>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -323,6 +332,26 @@ impl NodeView {
         from: &Language,
         to: &Language,
     ) -> Self {
+        Self::measured(node, target, candidate, from, to, None)
+    }
+
+    /// The same, plus what the two strings measure in the game's own font (§24).
+    pub fn measured(
+        node: &TextNode,
+        target: Option<&str>,
+        candidate: Option<&Candidate>,
+        from: &Language,
+        to: &Language,
+        metrics: Option<&tjlocalizer_core::font::metrics::Metrics>,
+    ) -> Self {
+        let metrics = metrics.filter(|m| !m.monospaced);
+        let (source_width, target_width) = match metrics {
+            Some(m) => (
+                m.measure(&node.source_text),
+                target.and_then(|t| m.measure(t)),
+            ),
+            None => (None, None),
+        };
         let issues = match target {
             Some(t) => {
                 let mut found = tjlocalizer_core::quality::check(
@@ -347,6 +376,8 @@ impl NodeView {
             None => Vec::new(),
         };
         Self {
+            source_width,
+            target_width,
             id: node.id.clone(),
             source: node.source_text.clone(),
             target: target.map(str::to_string),

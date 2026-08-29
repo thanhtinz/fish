@@ -20,9 +20,19 @@ fn main() {
         }
         let (ox, oy) = grid.cell_origin(i as u32);
         let seed = (*c as u32).wrapping_mul(2_654_435_761);
+
+        // Proportional, like the fonts games actually ship: an i is not as wide as a W, and a
+        // fixture where they were would make the layout check (§24) untestable against it.
+        let width = match c {
+            'i' | 'l' | 'I' | 'j' | '.' | ',' | ':' | ';' | '\'' | '!' | '|' => 2,
+            'W' | 'M' | 'm' | 'w' | '@' => 6,
+            c if c.is_ascii_uppercase() => 5,
+            _ => 4,
+        };
+
         for y in 0..5u32 {
-            for x in 0..5u32 {
-                let edge = x == 0 || x == 4 || y == 0 || y == 4;
+            for x in 0..width {
+                let edge = x == 0 || x == width - 1 || y == 0 || y == 4;
                 let inked = edge || {
                     let b = (y - 1) * 3 + (x - 1).min(2);
                     (seed >> b) & 1 == 1

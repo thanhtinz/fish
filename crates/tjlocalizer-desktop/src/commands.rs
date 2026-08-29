@@ -174,16 +174,21 @@ pub fn nodes(path: String, language: String) -> Reply<Vec<NodeView>> {
         .collect();
 
     let from = project.source_language().clone();
+    // Measured once for the whole table rather than per row: reading the widths means bounding
+    // the ink in every cell of the sheet, and a table has thousands of rows.
+    let metrics = project.font_metrics().map_err(err)?;
+
     Ok(graph
         .nodes
         .iter()
         .map(|node| {
-            NodeView::of(
+            NodeView::measured(
                 node,
                 approved.get(&node.id),
                 by_node.get(node.id.as_str()).copied(),
                 &from,
                 &language,
+                metrics.as_ref(),
             )
         })
         .collect())

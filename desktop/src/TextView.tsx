@@ -204,6 +204,35 @@ export function TextView({
               </dl>
             </div>
 
+            {current.sourceWidth !== undefined && (
+              <div className="block">
+                <h4>Bề ngang khi vẽ</h4>
+                <div className="row" style={{ gap: 8 }}>
+                  <span style={{ fontFamily: "var(--mono)", fontSize: 12.5 }}>
+                    {current.sourceWidth}px
+                  </span>
+                  <span style={{ color: "var(--text-faint)" }}>→</span>
+                  <span
+                    style={{
+                      fontFamily: "var(--mono)",
+                      fontSize: 12.5,
+                      color:
+                        current.targetWidth !== undefined &&
+                        current.targetWidth > current.sourceWidth * 1.5
+                          ? "var(--warn)"
+                          : undefined,
+                    }}
+                  >
+                    {current.targetWidth !== undefined ? `${current.targetWidth}px` : "—"}
+                  </span>
+                </div>
+                <div style={{ color: "var(--text-faint)", fontSize: 11.5, marginTop: 5 }}>
+                  Đo bằng chính chữ của game. Số ký tự không nói lên điều này: chữ hoa rộng gấp mấy
+                  lần chữ i, còn dấu tiếng Việt thì gần như không tốn thêm bề ngang.
+                </div>
+              </div>
+            )}
+
             {current.placeholders.length > 0 && (
               <div className="block">
                 <h4>Placeholder phải giữ nguyên</h4>

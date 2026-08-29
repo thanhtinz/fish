@@ -28,7 +28,7 @@ are built, because a reader needs to know what is missing as much as what is the
 | 21 | Project system | **Built** | `project`: immutable original, versioned profile, recorded builds, rollback. |
 | 22 | Localization workflow | **Partial** | Steps 1-11 and 14-17 are built, plus font generation and rules. Asset OCR is not. |
 | 23 | Build and repackaging | **Built** | Deterministic output, manifest preservation, SHA-256, build record. |
-| 24 | Validation and QA | **Partial** | Structural, class, resource, encoding, entry point, placeholder, attribution, per-language length and script, terminology, register and **glyph** checks. Layout and asset checks are not built. |
+| 24 | Validation and QA | **Partial** | Structural, class, resource, encoding, entry point, placeholder, attribution, per-language length and script, terminology, register, **glyph** and **layout width** checks - the last measured in the game's own pixels from its glyph sheet, for interface text on proportional fonts. Asset checks are not built. |
 | 25 | Emulator and visual regression | **Not built** | `tjlocalizer test` performs static checks only and says so. |
 | 26 | Branding and attribution | **Built** | See `docs/LEGAL.md`. |
 | 27 | CLI and automation | **Built** | Every subcommand in the specification, plus `builds` and `rollback`. The same pipeline is driveable from the desktop application. |

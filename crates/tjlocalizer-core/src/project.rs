@@ -23,7 +23,7 @@ use crate::lang::Language;
 use crate::provider::ProviderConfig;
 use crate::suggest::{self, CandidateSet};
 use crate::translation::{Glossary, TranslationMemory, TranslationStore};
-use crate::validate::{validate_with_font, ValidationReport};
+use crate::validate::{validate_with_layout, ValidationReport};
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 
@@ -649,6 +649,29 @@ impl Project {
         Ok(Some(Sheet::new(image, grid, order, [0, 0, 0, 0])))
     }
 
+    /// How wide the game's own letters are, when it draws from a sheet (§24).
+    ///
+    /// `None` when nobody has said which image the font is, or when the game uses the device
+    /// font. In both cases nothing here can measure anything, which is a different answer from
+    /// "every label fits".
+    pub fn font_metrics(&self) -> crate::Result<Option<font::metrics::Metrics>> {
+        // The sheet that ships, not the one in the archive: a rule may be installing the composed
+        // one, and its letters are the ones a player will see.
+        if let Some(order) = self.installed_font_order()? {
+            if let Some(sheet) = self.font_sheet()? {
+                let composed = self.root.join("fonts/extended.png");
+                if let Ok(bytes) = std::fs::read(&composed) {
+                    let image = Image::decode_png(&bytes)?;
+                    let rows = image.height / sheet.grid.cell_height;
+                    let grid = font::sheet::Grid { rows, ..sheet.grid };
+                    let extended = font::sheet::Sheet::new(image, grid, order, [0, 0, 0, 0]);
+                    return Ok(Some(font::metrics::Metrics::of(&extended)));
+                }
+            }
+        }
+        Ok(self.font_sheet()?.as_ref().map(font::metrics::Metrics::of))
+    }
+
     /// Checks one language's approved translations against the game's font (§16, §24).
     pub fn font_report(&self, language: &Language) -> crate::Result<Option<CoverageReport>> {
         let Some(coverage) = self.font_coverage()? else {
@@ -930,7 +953,10 @@ impl Project {
         let rules = crate::rules::apply(&self.rules()?, &mut built, &self.root)?;
         let bytes = built.write()?;
         let font = self.font_coverage()?;
-        let validation = validate_with_font(
+        // Measured from the sheet the game actually draws from, which is the composed one when a
+        // rule installs it: the letters that ship are the letters whose widths matter.
+        let metrics = self.font_metrics()?;
+        let validation = validate_with_layout(
             &original,
             &built,
             &graph,
@@ -938,6 +964,7 @@ impl Project {
             self.source_language(),
             &target.language,
             font.as_ref(),
+            metrics.as_ref(),
         );
 
         let revision = self.next_build_revision(target)?;

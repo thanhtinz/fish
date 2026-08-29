@@ -168,6 +168,44 @@ because a test caught the second one ranking a 4-row reading of a 6-row sheet fi
 `font_candidates` ranks the archive's images by how much each looks like a glyph sheet, on the
 best grid's score, how little ink it carries, and how few colours it uses.
 
+## Measuring it
+
+A sheet says more than which letters a game can draw. Bounding the ink in each cell gives a width
+per character, and that answers the question a character count cannot: will this label still fit?
+
+Character counts are the wrong unit, and the more proportional the font the wronger they get.
+"Menu" and "Illli" are both five characters and rarely the same width. Vietnamese makes this worse
+in both directions: a translation gains letters, but its diacritics sit above and below the letter
+and cost almost no width at all.
+
+So `font::metrics` measures, and `check_layout` compares the translation against the original.
+Three limits, because the alternative is a check people learn to ignore:
+
+- **Interface text only.** Dialogue and story wrap; a long line there is a line, not a bug.
+- **Proportional sheets only.** Where every letter is the width of its cell, this is the character
+  count in different units, and the length check already made that point. `Metrics::monospaced`
+  says which kind of sheet this is, and the check stands down on the fixed-pitch ones.
+- **A warning, never an error.** Nothing here knows how wide the button is. What it knows is that
+  the original fitted - the game shipped that way - so a translation much wider is a risk. That is
+  a weaker claim than "this overflows", and it is the claim the data supports.
+
+The threshold is 1.5x, its own number rather than the language's `expansion_limit`. That one is
+set loose (three times) because character counts across scripts are blunt. Pixels are not: a label
+half again as wide as the layout was drawn for is past what ordinary padding absorbs, and a limit
+of three would let nearly everything through.
+
+`tools/verify-font.sh` proves it on a real build:
+
+```
+warn  layout.width  "Bắt đầu trò chơi" draws 80 pixels wide against 53 for "Start Game"
+```
+
+The measurement follows the sheet that ships. When a rule installs the composed sheet, the widths
+come from that one - the letters a player will actually see.
+
+The Text tab shows the same two numbers per row while translating, so the problem is visible
+before the build rather than in a report afterwards.
+
 ## Installing it
 
 Composing writes artwork. Putting it in the game is a rule (§19), because which entry the game
