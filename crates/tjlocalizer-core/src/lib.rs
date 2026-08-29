@@ -13,6 +13,7 @@ pub mod encoding;
 pub mod error;
 pub mod graph;
 pub mod jar;
+pub mod project;
 pub mod validate;
 pub mod vietnamese;
 
