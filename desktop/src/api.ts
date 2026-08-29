@@ -180,6 +180,12 @@ export const api = {
   fontPreview: (path: string, text: string | null, scale: number | null) =>
     call<string>("font_preview", { path, text, scale }),
 
+  renderText: (path: string, text: string, scale: number | null) =>
+    call<string | null>("render_text", { path, text, scale }),
+
+  proofSheet: (path: string, language: string, scale: number | null) =>
+    call<string | null>("proof_sheet", { path, language, scale }),
+
   rules: (path: string) => call<RuleView[]>("rules", { path }),
   writeFontInstallRule: (path: string) => call<RuleView[]>("write_font_install_rule", { path }),
 

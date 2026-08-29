@@ -18,6 +18,7 @@ use std::collections::BTreeSet;
 pub mod library;
 pub mod metrics;
 pub mod outline;
+pub mod proof;
 pub mod sheet;
 
 /// A modification to the vowel itself, not a tone.

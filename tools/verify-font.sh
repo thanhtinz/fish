@@ -102,5 +102,19 @@ print(f"shipped font.png is the composed sheet ({len(composed)} bytes, "
       f"sha256 {hashlib.sha256(composed).hexdigest()[:12]})")
 CHECK
 
+# And it can be looked at: the text drawn with the game's own glyphs, which is the only way to
+# see a mark landing on the letter below it.
+"$tj" proof "$work/p" --lang vi-VN --scale 4 > "$work/proof"
+sheet="$(head -1 "$work/proof")"
+test -s "$sheet" || { echo "no proof sheet was drawn" >&2; cat "$work/proof" >&2; exit 1; }
+python3 - "$sheet" <<'SIZE'
+import struct, sys
+data = open(sys.argv[1], 'rb').read()
+w, h = struct.unpack('>II', data[16:24])
+if w < 40 or h < 40:
+    raise SystemExit(f"the proof sheet is {w}x{h}, which is not a drawing of anything")
+print(f"proof sheet {w}x{h}")
+SIZE
+
 echo "ok: the missing glyphs were caught, the build refused, 134 letters were composed,"
 echo "    and the game ships them only once a rule was written and switched on"

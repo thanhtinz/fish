@@ -79,6 +79,16 @@ export function App() {
     [projectPath, language],
   );
 
+  // Returns null rather than throwing when the game has no declared sheet: not knowing what the
+  // font is is the normal state of a fresh project, not an error to interrupt translating with.
+  const renderWithGameFont = useCallback(
+    (text: string) =>
+      projectPath
+        ? api.renderText(projectPath, text, 3).catch(() => null)
+        : Promise.resolve(null),
+    [projectPath],
+  );
+
   const loadProject = useCallback(
     async (path: string) => {
       const summary = await run("open", () => api.openProject(path));
@@ -466,6 +476,7 @@ export function App() {
                       );
                       await refresh();
                     }}
+                    onRender={renderWithGameFont}
                     onExport={doExportCsv}
                     onImport={doImportCsv}
                   />

@@ -6,6 +6,8 @@ interface Props {
   onSetTranslation: (nodeId: string, target: string) => void;
   onGloss: (nodeId: string) => Promise<GlossView | null>;
   onEngine: ((nodeId: string) => Promise<GlossView | null>) | null;
+  /// Draws one string with the game's own glyphs. Null when the game has no declared sheet.
+  onRender: (text: string) => Promise<string | null>;
   onExport: () => void;
   onImport: () => void;
 }
@@ -24,6 +26,7 @@ export function TextView({
   onSetTranslation,
   onGloss,
   onEngine,
+  onRender,
   onExport,
   onImport,
 }: Props) {
@@ -37,6 +40,10 @@ export function TextView({
   const [glossing, setGlossing] = useState(false);
   const [engine, setEngine] = useState<GlossView | null>(null);
   const [asking, setAsking] = useState(false);
+  const [drawn, setDrawn] = useState<{ source: string | null; target: string | null }>({
+    source: null,
+    target: null,
+  });
 
   const contexts = useMemo(
     () => Array.from(new Set(nodes.map((n) => n.context))).sort(),
@@ -84,6 +91,25 @@ export function TextView({
       cancelled = true;
     };
   }, [selected, onGloss]);
+
+  // Drawn on selection and after a save rather than on every keystroke: each render walks the
+  // glyph sheet, and a picture that redraws mid-word is harder to read than one that waits.
+  useEffect(() => {
+    let cancelled = false;
+    setDrawn({ source: null, target: null });
+    if (!current) return;
+    const wanted = [current.source, current.target ?? ""];
+    Promise.all(wanted.map((t) => (t ? onRender(t) : Promise.resolve(null))))
+      .then(([source, target]) => {
+        if (!cancelled) setDrawn({ source, target });
+      })
+      .catch(() => {
+        if (!cancelled) setDrawn({ source: null, target: null });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [current?.id, current?.target, onRender]);
 
   function select(node: NodeView) {
     setSelected(node.id);
@@ -203,6 +229,32 @@ export function TextView({
                 <dd>{current.location.detail}</dd>
               </dl>
             </div>
+
+            {(drawn.source || drawn.target) && (
+              <div className="block">
+                <h4>Như game sẽ vẽ</h4>
+                <div style={{ display: "grid", gap: 6 }}>
+                  {drawn.source && (
+                    <img
+                      src={drawn.source}
+                      alt="Nguyên bản như game vẽ"
+                      style={{ imageRendering: "pixelated", maxWidth: "100%" }}
+                    />
+                  )}
+                  {drawn.target && (
+                    <img
+                      src={drawn.target}
+                      alt="Bản dịch như game vẽ"
+                      style={{ imageRendering: "pixelated", maxWidth: "100%" }}
+                    />
+                  )}
+                </div>
+                <div style={{ color: "var(--text-faint)", fontSize: 11.5, marginTop: 6 }}>
+                  Vẽ bằng chính bảng chữ mà bản build sẽ dùng. Dấu chồng lên chữ, hay dấu bết lại
+                  ở cỡ nhỏ, thì không con số nào thấy được.
+                </div>
+              </div>
+            )}
 
             {current.sourceWidth !== undefined && (
               <div className="block">

@@ -655,21 +655,84 @@ impl Project {
     /// font. In both cases nothing here can measure anything, which is a different answer from
     /// "every label fits".
     pub fn font_metrics(&self) -> crate::Result<Option<font::metrics::Metrics>> {
-        // The sheet that ships, not the one in the archive: a rule may be installing the composed
-        // one, and its letters are the ones a player will see.
+        Ok(self
+            .shipping_sheet()?
+            .as_ref()
+            .map(font::metrics::Metrics::of))
+    }
+
+    /// The sheet the game will actually draw from.
+    ///
+    /// The composed one where a rule installs it, the archive's own otherwise. Everything that
+    /// measures or previews text goes through here, because the letters that ship are the letters
+    /// a player will see, and measuring the ones being replaced would answer the wrong question.
+    pub fn font_sheet_for_preview(&self) -> crate::Result<Option<font::sheet::Sheet>> {
+        self.shipping_sheet()
+    }
+
+    fn shipping_sheet(&self) -> crate::Result<Option<font::sheet::Sheet>> {
+        let Some(sheet) = self.font_sheet()? else {
+            return Ok(None);
+        };
         if let Some(order) = self.installed_font_order()? {
-            if let Some(sheet) = self.font_sheet()? {
-                let composed = self.root.join("fonts/extended.png");
-                if let Ok(bytes) = std::fs::read(&composed) {
-                    let image = Image::decode_png(&bytes)?;
-                    let rows = image.height / sheet.grid.cell_height;
-                    let grid = font::sheet::Grid { rows, ..sheet.grid };
-                    let extended = font::sheet::Sheet::new(image, grid, order, [0, 0, 0, 0]);
-                    return Ok(Some(font::metrics::Metrics::of(&extended)));
-                }
+            let composed = self.root.join("fonts/extended.png");
+            if let Ok(bytes) = std::fs::read(&composed) {
+                let image = Image::decode_png(&bytes)?;
+                let rows = image.height / sheet.grid.cell_height;
+                let grid = font::sheet::Grid { rows, ..sheet.grid };
+                return Ok(Some(font::sheet::Sheet::new(
+                    image,
+                    grid,
+                    order,
+                    [0, 0, 0, 0],
+                )));
             }
         }
-        Ok(self.font_sheet()?.as_ref().map(font::metrics::Metrics::of))
+        Ok(Some(sheet))
+    }
+
+    /// Draws every approved translation as the game will draw it, and writes the picture into the
+    /// project (§25).
+    ///
+    /// Not an emulator, and it does not pretend to be: it cannot show a menu, a background or a
+    /// button. It shows the text, in the game's own glyphs, at the game's own size, with a marker
+    /// where the original ended - which is where the failures this tool can see actually live.
+    /// `None` when the game has no sheet to draw with, or nothing has been approved yet.
+    pub fn proof_sheet(&self, language: &Language, scale: u32) -> crate::Result<Option<PathBuf>> {
+        let Some(sheet) = self.shipping_sheet()? else {
+            return Ok(None);
+        };
+        let metrics = font::metrics::Metrics::of(&sheet);
+        let graph = self.graph()?;
+        let translations = self.translations(language)?;
+
+        let pairs: Vec<(String, String)> = graph
+            .nodes
+            .iter()
+            .filter_map(|node| {
+                translations
+                    .get(&node.id)
+                    .map(|t| (node.source_text.clone(), t.to_string()))
+            })
+            .collect();
+        if pairs.is_empty() {
+            return Ok(None);
+        }
+        let rows: Vec<font::proof::Row> = pairs
+            .iter()
+            .map(|(source, target)| font::proof::Row { source, target })
+            .collect();
+
+        let image = font::proof::sheet(&sheet, &metrics, &rows, scale);
+        let dir = self.root.join("tests");
+        std::fs::create_dir_all(&dir)?;
+        let slug = language
+            .tag()
+            .to_lowercase()
+            .replace(|c: char| !c.is_ascii_alphanumeric(), "-");
+        let path = dir.join(format!("proof-{slug}.png"));
+        std::fs::write(&path, image.encode_png()?)?;
+        Ok(Some(path))
     }
 
     /// Checks one language's approved translations against the game's font (§16, §24).

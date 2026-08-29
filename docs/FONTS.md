@@ -206,6 +206,32 @@ come from that one - the letters a player will actually see.
 The Text tab shows the same two numbers per row while translating, so the problem is visible
 before the build rather than in a report afterwards.
 
+## Looking at it
+
+Measuring answers whether a label got wider. It says nothing about whether the result is legible,
+and for Vietnamese that is a separate question: a mark can land on the letter below it, and a
+stack of two can read as a smudge at twelve pixels. No count sees either.
+
+```
+tjlocalizer proof <project> --lang vi-VN --scale 4
+```
+
+writes a picture into the project's `tests/`: every approved translation drawn with the game's own
+glyphs at the game's own size, the original above it, and an orange line where the original ended.
+Anything crossing that line is a label that outgrew its button - visible rather than measured.
+
+This is not an emulator and does not pretend to be one. It cannot show a menu, a background or a
+button, and it says nothing about timing or input. What it shows is the text, which is where the
+failures this project can see actually live.
+
+The Text tab draws the selected row the same way while translating, so the picture is beside the
+words rather than in a folder.
+
+Drawing follows the sheet, not an assumption: where every letter fills its cell the game must be
+drawing on a fixed pitch, and where the widths differ it must be advancing by the letter or its
+text would be full of holes. Drawing a proportional font at fixed pitch would produce a picture
+no player will ever see.
+
 ## Installing it
 
 Composing writes artwork. Putting it in the game is a rule (§19), because which entry the game

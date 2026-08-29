@@ -99,6 +99,9 @@ Coverage is reported in three states, not two: covered, missing, and *nobody has
 whose font has never been declared has an unknown answer rather than a good one, and showing the
 two the same way is how a localization ships with empty boxes where the accents should be.
 
+The Text tab also draws the selected row with the game's own glyphs, above the two widths, so a
+mark landing on the letter below it is visible while translating rather than after building.
+
 **Đóng gói** - build one language or all of them, the validation report, the build history with
 rollback, and **Xuất file ra…**, which opens a native save dialog. Where the finished file goes is
 the user's business, not the tool's; the project directory is the tool's.

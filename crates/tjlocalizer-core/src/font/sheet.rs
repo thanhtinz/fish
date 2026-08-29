@@ -704,6 +704,48 @@ pub fn render_line(sheet: &Sheet, text: &str) -> Image {
     image
 }
 
+/// The same, advancing by each letter's own width rather than by the cell.
+///
+/// Which is right depends on the game, and the sheet says which: where every letter fills its
+/// cell the game must be drawing on a fixed pitch, and where they differ it must be advancing by
+/// the letter or its text would be full of holes. Drawing a proportional font at fixed pitch
+/// produces a picture no player will ever see, which defeats the point of a preview.
+pub fn render_line_with(
+    sheet: &Sheet,
+    metrics: &crate::font::metrics::Metrics,
+    text: &str,
+) -> Image {
+    if metrics.monospaced {
+        return render_line(sheet, text);
+    }
+    let width = metrics.measure(text).unwrap_or_else(|| {
+        // A character the sheet cannot draw has no width. The game leaves a gap for it, so the
+        // preview does too rather than refusing to draw the line at all.
+        text.chars()
+            .map(|c| metrics.width_of(c).unwrap_or(sheet.grid.cell_width) + 1)
+            .sum::<u32>()
+    });
+    let mut image = Image::new(width.max(1), sheet.grid.cell_height);
+
+    let mut pen = 0u32;
+    for c in text.chars() {
+        let advance = metrics.width_of(c).unwrap_or(sheet.grid.cell_width) + 1;
+        if let (Some(index), Some(bounds)) = (sheet.index_of(c), sheet.ink_bounds(c)) {
+            let (ox, oy) = sheet.grid.cell_origin(index);
+            for y in 0..sheet.grid.cell_height {
+                for x in 0..bounds.width {
+                    let pixel = sheet.image.get(ox + bounds.x + x, oy + y);
+                    if pen + x < image.width {
+                        image.set(pen + x, y, pixel);
+                    }
+                }
+            }
+        }
+        pen += advance;
+    }
+    image
+}
+
 /// Nearest-neighbour enlargement, for looking at a sheet on a monitor.
 ///
 /// Nearest neighbour rather than anything smoother: these are pixels, and smoothing them shows
@@ -728,8 +770,9 @@ pub fn preview(sheets: &[(&str, &Sheet)], lines: &[&str], scale: u32) -> Image {
     let mut rendered: Vec<Image> = Vec::new();
 
     for (_, sheet) in sheets {
+        let metrics = crate::font::metrics::Metrics::of(sheet);
         for line in lines {
-            let line = render_line(sheet, line);
+            let line = render_line_with(sheet, &metrics, line);
             rendered.push(scaled(&line, 1));
             rendered.push(scaled(&line, scale));
         }

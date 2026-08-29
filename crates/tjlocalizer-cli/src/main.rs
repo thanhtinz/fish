@@ -235,6 +235,20 @@ enum Command {
         lang: Option<String>,
     },
 
+    /// Draw the translations as the game will draw them (§25).
+    ///
+    /// Not an emulator: no menus, no backgrounds, no buttons. The text itself, in the game's own
+    /// glyphs, at the game's own size, with a marker where the original ended - which is where
+    /// the failures this tool can see actually live.
+    Proof {
+        project: PathBuf,
+        #[arg(long)]
+        lang: Option<String>,
+        /// Enlargement, so a twelve-pixel font can be looked at.
+        #[arg(long, default_value_t = 4)]
+        scale: u32,
+    },
+
     /// The per-game patches a project holds, and whether they fit this game (§19).
     ///
     /// A rule is data, not code: it says what it expects to find in the game and what it would
@@ -922,6 +936,30 @@ fn run(cli: Cli) -> Result<()> {
                         );
                     }
                 }
+            }
+            Ok(())
+        }
+
+        Command::Proof {
+            project,
+            lang,
+            scale,
+        } => {
+            let project = Project::open(&project)?;
+            let language = one_language(&project, lang.as_deref())?;
+
+            match project.proof_sheet(&language, scale)? {
+                Some(path) => {
+                    println!("{}", path.display());
+                    println!(
+                        "  the original above, the translation below, and a line where the \n  \
+                         original ended - anything past it may not fit"
+                    );
+                }
+                None => println!(
+                    "nothing to draw: this needs a declared glyph sheet and at least one approved \n\
+                     translation"
+                ),
             }
             Ok(())
         }

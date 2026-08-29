@@ -196,3 +196,75 @@ mod layout_check {
         assert!(findings("OK", "KHONG DONG Y DAU", ContextType::Ui, true).is_empty());
     }
 }
+
+mod drawing {
+    use super::*;
+    use tjlocalizer_core::font::proof::{self, Row};
+    use tjlocalizer_core::font::sheet::{render_line, render_line_with};
+
+    /// A proportional font drawn at fixed pitch is a picture no player will ever see.
+    #[test]
+    fn a_proportional_line_is_narrower_than_the_same_line_on_a_fixed_pitch() {
+        let sheet = sheet_with(|c| if c == 'i' { 2 } else { 4 });
+        let metrics = Metrics::of(&sheet);
+
+        let proportional = render_line_with(&sheet, &metrics, "iiiiii");
+        let fixed = render_line(&sheet, "iiiiii");
+        assert!(
+            proportional.width < fixed.width,
+            "{} against {}",
+            proportional.width,
+            fixed.width
+        );
+        assert_eq!(proportional.width, metrics.measure("iiiiii").unwrap());
+    }
+
+    /// On a fixed-pitch sheet the two are the same drawing, because there they should be.
+    #[test]
+    fn a_fixed_pitch_sheet_draws_the_same_either_way() {
+        let sheet = sheet_with(|_| 5);
+        let metrics = Metrics::of(&sheet);
+        assert_eq!(
+            render_line_with(&sheet, &metrics, "abc").width,
+            render_line(&sheet, "abc").width
+        );
+    }
+
+    /// A letter the sheet cannot draw leaves a gap, which is what the game shows - rather than
+    /// stopping the whole line from being drawn.
+    #[test]
+    fn an_undrawable_letter_leaves_a_gap_rather_than_nothing() {
+        let sheet = sheet_with(|_| 4);
+        let metrics = Metrics::of(&sheet);
+        let line = render_line_with(&sheet, &metrics, "aăa");
+        assert!(line.width > 0);
+        assert!(line.height == 12);
+    }
+
+    #[test]
+    fn the_proof_sheet_holds_a_row_per_translation() {
+        let sheet = sheet_with(|c| if c.is_ascii_uppercase() { 6 } else { 3 });
+        let metrics = Metrics::of(&sheet);
+        let rows = [
+            Row {
+                source: "Start",
+                target: "Bat dau",
+            },
+            Row {
+                source: "Quit",
+                target: "Thoat",
+            },
+        ];
+
+        let one = proof::sheet(&sheet, &metrics, &rows[..1], 2);
+        let two = proof::sheet(&sheet, &metrics, &rows, 2);
+        assert!(
+            two.height > one.height,
+            "two rows drew no taller than one: {} against {}",
+            two.height,
+            one.height
+        );
+        // Wide enough for the longest line it drew, whichever row that was on.
+        assert!(two.width >= metrics.measure("Bat dau").unwrap() * 2);
+    }
+}

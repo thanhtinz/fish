@@ -1032,6 +1032,42 @@ pub fn compose_font(path: String) -> Reply<CompositionView> {
     })
 }
 
+/// Draws one string exactly as the game will draw it.
+///
+/// The numbers beside a row say a translation is wider; this says what it looks like. Which
+/// matters most for Vietnamese, where the risk is not only width: a mark can land on the letter
+/// below it, or a stack can read as a smudge at twelve pixels, and no count sees either.
+#[tauri::command]
+pub fn render_text(path: String, text: String, scale: Option<u32>) -> Reply<Option<String>> {
+    let project = open(&path)?;
+    let Some(sheet) = project.font_sheet_for_preview().map_err(err)? else {
+        return Ok(None);
+    };
+    if text.is_empty() {
+        return Ok(None);
+    }
+    let metrics = tjlocalizer_core::font::metrics::Metrics::of(&sheet);
+    let line = tjlocalizer_core::font::sheet::render_line_with(&sheet, &metrics, &text);
+    let image = tjlocalizer_core::font::sheet::scaled(&line, scale.unwrap_or(3).clamp(1, 8));
+    Ok(Some(data_uri(&image.encode_png().map_err(err)?)))
+}
+
+/// Draws every approved translation for one language, original above translation.
+#[tauri::command]
+pub fn proof_sheet(path: String, language: String, scale: Option<u32>) -> Reply<Option<String>> {
+    let project = open(&path)?;
+    let language = Language::new(language);
+    let Some(written) = project
+        .proof_sheet(&language, scale.unwrap_or(4))
+        .map_err(err)?
+    else {
+        return Ok(None);
+    };
+    std::fs::read(&written)
+        .map(|b| Some(data_uri(&b)))
+        .map_err(err)
+}
+
 /// Renders sample text with the drawn marks and, when one is chosen, with the typeface's.
 ///
 /// Which reads better is not a thing a count can answer, so it is put in front of a person at the

@@ -29,7 +29,7 @@ are built, because a reader needs to know what is missing as much as what is the
 | 22 | Localization workflow | **Partial** | Steps 1-11 and 14-17 are built, plus font generation and rules. Asset OCR is not. |
 | 23 | Build and repackaging | **Built** | Deterministic output, manifest preservation, SHA-256, build record. |
 | 24 | Validation and QA | **Partial** | Structural, class, resource, encoding, entry point, placeholder, attribution, per-language length and script, terminology, register, **glyph** and **layout width** checks - the last measured in the game's own pixels from its glyph sheet, for interface text on proportional fonts. Asset checks are not built. |
-| 25 | Emulator and visual regression | **Not built** | `tjlocalizer test` performs static checks only and says so. |
+| 25 | Emulator and visual regression | **Partial** | No emulator: nothing here runs the game. `tjlocalizer proof` draws every approved translation with the game's own glyphs, at its own size, with a marker where the original ended, and the Text tab draws the selected row the same way. That catches what a report cannot - a mark landing on the letter below it, a stack that smudges at twelve pixels - and catches nothing about menus, backgrounds or timing. `tjlocalizer test` is still static. |
 | 26 | Branding and attribution | **Built** | See `docs/LEGAL.md`. |
 | 27 | CLI and automation | **Built** | Every subcommand in the specification, plus `builds` and `rollback`. The same pipeline is driveable from the desktop application. |
 | 28 | Data model | **Partial** | project.json is schema 3: a source language and a list of targets, migrated from schema 2 on open. DictionaryStore, a register model, a font profile and a rule set exist; assets do not. |
