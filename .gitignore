@@ -1,37 +1,16 @@
-# Build output
-build/
-out/
-bin/
-.gradle/
-gradle-app.setting
-local.properties
+/target/
+**/*.rs.bk
+Cargo.lock.orig
 
-# GWT / web
-html/war/
-html/gwt-unitCache/
-war/
+# Node / desktop shell
+node_modules/
+dist/
 
-# Android
-*.apk
-*.aab
-*.keystore
-android/libs/
-android/gen/
+# Local project workspaces created by the CLI
+/projects/
+/out/
 
-# iOS
-ios/robovm-build/
-ios/build/
-*.ipa
-*.dSYM
-
-# IDE
-.idea/
-*.iml
-.classpath
-.project
-.settings/
-.vscode/
-
-# OS
+# OS / IDE
 .DS_Store
-Thumbs.db
+.idea/
+.vscode/

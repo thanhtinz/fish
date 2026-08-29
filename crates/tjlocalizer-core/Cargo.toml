@@ -1,0 +1,20 @@
+[package]
+name = "tjlocalizer-core"
+description = "Generic Java/J2ME localization core: JAR analysis, capability detection, content graph, patching and repackaging."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dev-dependencies]
+anyhow.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+thiserror.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+zip.workspace = true
+encoding_rs.workspace = true
