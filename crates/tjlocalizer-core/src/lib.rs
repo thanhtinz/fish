@@ -13,6 +13,7 @@ pub mod dictionary;
 pub mod dictionary_data;
 pub mod encoding;
 pub mod error;
+pub mod font;
 pub mod graph;
 pub mod jar;
 pub mod lang;

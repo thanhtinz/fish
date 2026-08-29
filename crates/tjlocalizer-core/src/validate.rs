@@ -72,12 +72,27 @@ pub fn validate(
     from: &Language,
     to: &Language,
 ) -> ValidationReport {
+    validate_with_font(original, built, graph, translations, from, to, None)
+}
+
+/// Validation including the glyph check, when the game's font has been established.
+#[allow(clippy::too_many_arguments)]
+pub fn validate_with_font(
+    original: &Archive,
+    built: &Archive,
+    graph: &ContentGraph,
+    translations: &TranslationStore,
+    from: &Language,
+    to: &Language,
+    font: Option<&crate::font::Coverage>,
+) -> ValidationReport {
     let mut report = ValidationReport::default();
 
     check_nothing_lost(original, built, &mut report);
     check_classes_parse(built, &mut report);
     check_entry_points(built, &mut report);
     check_translations(graph, translations, from, to, &mut report);
+    check_font(font, graph, translations, &mut report);
     check_originals_preserved(original, built, &mut report);
 
     report
@@ -201,6 +216,48 @@ fn check_translations(
                 detail: format!("{:?}: {}", node.source_text, issue.detail),
             });
         }
+    }
+}
+
+/// Text the game's font cannot draw (specification §16, §24).
+///
+/// A translation using a glyph the font does not have passes every other check there is: right
+/// length, right script, right spacing, placeholders intact. It also shows the player a blank.
+/// This is the only check that sees it, and it needs the font to have been established - which is
+/// why a project with no font profile gets a warning rather than silence.
+pub fn check_font(
+    coverage: Option<&crate::font::Coverage>,
+    graph: &ContentGraph,
+    translations: &TranslationStore,
+    report: &mut ValidationReport,
+) {
+    let Some(coverage) = coverage else {
+        if !translations.is_empty() {
+            report.warn(
+                "font",
+                "no font is established for this game, so nothing can say whether the translations will display; if it draws from a glyph sheet rather than the device font, they will not"
+                    .into(),
+            );
+        }
+        return;
+    };
+
+    for node in &graph.nodes {
+        let Some(target) = translations.get(&node.id) else {
+            continue;
+        };
+        let missing = coverage.missing_in(target);
+        if missing.is_empty() {
+            continue;
+        }
+        report.error(
+            "font.glyph",
+            format!(
+                "{:?}: the font has no glyph for {} - this will show as blanks",
+                target,
+                missing.iter().collect::<String>()
+            ),
+        );
     }
 }
 

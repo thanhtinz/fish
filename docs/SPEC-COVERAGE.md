@@ -20,7 +20,7 @@ are built, because a reader needs to know what is missing as much as what is the
 | 13 | Glossary and translation memory | **Built** | `vietnamese`: locked terms, exact and fuzzy memory, `suggest` for candidates. |
 | 14 | Natural dialogue engine | **Partial** | Register profiles decide the voice, are sent to an external engine as instructions, and are checked against every reply. Sentence-level generation is the external engine's, and its output is never auto-approved - see `docs/LANGUAGES.md`. |
 | 15 | Character and relationship model | **Partial** | `Speaker` and `Stance` select the voice; nothing yet infers them per line. |
-| 16 | Font engine | **Not built** | Vietnamese glyph generation for bitmap fonts. `bitmap_font_candidates` detection exists; nothing acts on it. |
+| 16 | Font engine | **Partial** | Glyph sheets read, coverage reported, missing-glyph scan wired into validation, and the 134 Vietnamese letters composed from the game's own letters. Installing the sheet into a game needs a per-game patch (§19) and is not done - see `docs/FONTS.md`. |
 | 17 | Asset and OCR pipeline | **Not built** | |
 | 18 | Bytecode analysis and patching | **Partial** | Constant-pool rewriting is complete and JVM-verified. Semantic patching beyond the pool is not built. |
 | 19 | Rule engine | **Not built** | The project reserves `rules/`. |
@@ -28,7 +28,7 @@ are built, because a reader needs to know what is missing as much as what is the
 | 21 | Project system | **Built** | `project`: immutable original, versioned profile, recorded builds, rollback. |
 | 22 | Localization workflow | **Partial** | Steps 1-11 and 14-17 are built. Font generation, asset OCR and rules are not. |
 | 23 | Build and repackaging | **Built** | Deterministic output, manifest preservation, SHA-256, build record. |
-| 24 | Validation and QA | **Partial** | Structural, class, resource, encoding, entry point, placeholder, attribution, per-language length and script, terminology and register checks. Glyph, layout and asset checks are not built. |
+| 24 | Validation and QA | **Partial** | Structural, class, resource, encoding, entry point, placeholder, attribution, per-language length and script, terminology, register and **glyph** checks. Layout and asset checks are not built. |
 | 25 | Emulator and visual regression | **Not built** | `tjlocalizer test` performs static checks only and says so. |
 | 26 | Branding and attribution | **Built** | See `docs/LEGAL.md`. |
 | 27 | CLI and automation | **Built** | Every subcommand in the specification, plus `builds` and `rollback`. The same pipeline is driveable from the desktop application. |

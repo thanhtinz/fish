@@ -11,10 +11,11 @@ use clap::{Parser, Subcommand};
 use std::path::{Path, PathBuf};
 use tjlocalizer_core::build::Branding;
 use tjlocalizer_core::dictionary::Dictionary;
+use tjlocalizer_core::font::sheet::Grid;
 use tjlocalizer_core::graph::ContentGraph;
 use tjlocalizer_core::jar::Archive;
 use tjlocalizer_core::lang::Language;
-use tjlocalizer_core::project::{BuildRecord, Project, Target};
+use tjlocalizer_core::project::{BuildRecord, FontProfile, Project, Target};
 use tjlocalizer_core::provider::{Briefing, HttpProvider, ProviderConfig, ProviderKind};
 use tjlocalizer_core::register;
 use tjlocalizer_core::secrets::Keys;
@@ -176,6 +177,31 @@ enum Command {
         dry_run: Option<String>,
         #[arg(long)]
         lang: Option<String>,
+    },
+
+    /// Check the game's font against the translations, and compose the letters it lacks.
+    ///
+    /// A game that draws its own text can only show the glyphs somebody drew into its sheet, and
+    /// nobody drew ế. The translation is right, the build passes, and the screen shows blanks.
+    Font {
+        project: PathBuf,
+        #[arg(long)]
+        lang: Option<String>,
+        /// Declare the archive entry holding the glyph sheet.
+        #[arg(long)]
+        sheet: Option<String>,
+        /// Cell size, as WIDTHxHEIGHT. Required with --sheet: a guessed grid shifts every glyph.
+        #[arg(long)]
+        cell: Option<String>,
+        /// Cells per row.
+        #[arg(long)]
+        columns: Option<u32>,
+        /// Declare that the game uses the handset's own font and needs no sheet.
+        #[arg(long)]
+        device_font: bool,
+        /// Build a sheet with the missing Vietnamese letters composed from the game's own.
+        #[arg(long)]
+        compose: bool,
     },
 
     /// List the register profiles this build ships.
@@ -358,6 +384,11 @@ fn run(cli: Cli) -> Result<()> {
             for language in languages(&project, lang.as_deref(), all)? {
                 let record = project.build(&language)?;
                 report_build(&project, &record);
+                // Printed here, not only on `validate`: a build that says it failed without
+                // saying why sends the reader looking for a second command to run.
+                if !record.validation.findings.is_empty() {
+                    report_validation(&record.validation);
+                }
                 failed |= !record.validation.is_ok();
             }
             if failed {
@@ -615,6 +646,127 @@ fn run(cli: Cli) -> Result<()> {
                 let call = provider.build_call(&request);
                 println!("\n--- would POST to {} ---", call.url);
                 println!("{}", call.body);
+            }
+            Ok(())
+        }
+
+        Command::Font {
+            project,
+            lang,
+            sheet,
+            cell,
+            columns,
+            device_font,
+            compose,
+        } => {
+            let mut project = Project::open(&project)?;
+
+            if device_font {
+                project.profile_mut().font = Some(FontProfile {
+                    entry: String::new(),
+                    grid: None,
+                    order: String::new(),
+                    device_font: true,
+                });
+                project.save()?;
+            } else if let Some(entry) = sheet {
+                let cell = cell.context(
+                    "--cell WIDTHxHEIGHT is required with --sheet: a guessed grid shifts every glyph",
+                )?;
+                let (w, h) = cell.split_once('x').context("--cell must look like 8x12")?;
+                let cell_width: u32 = w.parse().context("--cell width")?;
+                let cell_height: u32 = h.parse().context("--cell height")?;
+                let columns = columns.context("--columns is required with --sheet")?;
+
+                // Rows are worked out from the image, so only the parts a person actually knows
+                // have to be given.
+                let archive = project.original()?;
+                let data = archive
+                    .get(&entry)
+                    .with_context(|| format!("the archive has no entry {entry}"))?;
+                let image = tjlocalizer_core::font::sheet::Image::decode_png(&data.data)?;
+                let rows = image.height / cell_height;
+
+                project.profile_mut().font = Some(FontProfile {
+                    entry: entry.clone(),
+                    grid: Some(Grid {
+                        cell_width,
+                        cell_height,
+                        columns,
+                        rows,
+                    }),
+                    order: String::new(),
+                    device_font: false,
+                });
+                project.save()?;
+                println!(
+                    "{entry}: {}x{} pixels, {columns}x{rows} cells",
+                    image.width, image.height
+                );
+            }
+
+            match project.profile().font.as_ref() {
+                None => {
+                    println!("no font established for this game");
+                    println!(
+                        "  if it draws from a glyph sheet, translations will show blanks until one is declared:"
+                    );
+                    println!(
+                        "    tjlocalizer font <project> --sheet font.png --cell 8x12 --columns 16"
+                    );
+                    println!("  if it uses the handset's own font:");
+                    println!("    tjlocalizer font <project> --device-font");
+                }
+                Some(profile) if profile.device_font => {
+                    println!("device font: the handset draws the text, so nothing needs composing")
+                }
+                Some(profile) => println!("sheet: {}", profile.entry),
+            }
+
+            for language in languages(&project, lang.as_deref(), lang.is_none())? {
+                if let Some(report) = project.font_report(&language)? {
+                    println!("== {language}");
+                    println!("  {} glyphs in the sheet", report.covered_count);
+                    println!(
+                        "  {} of the {} letters Vietnamese needs are missing, {} of them composable from letters the sheet already has",
+                        report.missing_required.len(),
+                        134,
+                        report.composable_count
+                    );
+                    if report.affected_strings > 0 {
+                        println!(
+                            "  {} approved translations use {} the font cannot draw: {}",
+                            report.affected_strings,
+                            report.missing_used.len(),
+                            report.missing_used.iter().collect::<String>()
+                        );
+                    } else {
+                        println!("  every approved translation can be drawn");
+                    }
+                }
+            }
+
+            if compose {
+                match project.compose_font()? {
+                    None => bail!("declare a glyph sheet first, with --sheet"),
+                    Some((path, report)) => {
+                        println!(
+                            "composed {} glyphs into {}",
+                            report.added.len(),
+                            path.display()
+                        );
+                        for skipped in report.skipped.iter().take(8) {
+                            println!("  skipped {} - {}", skipped.composed, skipped.reason);
+                        }
+                        if report.skipped.len() > 8 {
+                            println!("  ... {} more skipped", report.skipped.len() - 8);
+                        }
+                        println!(
+                            "note: glyphs only. Making the game use them means changing how it \
+                             looks characters up, which is per-game and is not done here."
+                        );
+                    }
+                }
             }
             Ok(())
         }

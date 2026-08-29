@@ -14,13 +14,15 @@
 use crate::build::{self, Branding, BuildReport};
 use crate::detect::{self, CapabilityManifest};
 use crate::dictionary::Dictionary;
+use crate::font::sheet::{extend, Grid, Image, Sheet};
+use crate::font::{self, Coverage, CoverageReport};
 use crate::graph::{self, ContentGraph};
 use crate::jar::{sha256_hex, Archive};
 use crate::lang::Language;
 use crate::provider::ProviderConfig;
 use crate::suggest::{self, CandidateSet};
 use crate::translation::{Glossary, TranslationMemory, TranslationStore};
-use crate::validate::{validate, ValidationReport};
+use crate::validate::{validate_with_font, ValidationReport};
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 
@@ -147,6 +149,33 @@ pub struct ProjectProfile {
     /// deliberately not here: this file is committed and sent to translators.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub provider: Option<ProviderConfig>,
+    /// The game's glyph sheet, when it draws its own text (§16).
+    ///
+    /// Absent means "not established". It does not mean the game uses the device font: a game
+    /// that draws from a sheet and has no profile here will show blanks, and saying nothing about
+    /// that would be the worst of the three answers.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub font: Option<FontProfile>,
+}
+
+/// Where a game's glyph sheet is and how it is laid out.
+///
+/// Given rather than guessed at: a grid inferred from one sheet is a guess about that sheet, and
+/// a wrong guess shifts every glyph by a pixel in a way that looks like a rendering bug.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FontProfile {
+    /// Archive entry holding the sheet, or empty when the game uses the device font.
+    pub entry: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub grid: Option<Grid>,
+    /// The characters the sheet lays out, in order. Empty means printable ASCII, which is what
+    /// most game sheets are.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub order: String,
+    /// True when the game uses the device font and can draw whatever the handset can.
+    #[serde(default)]
+    pub device_font: bool,
 }
 
 /// One recorded build of one language, enough to reproduce or undo it.
@@ -218,6 +247,7 @@ impl Project {
             branding: Branding::default(),
             permission_reference: None,
             provider: None,
+            font: None,
         };
 
         let mut project = Project { root, profile };
@@ -498,6 +528,101 @@ impl Project {
             .and_then(|t| crate::register::builtin(&t.style_profile))
     }
 
+    /// What the game's font can draw, if the project has said which font that is.
+    ///
+    /// `None` means nobody has established it. That is a different answer from "it covers
+    /// everything", and the caller has to keep them apart: a game drawing from a sheet nobody
+    /// declared will show blanks, and reporting that as fine is how a localization ships broken.
+    pub fn font_coverage(&self) -> crate::Result<Option<Coverage>> {
+        let Some(profile) = &self.profile.font else {
+            return Ok(None);
+        };
+        if profile.device_font {
+            let mut covered: Vec<char> = (0x20u8..=0x7E).map(|b| b as char).collect();
+            covered.extend(font::vietnamese_required());
+            return Ok(Some(Coverage::new(covered, "device font")));
+        }
+        let sheet = self.font_sheet()?;
+        Ok(sheet.map(|s| Coverage::new(s.order.clone(), profile.entry.clone())))
+    }
+
+    /// The game's glyph sheet, read from the original archive.
+    pub fn font_sheet(&self) -> crate::Result<Option<Sheet>> {
+        let Some(profile) = &self.profile.font else {
+            return Ok(None);
+        };
+        if profile.device_font || profile.entry.is_empty() {
+            return Ok(None);
+        }
+        let archive = self.original()?;
+        let entry = archive
+            .get(&profile.entry)
+            .ok_or_else(|| crate::Error::InvalidProject {
+                path: self.root.clone(),
+                reason: format!("the archive has no entry {}", profile.entry),
+            })?;
+        let image = Image::decode_png(&entry.data)?;
+
+        let grid = match profile.grid {
+            Some(grid) => grid,
+            None => {
+                return Err(crate::Error::InvalidProject {
+                    path: self.root.clone(),
+                    reason: "the font profile has no grid; a guessed one shifts every glyph".into(),
+                })
+            }
+        };
+        let order: Vec<char> = if profile.order.is_empty() {
+            (0x20u8..=0x7E).map(|b| b as char).collect()
+        } else {
+            profile.order.chars().collect()
+        };
+        Ok(Some(Sheet::new(image, grid, order, [0, 0, 0, 0])))
+    }
+
+    /// Checks one language's approved translations against the game's font (§16, §24).
+    pub fn font_report(&self, language: &Language) -> crate::Result<Option<CoverageReport>> {
+        let Some(coverage) = self.font_coverage()? else {
+            return Ok(None);
+        };
+        let translations = self.translations(language)?;
+        let strings: Vec<&str> = translations.approved.values().map(|s| s.as_str()).collect();
+        Ok(Some(font::report(&coverage, strings)))
+    }
+
+    /// Builds a sheet holding the game's own glyphs plus the Vietnamese letters composed from
+    /// them, and writes it into the project's `fonts/` directory.
+    ///
+    /// It does not install the sheet. Making the game *use* the new glyphs means changing how it
+    /// looks them up, which is per-game and belongs to the rule engine (§19) - not built. This
+    /// produces the artwork and says so.
+    pub fn compose_font(&self) -> crate::Result<Option<(PathBuf, font::sheet::Extension)>> {
+        let Some(sheet) = self.font_sheet()? else {
+            return Ok(None);
+        };
+        let (extended, report) = extend(&sheet, &font::vietnamese_compositions())?;
+
+        let dir = self.root.join("fonts");
+        std::fs::create_dir_all(&dir)?;
+        let path = dir.join("extended.png");
+        std::fs::write(&path, extended.image.encode_png()?)?;
+
+        // A sidecar rather than a format: J2ME games agree on no font metadata whatsoever, so
+        // anything written into the sheet itself would be a guess about one game.
+        write_json(
+            &dir.join("extended.json"),
+            &serde_json::json!({
+                "source": self.profile.font.as_ref().map(|f| f.entry.clone()),
+                "grid": extended.grid,
+                "order": extended.order.iter().collect::<String>(),
+                "added": report.added.iter().collect::<String>(),
+                "skipped": report.skipped,
+                "note": "Glyphs only. Making the game use them requires changing its font lookup, which is per-game and is not done here.",
+            }),
+        )?;
+        Ok(Some((path, report)))
+    }
+
     /// Generates translation candidates for one target (§22, step 9).
     pub fn suggest(
         &self,
@@ -541,13 +666,15 @@ impl Project {
         let (built, report) =
             build::apply(&original, &graph, &translations, &self.profile.branding)?;
         let bytes = built.write()?;
-        let validation = validate(
+        let font = self.font_coverage()?;
+        let validation = validate_with_font(
             &original,
             &built,
             &graph,
             &translations,
             self.source_language(),
             &target.language,
+            font.as_ref(),
         );
 
         let revision = self.next_build_revision(target)?;
