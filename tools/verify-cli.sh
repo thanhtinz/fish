@@ -13,12 +13,15 @@ cargo build -q -p tjlocalizer-cli
 tj="$root/target/debug/tjlocalizer"
 jar="$root/crates/tjlocalizer-core/tests/data/sample-game.jar"
 
-"$tj" import "$jar" --into "$work/demo" --name sample-game
+# Two targets, so the multi-language path is exercised rather than assumed.
+"$tj" import "$jar" --into "$work/demo" --name sample-game --target vi-VN,th --source-language en
 "$tj" analyze "$work/demo"
 "$tj" extract "$work/demo"
+"$tj" dictionaries "$work/demo"
 
-# Seed the memory the way a previous project would have, so there is something to approve.
-cat > "$work/demo/memory/memory.json" <<'JSON'
+# Seed the memory the way a previous project would have, so there is something to approve. The
+# file is named for the direction: a project can hold several, and they must not collide.
+cat > "$work/demo/memory/en-vi-vn.json" <<'JSON'
 { "entries": [
   { "source": "Start Game", "target": "Bắt đầu trò chơi", "context": null },
   { "source": "Quit", "target": "Thoát", "context": null },
@@ -26,9 +29,17 @@ cat > "$work/demo/memory/memory.json" <<'JSON'
 ] }
 JSON
 
-"$tj" translate "$work/demo" --apply-safe
-"$tj" build "$work/demo"
+"$tj" translate "$work/demo" --lang vi-VN --apply-safe --gloss
+"$tj" build "$work/demo" --all
+"$tj" builds "$work/demo"
 "$tj" test "$work/demo/output/sample-game-vi-vn.jar"
+
+# Exporting to a path of the user's choosing is the whole point of a desktop tool; the CLI runs
+# the same copy so it is checked here too.
+mkdir -p "$work/out"
+"$tj" export "$work/demo" "$work/out" --all
+test -f "$work/out/sample-game-vi-vn.jar" || { echo "export did not write the Vietnamese build" >&2; exit 1; }
+test -f "$work/out/sample-game-th.jar" || { echo "export did not write the Thai build" >&2; exit 1; }
 
 echo "--- JVM output from the localized JAR:"
 # stdout.encoding, not file.encoding: since Java 19 the console stream follows the former.

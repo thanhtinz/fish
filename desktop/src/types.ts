@@ -2,11 +2,23 @@
 // Kept by hand rather than generated: the surface is small, and a hand-written file is one a
 // reviewer can read against the Rust without a build step in between.
 
+export interface TargetView {
+  tag: string;
+  name: string;
+  styleProfile: string;
+  enabled: boolean;
+  approvedCount: number;
+  buildCount: number;
+  outputPath: string | null;
+}
+
 export interface ProjectSummary {
   path: string;
   name: string;
-  targetLanguage: string;
-  styleProfile: string;
+  sourceLanguage: string;
+  sourceLanguageName: string;
+  sourceLanguageDetected: boolean;
+  targets: TargetView[];
   sourceSha256: string;
   revision: number;
   brandingEnabled: boolean;
@@ -14,8 +26,51 @@ export interface ProjectSummary {
   needsExtract: boolean;
   nodeCount: number;
   translatableCount: number;
-  approvedCount: number;
-  buildCount: number;
+}
+
+export interface LanguageView {
+  tag: string;
+  name: string;
+  script: string;
+}
+
+export interface StyleView {
+  id: string;
+  language: string;
+  description: string;
+  firstPerson: string;
+  secondPerson: string;
+}
+
+export interface GlossTerm {
+  source: string;
+  target: string;
+  domain: string;
+}
+
+export interface GlossView {
+  text: string;
+  completeness: "complete" | "partial" | "none";
+  confidence: number;
+  engine: string;
+  terms: GlossTerm[];
+  unresolved: string[];
+  notes: string[];
+}
+
+export interface DictionaryView {
+  from: string;
+  to: string;
+  fromName: string;
+  toName: string;
+  entries: number;
+}
+
+export interface ImportReport {
+  applied: number;
+  unchanged: number;
+  unknown: number;
+  malformed: number[];
 }
 
 export interface Location {
@@ -60,6 +115,7 @@ export interface FindingView {
 
 export interface BuildView {
   revision: number;
+  language: string;
   profileRevision: number;
   literalsPatched: number;
   resourcesPatched: number;

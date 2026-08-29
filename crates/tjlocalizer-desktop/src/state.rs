@@ -8,9 +8,25 @@
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 use tjlocalizer_core::graph::{ContextType, TextNode, TextSource};
+use tjlocalizer_core::lang::Language;
 use tjlocalizer_core::project::{BuildRecord, Project};
 use tjlocalizer_core::suggest::{Candidate, Origin};
+use tjlocalizer_core::translate::{Completeness, Proposal};
 use tjlocalizer_core::validate::Severity;
+
+/// One target language of a project, with its own progress.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TargetView {
+    pub tag: String,
+    pub name: String,
+    pub style_profile: String,
+    pub enabled: bool,
+    pub approved_count: usize,
+    pub build_count: usize,
+    /// Where the last build was published, if it is still there.
+    pub output_path: Option<String>,
+}
 
 /// Enough about a project to list and reopen it without loading its content.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -18,8 +34,10 @@ use tjlocalizer_core::validate::Severity;
 pub struct ProjectSummary {
     pub path: String,
     pub name: String,
-    pub target_language: String,
-    pub style_profile: String,
+    pub source_language: String,
+    pub source_language_name: String,
+    pub source_language_detected: bool,
+    pub targets: Vec<TargetView>,
     pub source_sha256: String,
     pub revision: u32,
     pub branding_enabled: bool,
@@ -28,24 +46,44 @@ pub struct ProjectSummary {
     pub needs_extract: bool,
     pub node_count: usize,
     pub translatable_count: usize,
-    pub approved_count: usize,
-    pub build_count: usize,
 }
 
 impl ProjectSummary {
     pub fn of(project: &Project) -> Self {
         let profile = project.profile();
         let graph = project.graph().ok();
-        let approved = project.translations().map(|t| t.len()).unwrap_or(0);
         let (nodes, translatable) = match &graph {
             Some(g) => (g.nodes.len(), g.translatable().count()),
             None => (0, 0),
         };
+        let targets = profile
+            .targets
+            .iter()
+            .map(|t| TargetView {
+                tag: t.language.tag().to_string(),
+                name: t.language.display_name(),
+                style_profile: t.style_profile.clone(),
+                enabled: t.enabled,
+                approved_count: project
+                    .translations(&t.language)
+                    .map(|s| s.len())
+                    .unwrap_or(0),
+                build_count: project.builds(&t.language).map(|b| b.len()).unwrap_or(0),
+                output_path: project
+                    .output_path(&t.language)
+                    .ok()
+                    .flatten()
+                    .map(|p| p.display().to_string()),
+            })
+            .collect();
+
         Self {
             path: project.root().display().to_string(),
             name: profile.name.clone(),
-            target_language: profile.localization.target_language.clone(),
-            style_profile: profile.localization.style_profile.clone(),
+            source_language: profile.source_language.language.tag().to_string(),
+            source_language_name: profile.source_language.language.display_name(),
+            source_language_detected: profile.source_language.detected,
+            targets,
             source_sha256: profile.source.sha256.clone(),
             revision: profile.revision,
             branding_enabled: profile.branding.enabled,
@@ -53,10 +91,97 @@ impl ProjectSummary {
             needs_extract: graph.is_none(),
             node_count: nodes,
             translatable_count: translatable,
-            approved_count: approved,
-            build_count: project.builds().map(|b| b.len()).unwrap_or(0),
         }
     }
+}
+
+/// A language the interface can offer, whether or not the project uses it.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LanguageView {
+    pub tag: String,
+    pub name: String,
+    pub script: String,
+}
+
+impl LanguageView {
+    pub fn of(language: &Language) -> Self {
+        Self {
+            tag: language.tag().to_string(),
+            name: language.display_name(),
+            script: format!("{:?}", language.script()).to_lowercase(),
+        }
+    }
+}
+
+/// A register profile, for the picker.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StyleView {
+    pub id: String,
+    pub language: String,
+    pub description: String,
+    pub first_person: String,
+    pub second_person: String,
+}
+
+/// What the offline engine makes of a string, for the detail panel.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GlossView {
+    pub text: String,
+    pub completeness: String,
+    pub confidence: f32,
+    pub engine: String,
+    pub terms: Vec<GlossTerm>,
+    pub unresolved: Vec<String>,
+    pub notes: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GlossTerm {
+    pub source: String,
+    pub target: String,
+    pub domain: String,
+}
+
+impl GlossView {
+    pub fn of(proposal: &Proposal) -> Self {
+        Self {
+            text: proposal.target_text.clone(),
+            completeness: match proposal.completeness {
+                Completeness::Complete => "complete",
+                Completeness::Partial => "partial",
+                Completeness::None => "none",
+            }
+            .into(),
+            confidence: proposal.confidence,
+            engine: proposal.engine.clone(),
+            terms: proposal
+                .terms
+                .iter()
+                .map(|t| GlossTerm {
+                    source: t.source.clone(),
+                    target: t.target.clone(),
+                    domain: format!("{:?}", t.domain).to_lowercase(),
+                })
+                .collect(),
+            unresolved: proposal.unresolved.clone(),
+            notes: proposal.notes.clone(),
+        }
+    }
+}
+
+/// A direction the dictionary covers, for the settings screen.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DictionaryView {
+    pub from: String,
+    pub to: String,
+    pub from_name: String,
+    pub to_name: String,
+    pub entries: usize,
 }
 
 /// Where a string lives, in a form a person can read.
@@ -150,20 +275,39 @@ pub struct IssueView {
 }
 
 impl NodeView {
-    pub fn of(node: &TextNode, target: Option<&str>, candidate: Option<&Candidate>) -> Self {
+    /// Joins a node with its translation and candidate.
+    ///
+    /// The languages are needed because the quality checks are language-specific: a length that
+    /// is suspicious in Vietnamese is normal in Chinese, and a check that fires on everything is
+    /// one a translator learns to ignore.
+    pub fn of(
+        node: &TextNode,
+        target: Option<&str>,
+        candidate: Option<&Candidate>,
+        from: &Language,
+        to: &Language,
+    ) -> Self {
         let issues = match target {
-            Some(t) => tjlocalizer_core::vietnamese::check(
-                &node.source_text,
-                t,
-                &node.constraints.placeholders,
-            )
-            .into_iter()
-            .map(|i| IssueView {
-                blocking: i.code == "placeholder" || i.code == "empty",
-                code: i.code,
-                detail: i.detail,
-            })
-            .collect(),
+            Some(t) => {
+                let mut found = tjlocalizer_core::quality::check(
+                    &node.source_text,
+                    t,
+                    &node.constraints.placeholders,
+                    from,
+                    to,
+                );
+                if to.base() == "vi" {
+                    found.extend(tjlocalizer_core::vietnamese::check(t));
+                }
+                found
+                    .into_iter()
+                    .map(|i| IssueView {
+                        blocking: i.code == "placeholder" || i.code == "empty",
+                        code: i.code,
+                        detail: i.detail,
+                    })
+                    .collect()
+            }
             None => Vec::new(),
         };
         Self {
@@ -202,6 +346,7 @@ fn context_label(context: ContextType) -> &'static str {
 #[serde(rename_all = "camelCase")]
 pub struct BuildView {
     pub revision: u32,
+    pub language: String,
     pub profile_revision: u32,
     pub literals_patched: usize,
     pub resources_patched: usize,
@@ -223,6 +368,7 @@ impl BuildView {
     pub fn of(record: &BuildRecord) -> Self {
         Self {
             revision: record.revision,
+            language: record.language.tag().to_string(),
             profile_revision: record.profile_revision,
             literals_patched: record.report.literals_patched,
             resources_patched: record.report.resources_patched,
@@ -253,6 +399,18 @@ pub struct CapabilityView {
     pub id: String,
     pub confidence: f32,
     pub evidence: Vec<String>,
+}
+
+/// What came back from a CSV a translator returned.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ImportReport {
+    pub applied: usize,
+    pub unchanged: usize,
+    /// Rows for strings this project no longer has - the game was re-imported and changed.
+    pub unknown: usize,
+    /// Line numbers that did not parse, so they can be looked at rather than guessed about.
+    pub malformed: Vec<usize>,
 }
 
 /// The list of projects the user has opened, kept beside the application's own config.

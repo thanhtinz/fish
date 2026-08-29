@@ -182,10 +182,12 @@ textarea { resize: vertical; font-family: var(--mono); line-height: 1.55; }
 .text-left { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 
 .filters {
-  flex: none; display: flex; align-items: center; gap: 9px;
+  flex: none; display: flex; align-items: center; gap: 9px; flex-wrap: wrap;
   padding: 10px 14px; border-bottom: 1px solid var(--line);
 }
-.filters input[type="search"] { max-width: 260px; }
+/* Given a minimum, or the buttons beside it squeeze the search box to a few characters. */
+.filters input[type="search"] { flex: 1 1 170px; min-width: 150px; max-width: 260px; }
+.filters select { flex: 0 1 auto; min-width: 118px; }
 .filters select { width: auto; }
 .filters .count { margin-left: auto; color: var(--text-faint); font-size: 12px; }
 

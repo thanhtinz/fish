@@ -1,0 +1,838 @@
+{
+  "from": "zh",
+  "to": "vi-VN",
+  "sourceNote": "Game terminology for Chinese J2ME titles, wuxia and xianxia register noted per entry.",
+  "entries": [
+    {
+      "source": "生命",
+      "target": "sinh lực",
+      "domain": "stat"
+    },
+    {
+      "source": "生命值",
+      "target": "sinh lực",
+      "domain": "stat"
+    },
+    {
+      "source": "气血",
+      "target": "khí huyết",
+      "domain": "stat",
+      "priority": 1,
+      "note": "wuxia register"
+    },
+    {
+      "source": "血量",
+      "target": "lượng máu",
+      "domain": "stat"
+    },
+    {
+      "source": "法力",
+      "target": "nội lực",
+      "domain": "stat",
+      "priority": 1,
+      "note": "wuxia; 'pháp lực' in fantasy settings"
+    },
+    {
+      "source": "魔法",
+      "target": "phép thuật",
+      "domain": "skill"
+    },
+    {
+      "source": "内力",
+      "target": "nội lực",
+      "domain": "stat"
+    },
+    {
+      "source": "真气",
+      "target": "chân khí",
+      "domain": "stat"
+    },
+    {
+      "source": "经验",
+      "target": "kinh nghiệm",
+      "domain": "stat"
+    },
+    {
+      "source": "经验值",
+      "target": "điểm kinh nghiệm",
+      "domain": "stat"
+    },
+    {
+      "source": "等级",
+      "target": "cấp độ",
+      "domain": "stat"
+    },
+    {
+      "source": "级别",
+      "target": "cấp bậc",
+      "domain": "stat"
+    },
+    {
+      "source": "属性",
+      "target": "thuộc tính",
+      "domain": "stat"
+    },
+    {
+      "source": "攻击",
+      "target": "tấn công",
+      "domain": "combat"
+    },
+    {
+      "source": "攻击力",
+      "target": "lực tấn công",
+      "domain": "combat"
+    },
+    {
+      "source": "防御",
+      "target": "phòng thủ",
+      "domain": "combat"
+    },
+    {
+      "source": "防御力",
+      "target": "lực phòng thủ",
+      "domain": "combat"
+    },
+    {
+      "source": "敏捷",
+      "target": "nhanh nhẹn",
+      "domain": "stat"
+    },
+    {
+      "source": "力量",
+      "target": "sức mạnh",
+      "domain": "stat"
+    },
+    {
+      "source": "体力",
+      "target": "thể lực",
+      "domain": "stat"
+    },
+    {
+      "source": "智力",
+      "target": "trí lực",
+      "domain": "stat"
+    },
+    {
+      "source": "幸运",
+      "target": "may mắn",
+      "domain": "stat"
+    },
+    {
+      "source": "暴击",
+      "target": "bạo kích",
+      "domain": "combat"
+    },
+    {
+      "source": "命中",
+      "target": "chính xác",
+      "domain": "combat"
+    },
+    {
+      "source": "闪避",
+      "target": "né tránh",
+      "domain": "combat"
+    },
+    {
+      "source": "速度",
+      "target": "tốc độ",
+      "domain": "stat"
+    },
+    {
+      "source": "装备",
+      "target": "trang bị",
+      "domain": "item",
+      "priority": 2,
+      "note": "not 'thiết bị', which is hardware"
+    },
+    {
+      "source": "武器",
+      "target": "vũ khí",
+      "domain": "item"
+    },
+    {
+      "source": "兵器",
+      "target": "binh khí",
+      "domain": "item",
+      "priority": 1,
+      "note": "wuxia register"
+    },
+    {
+      "source": "防具",
+      "target": "phòng cụ",
+      "domain": "item"
+    },
+    {
+      "source": "盔甲",
+      "target": "giáp",
+      "domain": "item"
+    },
+    {
+      "source": "头盔",
+      "target": "mũ giáp",
+      "domain": "item"
+    },
+    {
+      "source": "戒指",
+      "target": "nhẫn",
+      "domain": "item"
+    },
+    {
+      "source": "项链",
+      "target": "dây chuyền",
+      "domain": "item"
+    },
+    {
+      "source": "药水",
+      "target": "thuốc",
+      "domain": "item"
+    },
+    {
+      "source": "丹药",
+      "target": "đan dược",
+      "domain": "item",
+      "priority": 1,
+      "note": "xianxia"
+    },
+    {
+      "source": "材料",
+      "target": "nguyên liệu",
+      "domain": "item"
+    },
+    {
+      "source": "背包",
+      "target": "hành trang",
+      "domain": "ui"
+    },
+    {
+      "source": "仓库",
+      "target": "kho",
+      "domain": "ui"
+    },
+    {
+      "source": "物品",
+      "target": "vật phẩm",
+      "domain": "item"
+    },
+    {
+      "source": "道具",
+      "target": "đạo cụ",
+      "domain": "item"
+    },
+    {
+      "source": "宝箱",
+      "target": "rương báu",
+      "domain": "item"
+    },
+    {
+      "source": "碎片",
+      "target": "mảnh",
+      "domain": "item"
+    },
+    {
+      "source": "强化",
+      "target": "cường hoá",
+      "domain": "item"
+    },
+    {
+      "source": "升级",
+      "target": "nâng cấp",
+      "domain": "item"
+    },
+    {
+      "source": "镶嵌",
+      "target": "khảm",
+      "domain": "item"
+    },
+    {
+      "source": "宝石",
+      "target": "bảo thạch",
+      "domain": "item"
+    },
+    {
+      "source": "耐久",
+      "target": "độ bền",
+      "domain": "item"
+    },
+    {
+      "source": "技能",
+      "target": "kỹ năng",
+      "domain": "skill"
+    },
+    {
+      "source": "武功",
+      "target": "võ công",
+      "domain": "skill",
+      "priority": 1,
+      "note": "wuxia"
+    },
+    {
+      "source": "秘籍",
+      "target": "bí kíp",
+      "domain": "skill",
+      "priority": 1,
+      "note": "wuxia"
+    },
+    {
+      "source": "心法",
+      "target": "tâm pháp",
+      "domain": "skill",
+      "priority": 1,
+      "note": "wuxia"
+    },
+    {
+      "source": "招式",
+      "target": "chiêu thức",
+      "domain": "skill"
+    },
+    {
+      "source": "被动",
+      "target": "bị động",
+      "domain": "skill"
+    },
+    {
+      "source": "主动",
+      "target": "chủ động",
+      "domain": "skill"
+    },
+    {
+      "source": "冷却",
+      "target": "hồi chiêu",
+      "domain": "skill"
+    },
+    {
+      "source": "释放",
+      "target": "thi triển",
+      "domain": "skill"
+    },
+    {
+      "source": "学习",
+      "target": "học",
+      "domain": "skill"
+    },
+    {
+      "source": "修炼",
+      "target": "tu luyện",
+      "domain": "skill",
+      "priority": 1,
+      "note": "xianxia"
+    },
+    {
+      "source": "突破",
+      "target": "đột phá",
+      "domain": "skill",
+      "priority": 1,
+      "note": "xianxia"
+    },
+    {
+      "source": "任务",
+      "target": "nhiệm vụ",
+      "domain": "quest"
+    },
+    {
+      "source": "主线",
+      "target": "nhiệm vụ chính",
+      "domain": "quest"
+    },
+    {
+      "source": "支线",
+      "target": "nhiệm vụ phụ",
+      "domain": "quest"
+    },
+    {
+      "source": "日常",
+      "target": "hằng ngày",
+      "domain": "quest"
+    },
+    {
+      "source": "完成",
+      "target": "hoàn thành",
+      "domain": "quest"
+    },
+    {
+      "source": "接受",
+      "target": "nhận",
+      "domain": "quest"
+    },
+    {
+      "source": "放弃",
+      "target": "từ bỏ",
+      "domain": "quest"
+    },
+    {
+      "source": "奖励",
+      "target": "phần thưởng",
+      "domain": "quest"
+    },
+    {
+      "source": "目标",
+      "target": "mục tiêu",
+      "domain": "quest"
+    },
+    {
+      "source": "进度",
+      "target": "tiến độ",
+      "domain": "quest"
+    },
+    {
+      "source": "领取",
+      "target": "nhận thưởng",
+      "domain": "quest"
+    },
+    {
+      "source": "帮派",
+      "target": "bang hội",
+      "domain": "social",
+      "priority": 2,
+      "note": "not 'hiệp hội'"
+    },
+    {
+      "source": "公会",
+      "target": "bang hội",
+      "domain": "social",
+      "priority": 1
+    },
+    {
+      "source": "好友",
+      "target": "bạn bè",
+      "domain": "social"
+    },
+    {
+      "source": "聊天",
+      "target": "trò chuyện",
+      "domain": "social"
+    },
+    {
+      "source": "世界",
+      "target": "thế giới",
+      "domain": "social"
+    },
+    {
+      "source": "私聊",
+      "target": "nhắn riêng",
+      "domain": "social"
+    },
+    {
+      "source": "队伍",
+      "target": "tổ đội",
+      "domain": "social"
+    },
+    {
+      "source": "组队",
+      "target": "lập đội",
+      "domain": "social"
+    },
+    {
+      "source": "邀请",
+      "target": "mời",
+      "domain": "social"
+    },
+    {
+      "source": "交易",
+      "target": "giao dịch",
+      "domain": "social"
+    },
+    {
+      "source": "拍卖",
+      "target": "đấu giá",
+      "domain": "social"
+    },
+    {
+      "source": "排行榜",
+      "target": "bảng xếp hạng",
+      "domain": "social"
+    },
+    {
+      "source": "师父",
+      "target": "sư phụ",
+      "domain": "social"
+    },
+    {
+      "source": "徒弟",
+      "target": "đồ đệ",
+      "domain": "social"
+    },
+    {
+      "source": "确定",
+      "target": "xác nhận",
+      "domain": "ui"
+    },
+    {
+      "source": "取消",
+      "target": "huỷ",
+      "domain": "ui"
+    },
+    {
+      "source": "返回",
+      "target": "quay lại",
+      "domain": "ui"
+    },
+    {
+      "source": "退出",
+      "target": "thoát",
+      "domain": "ui"
+    },
+    {
+      "source": "设置",
+      "target": "cài đặt",
+      "domain": "ui"
+    },
+    {
+      "source": "帮助",
+      "target": "trợ giúp",
+      "domain": "ui"
+    },
+    {
+      "source": "关闭",
+      "target": "đóng",
+      "domain": "ui"
+    },
+    {
+      "source": "打开",
+      "target": "mở",
+      "domain": "ui"
+    },
+    {
+      "source": "购买",
+      "target": "mua",
+      "domain": "ui"
+    },
+    {
+      "source": "出售",
+      "target": "bán",
+      "domain": "ui"
+    },
+    {
+      "source": "使用",
+      "target": "dùng",
+      "domain": "ui"
+    },
+    {
+      "source": "丢弃",
+      "target": "vứt bỏ",
+      "domain": "ui"
+    },
+    {
+      "source": "确认",
+      "target": "xác nhận",
+      "domain": "ui"
+    },
+    {
+      "source": "提示",
+      "target": "gợi ý",
+      "domain": "ui"
+    },
+    {
+      "source": "菜单",
+      "target": "menu",
+      "domain": "ui"
+    },
+    {
+      "source": "商店",
+      "target": "cửa hàng",
+      "domain": "ui"
+    },
+    {
+      "source": "开始游戏",
+      "target": "bắt đầu trò chơi",
+      "domain": "ui"
+    },
+    {
+      "source": "继续游戏",
+      "target": "chơi tiếp",
+      "domain": "ui"
+    },
+    {
+      "source": "新游戏",
+      "target": "trò chơi mới",
+      "domain": "ui"
+    },
+    {
+      "source": "保存",
+      "target": "lưu",
+      "domain": "ui"
+    },
+    {
+      "source": "读取",
+      "target": "tải",
+      "domain": "ui"
+    },
+    {
+      "source": "音效",
+      "target": "âm thanh",
+      "domain": "ui"
+    },
+    {
+      "source": "音乐",
+      "target": "nhạc nền",
+      "domain": "ui"
+    },
+    {
+      "source": "是",
+      "target": "có",
+      "domain": "ui"
+    },
+    {
+      "source": "否",
+      "target": "không",
+      "domain": "ui"
+    },
+    {
+      "source": "下一步",
+      "target": "tiếp theo",
+      "domain": "ui"
+    },
+    {
+      "source": "上一步",
+      "target": "quay lại",
+      "domain": "ui"
+    },
+    {
+      "source": "角色",
+      "target": "nhân vật",
+      "domain": "ui"
+    },
+    {
+      "source": "创建角色",
+      "target": "tạo nhân vật",
+      "domain": "ui"
+    },
+    {
+      "source": "登录",
+      "target": "đăng nhập",
+      "domain": "ui"
+    },
+    {
+      "source": "注册",
+      "target": "đăng ký",
+      "domain": "ui"
+    },
+    {
+      "source": "充值",
+      "target": "nạp thẻ",
+      "domain": "ui"
+    },
+    {
+      "source": "礼包",
+      "target": "gói quà",
+      "domain": "ui"
+    },
+    {
+      "source": "活动",
+      "target": "sự kiện",
+      "domain": "ui"
+    },
+    {
+      "source": "公告",
+      "target": "thông báo",
+      "domain": "ui"
+    },
+    {
+      "source": "邮件",
+      "target": "thư",
+      "domain": "ui"
+    },
+    {
+      "source": "战斗",
+      "target": "chiến đấu",
+      "domain": "combat"
+    },
+    {
+      "source": "胜利",
+      "target": "chiến thắng",
+      "domain": "combat"
+    },
+    {
+      "source": "失败",
+      "target": "thất bại",
+      "domain": "combat"
+    },
+    {
+      "source": "复活",
+      "target": "hồi sinh",
+      "domain": "combat"
+    },
+    {
+      "source": "死亡",
+      "target": "tử vong",
+      "domain": "combat"
+    },
+    {
+      "source": "逃跑",
+      "target": "bỏ chạy",
+      "domain": "combat"
+    },
+    {
+      "source": "怪物",
+      "target": "quái vật",
+      "domain": "combat"
+    },
+    {
+      "source": "boss",
+      "target": "trùm",
+      "domain": "combat"
+    },
+    {
+      "source": "首领",
+      "target": "thủ lĩnh",
+      "domain": "combat"
+    },
+    {
+      "source": "伤害",
+      "target": "sát thương",
+      "domain": "combat"
+    },
+    {
+      "source": "治疗",
+      "target": "hồi phục",
+      "domain": "combat"
+    },
+    {
+      "source": "中毒",
+      "target": "trúng độc",
+      "domain": "combat"
+    },
+    {
+      "source": "眩晕",
+      "target": "choáng",
+      "domain": "combat"
+    },
+    {
+      "source": "回合",
+      "target": "lượt",
+      "domain": "combat"
+    },
+    {
+      "source": "网络",
+      "target": "mạng",
+      "domain": "system"
+    },
+    {
+      "source": "连接",
+      "target": "kết nối",
+      "domain": "system"
+    },
+    {
+      "source": "服务器",
+      "target": "máy chủ",
+      "domain": "system"
+    },
+    {
+      "source": "错误",
+      "target": "lỗi",
+      "domain": "system"
+    },
+    {
+      "source": "加载",
+      "target": "đang tải",
+      "domain": "system"
+    },
+    {
+      "source": "请稍候",
+      "target": "xin chờ",
+      "domain": "system"
+    },
+    {
+      "source": "金币",
+      "target": "vàng",
+      "domain": "stat"
+    },
+    {
+      "source": "银两",
+      "target": "bạc",
+      "domain": "stat",
+      "priority": 1,
+      "note": "wuxia"
+    },
+    {
+      "source": "元宝",
+      "target": "nguyên bảo",
+      "domain": "stat",
+      "priority": 1
+    },
+    {
+      "source": "钻石",
+      "target": "kim cương",
+      "domain": "stat"
+    },
+    {
+      "source": "地图",
+      "target": "bản đồ",
+      "domain": "ui"
+    },
+    {
+      "source": "传送",
+      "target": "dịch chuyển",
+      "domain": "ui"
+    },
+    {
+      "source": "大侠",
+      "target": "đại hiệp",
+      "domain": "story",
+      "priority": 1
+    },
+    {
+      "source": "少侠",
+      "target": "thiếu hiệp",
+      "domain": "story",
+      "priority": 1
+    },
+    {
+      "source": "前辈",
+      "target": "tiền bối",
+      "domain": "story",
+      "priority": 1
+    },
+    {
+      "source": "在下",
+      "target": "tại hạ",
+      "domain": "story",
+      "priority": 1
+    },
+    {
+      "source": "阁下",
+      "target": "các hạ",
+      "domain": "story",
+      "priority": 1
+    },
+    {
+      "source": "江湖",
+      "target": "giang hồ",
+      "domain": "story",
+      "priority": 1
+    },
+    {
+      "source": "门派",
+      "target": "môn phái",
+      "domain": "story",
+      "priority": 1
+    },
+    {
+      "source": "掌门",
+      "target": "chưởng môn",
+      "domain": "story",
+      "priority": 1
+    },
+    {
+      "source": "弟子",
+      "target": "đệ tử",
+      "domain": "story"
+    },
+    {
+      "source": "恭喜",
+      "target": "chúc mừng",
+      "domain": "story"
+    },
+    {
+      "source": "多谢",
+      "target": "đa tạ",
+      "domain": "story",
+      "priority": 1
+    },
+    {
+      "source": "告辞",
+      "target": "cáo từ",
+      "domain": "story",
+      "priority": 1
+    }
+  ]
+}

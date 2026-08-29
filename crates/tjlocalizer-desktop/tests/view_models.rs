@@ -6,8 +6,17 @@
 //! by the interface.
 
 use tjlocalizer_core::graph::{Constraints, ContextType, TextNode, TextSource};
+use tjlocalizer_core::lang::Language;
 use tjlocalizer_core::suggest::{Candidate, Origin};
 use tjlocalizer_desktop_lib::state::NodeView;
+
+fn en() -> Language {
+    Language::new("en")
+}
+
+fn vi() -> Language {
+    Language::new("vi-VN")
+}
 
 fn node(text: &str, placeholders: &[&str], context: ContextType) -> TextNode {
     TextNode {
@@ -30,7 +39,7 @@ fn node(text: &str, placeholders: &[&str], context: ContextType) -> TextNode {
 #[test]
 fn a_lost_placeholder_is_reported_as_blocking() {
     let n = node("HP: %d / %d", &["%d", "%d"], ContextType::Format);
-    let view = NodeView::of(&n, Some("Sinh lực"), None);
+    let view = NodeView::of(&n, Some("Sinh lực"), None, &en(), &vi());
 
     let issue = view
         .issues
@@ -46,14 +55,14 @@ fn a_lost_placeholder_is_reported_as_blocking() {
 #[test]
 fn a_sound_translation_has_no_issues() {
     let n = node("HP: %d / %d", &["%d", "%d"], ContextType::Format);
-    let view = NodeView::of(&n, Some("Sinh lực: %d / %d"), None);
+    let view = NodeView::of(&n, Some("Sinh lực: %d / %d"), None, &en(), &vi());
     assert!(view.issues.is_empty(), "{:?}", view.issues);
 }
 
 #[test]
 fn an_untranslated_row_is_not_flagged() {
     let n = node("Start Game", &[], ContextType::Ui);
-    let view = NodeView::of(&n, None, None);
+    let view = NodeView::of(&n, None, None, &en(), &vi());
     assert!(view.issues.is_empty());
     assert_eq!(view.target, None);
     assert!(view.translatable);
@@ -70,7 +79,7 @@ fn a_fuzzy_candidate_never_reaches_the_interface_as_auto_approvable() {
         auto_approvable: false,
         terms: Vec::new(),
     };
-    let view = NodeView::of(&n, None, Some(&candidate));
+    let view = NodeView::of(&n, None, Some(&candidate), &en(), &vi());
     let shown = view.candidate.expect("the candidate should be offered");
 
     assert_eq!(shown.origin, "memory-fuzzy");
@@ -89,7 +98,9 @@ fn an_exact_memory_candidate_is_marked_auto_approvable() {
         auto_approvable: true,
         terms: Vec::new(),
     };
-    let shown = NodeView::of(&n, None, Some(&candidate)).candidate.unwrap();
+    let shown = NodeView::of(&n, None, Some(&candidate), &en(), &vi())
+        .candidate
+        .unwrap();
     assert_eq!(shown.origin, "memory");
     assert_eq!(shown.score, None);
     assert!(shown.auto_approvable);
@@ -98,7 +109,7 @@ fn an_exact_memory_candidate_is_marked_auto_approvable() {
 #[test]
 fn technical_nodes_are_marked_untranslatable_rather_than_hidden() {
     let n = node("/img/hud.png", &[], ContextType::Technical);
-    let view = NodeView::of(&n, None, None);
+    let view = NodeView::of(&n, None, None, &en(), &vi());
     assert!(
         !view.translatable,
         "a resource path must not be offered for translation"
@@ -109,7 +120,7 @@ fn technical_nodes_are_marked_untranslatable_rather_than_hidden() {
 #[test]
 fn a_class_constant_reports_where_it_lives() {
     let n = node("Quit", &[], ContextType::Ui);
-    let view = NodeView::of(&n, None, None);
+    let view = NodeView::of(&n, None, None, &en(), &vi());
     assert_eq!(view.location.kind, "class");
     assert_eq!(view.location.file, "Main.class");
     assert_eq!(view.location.detail, "constant #7");

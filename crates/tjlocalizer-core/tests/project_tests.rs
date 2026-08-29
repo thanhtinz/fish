@@ -1,6 +1,11 @@
 //! The project directory: immutability of the original, versioning, builds and rollback.
 
+use tjlocalizer_core::lang::Language;
 use tjlocalizer_core::project::{Project, DIRECTORIES, SCHEMA_VERSION};
+
+fn vi() -> Language {
+    Language::new("vi-VN")
+}
 
 fn fixture() -> Vec<u8> {
     std::fs::read(concat!(
@@ -47,7 +52,7 @@ fn import_lays_out_the_directory_and_pins_the_original() {
     assert_eq!(project.profile().schema_version, SCHEMA_VERSION);
     assert_eq!(project.profile().source.jar, "original/sample-game.jar");
     assert_eq!(project.profile().source.sha256.len(), 64);
-    assert_eq!(project.profile().localization.target_language, "vi-VN");
+    assert_eq!(project.profile().targets[0].language.tag(), "vi-VN");
 
     // The recorded hash must be the hash of the bytes that were handed in, not of a re-zip.
     assert_eq!(
@@ -78,13 +83,13 @@ fn reopening_gives_back_the_same_profile() {
 fn saving_bumps_the_revision() {
     let (dir, mut project) = new_project("revision");
     let first = project.profile().revision;
-    project.profile_mut().localization.style_profile = "formal".to_string();
+    project.profile_mut().targets[0].style_profile = "formal".to_string();
     project.save().unwrap();
     assert_eq!(project.profile().revision, first + 1);
 
     let reopened = Project::open(&dir.0).unwrap();
     assert_eq!(reopened.profile().revision, first + 1);
-    assert_eq!(reopened.profile().localization.style_profile, "formal");
+    assert_eq!(reopened.profile().targets[0].style_profile, "formal");
 }
 
 #[test]
@@ -149,9 +154,9 @@ fn re_extracting_keeps_translations_attached_to_their_nodes() {
         .into_iter()
         .find(|n| n.source_text == "Start Game")
         .expect("fixture should offer this literal");
-    let mut store = project.translations().unwrap();
+    let mut store = project.translations(&vi()).unwrap();
     store.set(&node.id, "Bắt đầu trò chơi");
-    project.save_translations(&store).unwrap();
+    project.save_translations(&vi(), &store).unwrap();
 
     let again = project.extract().unwrap();
     let same = again
@@ -161,7 +166,7 @@ fn re_extracting_keeps_translations_attached_to_their_nodes() {
         .unwrap();
     assert_eq!(same.id, node.id);
     assert_eq!(
-        project.translations().unwrap().get(&same.id),
+        project.translations(&vi()).unwrap().get(&same.id),
         Some("Bắt đầu trò chơi")
     );
 }
@@ -171,15 +176,15 @@ fn build_records_what_it_produced_and_publishes_the_output() {
     let (dir, project) = new_project("build");
     let graph = project.extract().unwrap();
 
-    let mut store = project.translations().unwrap();
+    let mut store = project.translations(&vi()).unwrap();
     for node in graph.translatable() {
         if node.source_text == "Quit" {
             store.set(&node.id, "Thoát");
         }
     }
-    project.save_translations(&store).unwrap();
+    project.save_translations(&vi(), &store).unwrap();
 
-    let record = project.build().unwrap();
+    let record = project.build(&vi()).unwrap();
     assert_eq!(record.revision, 1);
     assert_eq!(record.profile_revision, project.profile().revision);
     assert_eq!(record.source_sha256, project.profile().source.sha256);
@@ -191,11 +196,11 @@ fn build_records_what_it_produced_and_publishes_the_output() {
         record.validation.findings
     );
 
-    let name = project.output_name();
+    let name = project.output_name(project.target(&vi()).unwrap());
     assert_eq!(name, "sample-game-vi-vn.jar");
     assert!(dir.0.join("output").join(&name).exists());
-    assert!(dir.0.join("builds/0001").join(&name).exists());
-    assert!(dir.0.join("builds/0001/build.json").exists());
+    assert!(dir.0.join("builds/vi-vn/0001").join(&name).exists());
+    assert!(dir.0.join("builds/vi-vn/0001/build.json").exists());
 }
 
 #[test]
@@ -208,36 +213,51 @@ fn rollback_restores_an_earlier_build() {
         .find(|n| n.source_text == "Quit")
         .unwrap();
 
-    let mut store = project.translations().unwrap();
+    let mut store = project.translations(&vi()).unwrap();
     store.set(&quit.id, "Thoát");
-    project.save_translations(&store).unwrap();
-    project.build().unwrap();
-    let good = std::fs::read(dir.0.join("output").join(project.output_name())).unwrap();
+    project.save_translations(&vi(), &store).unwrap();
+    project.build(&vi()).unwrap();
+    let good = std::fs::read(
+        dir.0
+            .join("output")
+            .join(project.output_name(project.target(&vi()).unwrap())),
+    )
+    .unwrap();
 
     // A second build with a translation someone later regrets.
     store.set(&quit.id, "Chấm dứt phiên làm việc ngay lập tức");
-    project.save_translations(&store).unwrap();
-    let second = project.build().unwrap();
+    project.save_translations(&vi(), &store).unwrap();
+    let second = project.build(&vi()).unwrap();
     assert_eq!(second.revision, 2);
-    let regrettable = std::fs::read(dir.0.join("output").join(project.output_name())).unwrap();
+    let regrettable = std::fs::read(
+        dir.0
+            .join("output")
+            .join(project.output_name(project.target(&vi()).unwrap())),
+    )
+    .unwrap();
     assert_ne!(good, regrettable);
 
-    let restored = project.rollback(1).unwrap();
+    let restored = project.rollback(&vi(), 1).unwrap();
     assert_eq!(restored.revision, 1);
     assert_eq!(
-        std::fs::read(dir.0.join("output").join(project.output_name())).unwrap(),
+        std::fs::read(
+            dir.0
+                .join("output")
+                .join(project.output_name(project.target(&vi()).unwrap()))
+        )
+        .unwrap(),
         good
     );
 
     // Rolling back does not throw the newer build away.
-    assert_eq!(project.builds().unwrap().len(), 2);
-    assert!(dir.0.join("builds/0002/build.json").exists());
+    assert_eq!(project.builds(&vi()).unwrap().len(), 2);
+    assert!(dir.0.join("builds/vi-vn/0002/build.json").exists());
 }
 
 #[test]
 fn rolling_back_to_a_build_that_never_happened_is_an_error() {
     let (_dir, project) = new_project("rollback-missing");
     project.extract().unwrap();
-    let err = project.rollback(7).unwrap_err();
+    let err = project.rollback(&vi(), 7).unwrap_err();
     assert!(err.to_string().contains("no build 7"), "got: {err}");
 }

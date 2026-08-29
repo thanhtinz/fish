@@ -1,0 +1,267 @@
+{
+  "from": "en",
+  "to": "zh-Hans",
+  "sourceNote": "Game terminology, English to Simplified Chinese.",
+  "entries": [
+    {
+      "source": "HP",
+      "target": "生命",
+      "domain": "stat"
+    },
+    {
+      "source": "MP",
+      "target": "法力",
+      "domain": "stat"
+    },
+    {
+      "source": "EXP",
+      "target": "经验",
+      "domain": "stat"
+    },
+    {
+      "source": "Level",
+      "target": "等级",
+      "domain": "stat"
+    },
+    {
+      "source": "Attack",
+      "target": "攻击",
+      "domain": "combat"
+    },
+    {
+      "source": "Defense",
+      "target": "防御",
+      "domain": "combat"
+    },
+    {
+      "source": "Speed",
+      "target": "速度",
+      "domain": "stat"
+    },
+    {
+      "source": "Damage",
+      "target": "伤害",
+      "domain": "combat"
+    },
+    {
+      "source": "Equipment",
+      "target": "装备",
+      "domain": "item"
+    },
+    {
+      "source": "Weapon",
+      "target": "武器",
+      "domain": "item"
+    },
+    {
+      "source": "Armor",
+      "target": "盔甲",
+      "domain": "item"
+    },
+    {
+      "source": "Item",
+      "target": "物品",
+      "domain": "item"
+    },
+    {
+      "source": "Inventory",
+      "target": "背包",
+      "domain": "ui"
+    },
+    {
+      "source": "Potion",
+      "target": "药水",
+      "domain": "item"
+    },
+    {
+      "source": "Material",
+      "target": "材料",
+      "domain": "item"
+    },
+    {
+      "source": "Skill",
+      "target": "技能",
+      "domain": "skill"
+    },
+    {
+      "source": "Quest",
+      "target": "任务",
+      "domain": "quest"
+    },
+    {
+      "source": "Reward",
+      "target": "奖励",
+      "domain": "quest"
+    },
+    {
+      "source": "Complete",
+      "target": "完成",
+      "domain": "quest"
+    },
+    {
+      "source": "Guild",
+      "target": "帮派",
+      "domain": "social"
+    },
+    {
+      "source": "Friend",
+      "target": "好友",
+      "domain": "social"
+    },
+    {
+      "source": "Chat",
+      "target": "聊天",
+      "domain": "social"
+    },
+    {
+      "source": "Party",
+      "target": "队伍",
+      "domain": "social"
+    },
+    {
+      "source": "Trade",
+      "target": "交易",
+      "domain": "social"
+    },
+    {
+      "source": "OK",
+      "target": "确定",
+      "domain": "ui"
+    },
+    {
+      "source": "Cancel",
+      "target": "取消",
+      "domain": "ui"
+    },
+    {
+      "source": "Back",
+      "target": "返回",
+      "domain": "ui"
+    },
+    {
+      "source": "Exit",
+      "target": "退出",
+      "domain": "ui"
+    },
+    {
+      "source": "Settings",
+      "target": "设置",
+      "domain": "ui"
+    },
+    {
+      "source": "Help",
+      "target": "帮助",
+      "domain": "ui"
+    },
+    {
+      "source": "Shop",
+      "target": "商店",
+      "domain": "ui"
+    },
+    {
+      "source": "Buy",
+      "target": "购买",
+      "domain": "ui"
+    },
+    {
+      "source": "Sell",
+      "target": "出售",
+      "domain": "ui"
+    },
+    {
+      "source": "Use",
+      "target": "使用",
+      "domain": "ui"
+    },
+    {
+      "source": "Yes",
+      "target": "是",
+      "domain": "ui"
+    },
+    {
+      "source": "No",
+      "target": "否",
+      "domain": "ui"
+    },
+    {
+      "source": "Save",
+      "target": "保存",
+      "domain": "ui"
+    },
+    {
+      "source": "Load",
+      "target": "读取",
+      "domain": "ui"
+    },
+    {
+      "source": "New Game",
+      "target": "新游戏",
+      "domain": "ui"
+    },
+    {
+      "source": "Continue",
+      "target": "继续游戏",
+      "domain": "ui"
+    },
+    {
+      "source": "Menu",
+      "target": "菜单",
+      "domain": "ui"
+    },
+    {
+      "source": "Character",
+      "target": "角色",
+      "domain": "ui"
+    },
+    {
+      "source": "Battle",
+      "target": "战斗",
+      "domain": "combat"
+    },
+    {
+      "source": "Victory",
+      "target": "胜利",
+      "domain": "combat"
+    },
+    {
+      "source": "Defeat",
+      "target": "失败",
+      "domain": "combat"
+    },
+    {
+      "source": "Monster",
+      "target": "怪物",
+      "domain": "combat"
+    },
+    {
+      "source": "Gold",
+      "target": "金币",
+      "domain": "stat"
+    },
+    {
+      "source": "Server",
+      "target": "服务器",
+      "domain": "system"
+    },
+    {
+      "source": "Error",
+      "target": "错误",
+      "domain": "system"
+    },
+    {
+      "source": "Loading",
+      "target": "加载",
+      "domain": "system"
+    },
+    {
+      "source": "Map",
+      "target": "地图",
+      "domain": "ui"
+    },
+    {
+      "source": "Start Game",
+      "target": "开始游戏",
+      "domain": "ui"
+    }
+  ]
+}

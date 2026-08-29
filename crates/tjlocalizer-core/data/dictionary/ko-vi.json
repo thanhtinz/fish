@@ -1,0 +1,309 @@
+{
+  "from": "ko",
+  "to": "vi-VN",
+  "sourceNote": "Game terminology, Korean to Vietnamese.",
+  "entries": [
+    {
+      "source": "체력",
+      "target": "thể lực",
+      "domain": "stat"
+    },
+    {
+      "source": "마나",
+      "target": "nội lực",
+      "domain": "stat"
+    },
+    {
+      "source": "경험치",
+      "target": "điểm kinh nghiệm",
+      "domain": "stat"
+    },
+    {
+      "source": "레벨",
+      "target": "cấp độ",
+      "domain": "stat"
+    },
+    {
+      "source": "공격",
+      "target": "tấn công",
+      "domain": "combat"
+    },
+    {
+      "source": "공격력",
+      "target": "lực tấn công",
+      "domain": "combat"
+    },
+    {
+      "source": "방어",
+      "target": "phòng thủ",
+      "domain": "combat"
+    },
+    {
+      "source": "속도",
+      "target": "tốc độ",
+      "domain": "stat"
+    },
+    {
+      "source": "능력치",
+      "target": "chỉ số",
+      "domain": "stat"
+    },
+    {
+      "source": "장비",
+      "target": "trang bị",
+      "domain": "item",
+      "priority": 2
+    },
+    {
+      "source": "무기",
+      "target": "vũ khí",
+      "domain": "item"
+    },
+    {
+      "source": "방어구",
+      "target": "phòng cụ",
+      "domain": "item"
+    },
+    {
+      "source": "아이템",
+      "target": "vật phẩm",
+      "domain": "item"
+    },
+    {
+      "source": "가방",
+      "target": "túi đồ",
+      "domain": "ui"
+    },
+    {
+      "source": "창고",
+      "target": "kho",
+      "domain": "ui"
+    },
+    {
+      "source": "재료",
+      "target": "nguyên liệu",
+      "domain": "item"
+    },
+    {
+      "source": "물약",
+      "target": "thuốc",
+      "domain": "item"
+    },
+    {
+      "source": "강화",
+      "target": "cường hoá",
+      "domain": "item"
+    },
+    {
+      "source": "스킬",
+      "target": "kỹ năng",
+      "domain": "skill"
+    },
+    {
+      "source": "기술",
+      "target": "kỹ năng",
+      "domain": "skill"
+    },
+    {
+      "source": "마법",
+      "target": "phép thuật",
+      "domain": "skill"
+    },
+    {
+      "source": "퀘스트",
+      "target": "nhiệm vụ",
+      "domain": "quest"
+    },
+    {
+      "source": "임무",
+      "target": "nhiệm vụ",
+      "domain": "quest"
+    },
+    {
+      "source": "보상",
+      "target": "phần thưởng",
+      "domain": "quest"
+    },
+    {
+      "source": "완료",
+      "target": "hoàn thành",
+      "domain": "quest"
+    },
+    {
+      "source": "길드",
+      "target": "bang hội",
+      "domain": "social",
+      "priority": 2
+    },
+    {
+      "source": "친구",
+      "target": "bạn bè",
+      "domain": "social"
+    },
+    {
+      "source": "채팅",
+      "target": "trò chuyện",
+      "domain": "social"
+    },
+    {
+      "source": "파티",
+      "target": "tổ đội",
+      "domain": "social"
+    },
+    {
+      "source": "거래",
+      "target": "giao dịch",
+      "domain": "social"
+    },
+    {
+      "source": "확인",
+      "target": "xác nhận",
+      "domain": "ui"
+    },
+    {
+      "source": "취소",
+      "target": "huỷ",
+      "domain": "ui"
+    },
+    {
+      "source": "뒤로",
+      "target": "quay lại",
+      "domain": "ui"
+    },
+    {
+      "source": "종료",
+      "target": "thoát",
+      "domain": "ui"
+    },
+    {
+      "source": "설정",
+      "target": "cài đặt",
+      "domain": "ui"
+    },
+    {
+      "source": "도움말",
+      "target": "trợ giúp",
+      "domain": "ui"
+    },
+    {
+      "source": "상점",
+      "target": "cửa hàng",
+      "domain": "ui"
+    },
+    {
+      "source": "구매",
+      "target": "mua",
+      "domain": "ui"
+    },
+    {
+      "source": "판매",
+      "target": "bán",
+      "domain": "ui"
+    },
+    {
+      "source": "사용",
+      "target": "dùng",
+      "domain": "ui"
+    },
+    {
+      "source": "예",
+      "target": "có",
+      "domain": "ui"
+    },
+    {
+      "source": "아니오",
+      "target": "không",
+      "domain": "ui"
+    },
+    {
+      "source": "저장",
+      "target": "lưu",
+      "domain": "ui"
+    },
+    {
+      "source": "불러오기",
+      "target": "tải",
+      "domain": "ui"
+    },
+    {
+      "source": "새 게임",
+      "target": "trò chơi mới",
+      "domain": "ui"
+    },
+    {
+      "source": "계속하기",
+      "target": "chơi tiếp",
+      "domain": "ui"
+    },
+    {
+      "source": "메뉴",
+      "target": "menu",
+      "domain": "ui"
+    },
+    {
+      "source": "캐릭터",
+      "target": "nhân vật",
+      "domain": "ui"
+    },
+    {
+      "source": "전투",
+      "target": "chiến đấu",
+      "domain": "combat"
+    },
+    {
+      "source": "승리",
+      "target": "chiến thắng",
+      "domain": "combat"
+    },
+    {
+      "source": "패배",
+      "target": "thất bại",
+      "domain": "combat"
+    },
+    {
+      "source": "몬스터",
+      "target": "quái vật",
+      "domain": "combat"
+    },
+    {
+      "source": "피해",
+      "target": "sát thương",
+      "domain": "combat"
+    },
+    {
+      "source": "도망",
+      "target": "bỏ chạy",
+      "domain": "combat"
+    },
+    {
+      "source": "골드",
+      "target": "vàng",
+      "domain": "stat"
+    },
+    {
+      "source": "서버",
+      "target": "máy chủ",
+      "domain": "system"
+    },
+    {
+      "source": "오류",
+      "target": "lỗi",
+      "domain": "system"
+    },
+    {
+      "source": "로딩",
+      "target": "đang tải",
+      "domain": "system"
+    },
+    {
+      "source": "연결",
+      "target": "kết nối",
+      "domain": "system"
+    },
+    {
+      "source": "지도",
+      "target": "bản đồ",
+      "domain": "ui"
+    }
+  ]
+}

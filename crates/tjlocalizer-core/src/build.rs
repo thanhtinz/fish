@@ -4,7 +4,7 @@ use crate::classfile::ClassFile;
 use crate::error::Result;
 use crate::graph::{ContentGraph, TextSource};
 use crate::jar::{Archive, Manifest};
-use crate::vietnamese::TranslationStore;
+use crate::translation::TranslationStore;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 

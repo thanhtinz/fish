@@ -6,7 +6,7 @@
 //! definition a translation this project already approved for this exact string.
 
 use crate::graph::ContentGraph;
-use crate::vietnamese::{Glossary, TranslationMemory, TranslationStore};
+use crate::translation::{Glossary, TranslationMemory, TranslationStore};
 use serde::{Deserialize, Serialize};
 
 /// Where a candidate came from. Kept on the candidate so a reviewer can weigh it: an exact memory

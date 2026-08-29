@@ -2,17 +2,22 @@ import type { BuildView as Build, ProjectSummary } from "./types";
 
 interface Props {
   project: ProjectSummary;
+  language: string;
   builds: Build[];
   outputPath: string | null;
   busy: string | null;
   onBuild: () => void;
+  onBuildAll: () => void;
   onRollback: (revision: number) => void;
+  onExport: () => void;
 }
 
 /** Build, validation result, and the history that makes a rollback possible. */
 export function BuildsView(props: Props) {
-  const { project: p, builds, busy } = props;
+  const { project: p, builds, busy, language } = props;
   const latest = builds[0] ?? null;
+  const target = p.targets.find((t) => t.tag === language);
+  const enabled = p.targets.filter((t) => t.enabled);
 
   return (
     <div className="pad">
@@ -22,16 +27,24 @@ export function BuildsView(props: Props) {
           Áp bản dịch đã duyệt, đóng gói lại, rồi kiểm tra. Kết quả ghi vào builds/ trước, chép
           sang output/ sau — nên output/ chỉ chứa bản build đã hoàn tất.
         </div>
-        <div className="row">
+        <div className="row" style={{ flexWrap: "wrap" }}>
           <button
             className="primary"
             disabled={busy !== null || p.needsExtract}
             onClick={props.onBuild}
           >
-            {busy === "build" ? <span className="spin" /> : null} Build {p.name}
+            {busy === "build" ? <span className="spin" /> : null} Build {target?.name ?? language}
+          </button>
+          {enabled.length > 1 && (
+            <button disabled={busy !== null || p.needsExtract} onClick={props.onBuildAll}>
+              Build cả {enabled.length} ngôn ngữ
+            </button>
+          )}
+          <button disabled={busy !== null || !props.outputPath} onClick={props.onExport}>
+            Xuất file ra…
           </button>
           <span style={{ color: "var(--text-faint)", fontSize: 12 }}>
-            {p.approvedCount} bản dịch sẽ được áp
+            {target?.approvedCount ?? 0} bản dịch sẽ được áp
           </span>
         </div>
         {props.outputPath && (

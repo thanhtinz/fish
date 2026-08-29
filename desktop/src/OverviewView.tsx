@@ -1,8 +1,19 @@
-import type { CapabilityView, ProjectSummary } from "./types";
+import { useState } from "react";
+import type {
+  CapabilityView,
+  DictionaryView,
+  LanguageView,
+  ProjectSummary,
+  StyleView,
+} from "./types";
 
 interface Props {
   project: ProjectSummary;
+  language: string;
   capabilities: CapabilityView[];
+  languages: LanguageView[];
+  styles: StyleView[];
+  dictionaries: DictionaryView[];
   busy: string | null;
   onAnalyze: () => void;
   onExtract: () => void;
@@ -10,14 +21,31 @@ interface Props {
   onApplySafe: () => void;
   onLearn: () => void;
   onSetBranding: (enabled: boolean) => void;
-  onSetLocalization: (target: string, style: string) => void;
+  onSetSourceLanguage: (tag: string) => void;
+  onSetStyle: (tag: string) => void;
+  onAddTarget: (tag: string) => void;
+  onRemoveTarget: (tag: string) => void;
+  onImportDictionary: () => void;
 }
 
-/** The pipeline, in the order §22 runs it, with each step's state visible rather than implied. */
+/** The pipeline in the order §22 runs it, with each step's state visible rather than implied. */
 export function OverviewView(props: Props) {
-  const { project: p, capabilities, busy } = props;
+  const { project: p, capabilities, busy, language } = props;
+  const [newLang, setNewLang] = useState("");
   const analyzed = !p.needsAnalyze;
   const extracted = !p.needsExtract;
+  const target = p.targets.find((t) => t.tag === language);
+  const styles = props.styles.filter(
+    (s) => s.language.split("-")[0] === language.split("-")[0],
+  );
+
+  // The directions this project can actually gloss in - a dictionary for the wrong source
+  // language is no dictionary at all, and that is invisible unless it is said.
+  const usable = props.dictionaries.filter(
+    (d) =>
+      d.from.split("-")[0] === p.sourceLanguage.split("-")[0] &&
+      d.to.split("-")[0] === language.split("-")[0],
+  );
 
   return (
     <div className="pad">
@@ -29,12 +57,7 @@ export function OverviewView(props: Props) {
               Mỗi bước ghi kết quả xuống đĩa, nên có thể dừng ở đây và làm tiếp sau.
             </div>
             <div className="steps">
-              <Step
-                n={1}
-                done
-                title="Nhập bản gốc"
-                detail={`Đã băm và khoá — sửa file gốc sẽ bị báo lỗi`}
-              />
+              <Step n={1} done title="Nhập bản gốc" detail="Đã băm và khoá — sửa file gốc sẽ bị báo lỗi" />
               <Step
                 n={2}
                 done={analyzed}
@@ -60,34 +83,22 @@ export function OverviewView(props: Props) {
                     : "Tìm chuỗi thật sự là nội dung game"
                 }
                 action={
-                  <button
-                    className="small"
-                    disabled={busy !== null || !analyzed}
-                    onClick={props.onExtract}
-                  >
+                  <button className="small" disabled={busy !== null || !analyzed} onClick={props.onExtract}>
                     {extracted ? "Trích xuất lại" : "Trích xuất"}
                   </button>
                 }
               />
               <Step
                 n={4}
-                done={p.approvedCount > 0}
-                title="Dịch"
-                detail={`${p.approvedCount}/${p.translatableCount} đã duyệt`}
+                done={(target?.approvedCount ?? 0) > 0}
+                title={`Dịch sang ${target?.name ?? language}`}
+                detail={`${target?.approvedCount ?? 0}/${p.translatableCount} đã duyệt`}
                 action={
                   <div className="row">
-                    <button
-                      className="small"
-                      disabled={busy !== null || !extracted}
-                      onClick={props.onSuggest}
-                    >
+                    <button className="small" disabled={busy !== null || !extracted} onClick={props.onSuggest}>
                       Gợi ý
                     </button>
-                    <button
-                      className="small"
-                      disabled={busy !== null || !extracted}
-                      onClick={props.onApplySafe}
-                    >
+                    <button className="small" disabled={busy !== null || !extracted} onClick={props.onApplySafe}>
                       Duyệt phần chắc chắn
                     </button>
                   </div>
@@ -95,36 +106,198 @@ export function OverviewView(props: Props) {
               />
               <Step
                 n={5}
-                done={p.buildCount > 0}
+                done={(target?.buildCount ?? 0) > 0}
                 title="Đóng gói và kiểm tra"
                 detail={
-                  p.buildCount > 0 ? `${p.buildCount} bản build đã ghi nhận` : "Chưa build lần nào"
+                  (target?.buildCount ?? 0) > 0
+                    ? `${target?.buildCount} bản build đã ghi nhận`
+                    : "Chưa build lần nào"
                 }
               />
             </div>
           </div>
 
           <div className="card">
+            <h3>Ngôn ngữ</h3>
+            <div className="sub">
+              Một dự án có thể xuất ra nhiều ngôn ngữ. Văn bản gốc dùng chung; bản dịch, văn phong
+              và bản build thì riêng cho từng thứ tiếng.
+            </div>
+
+            <div className="row" style={{ marginBottom: 12 }}>
+              <label style={{ width: 108, color: "var(--text-faint)", fontSize: 12 }}>Ngôn ngữ gốc</label>
+              <select
+                value={p.sourceLanguage}
+                onChange={(e) => props.onSetSourceLanguage(e.target.value)}
+              >
+                {!props.languages.some((l) => l.tag === p.sourceLanguage) && (
+                  <option value={p.sourceLanguage}>{p.sourceLanguage}</option>
+                )}
+                {props.languages.map((l) => (
+                  <option key={l.tag} value={l.tag}>
+                    {l.name} ({l.tag})
+                  </option>
+                ))}
+              </select>
+            </div>
+            {p.sourceLanguageDetected && (
+              <div className="banner note" style={{ marginBottom: 12 }}>
+                <span>
+                  Ngôn ngữ gốc là <b>đoán</b> từ chữ trong game, chưa ai xác nhận. Đoán sai thì
+                  toàn bộ từ điển im lặng ngừng hoạt động — nên hãy kiểm lại.
+                </span>
+              </div>
+            )}
+
+            <div style={{ marginBottom: 10 }}>
+              {p.targets.map((t) => (
+                <div className="build-row" key={t.tag} style={{ marginBottom: 6 }}>
+                  <span className="rev">{t.tag}</span>
+                  <span>
+                    <div className="sum">
+                      {t.name} · {t.approvedCount}/{p.translatableCount} đã dịch ·{" "}
+                      {t.buildCount} build
+                    </div>
+                    <div className="sha">{t.styleProfile}</div>
+                  </span>
+                  <button
+                    className="small"
+                    disabled={busy !== null || p.targets.length < 2}
+                    title={
+                      p.targets.length < 2
+                        ? "Dự án phải có ít nhất một ngôn ngữ đích"
+                        : "Bản dịch vẫn được giữ trên đĩa"
+                    }
+                    onClick={() => props.onRemoveTarget(t.tag)}
+                  >
+                    Bỏ
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            <div className="row">
+              <select value={newLang} onChange={(e) => setNewLang(e.target.value)}>
+                <option value="">Thêm ngôn ngữ…</option>
+                {props.languages
+                  .filter((l) => !p.targets.some((t) => t.tag === l.tag))
+                  .map((l) => (
+                    <option key={l.tag} value={l.tag}>
+                      {l.name} ({l.tag})
+                    </option>
+                  ))}
+              </select>
+              <button
+                disabled={busy !== null || newLang === ""}
+                onClick={() => {
+                  props.onAddTarget(newLang);
+                  setNewLang("");
+                }}
+              >
+                Thêm
+              </button>
+            </div>
+          </div>
+
+          <div className="card">
             <h3>Bộ nhớ dịch</h3>
             <div className="sub">
-              Đưa các bản dịch đã duyệt vào bộ nhớ để dự án sau dùng lại.
+              Đưa bản dịch đã duyệt vào bộ nhớ để dự án sau dùng lại. Bộ nhớ riêng cho từng cặp
+              ngôn ngữ.
             </div>
-            <button disabled={busy !== null || p.approvedCount === 0} onClick={props.onLearn}>
-              Ghi nhớ {p.approvedCount} bản dịch
+            <button
+              disabled={busy !== null || (target?.approvedCount ?? 0) === 0}
+              onClick={props.onLearn}
+            >
+              Ghi nhớ {target?.approvedCount ?? 0} bản dịch
             </button>
           </div>
         </div>
 
         <div>
           <div className="card">
+            <h3>Văn phong · {target?.name ?? language}</h3>
+            <div className="sub">
+              Tiếng Việt không có đại từ trung tính, nên phải chọn. NPC kiếm hiệp nói{" "}
+              <i>“Ngươi chắc chứ?”</i>, game hiện đại nói <i>“Bạn có chắc không?”</i> — cùng một
+              câu gốc.
+            </div>
+            {styles.length === 0 ? (
+              <div style={{ color: "var(--text-faint)", fontSize: 12.5, lineHeight: 1.6 }}>
+                Bản dựng này chưa có bộ luật xưng hô cho {target?.name ?? language}. Bản dịch vẫn
+                làm được, chỉ là không có kiểm tra văn phong.
+              </div>
+            ) : (
+              styles.map((s) => (
+                <label
+                  key={s.id}
+                  className="step"
+                  style={{ cursor: "pointer", marginBottom: 6 }}
+                >
+                  <input
+                    type="radio"
+                    style={{ width: "auto" }}
+                    name="style"
+                    checked={target?.styleProfile === s.id}
+                    onChange={() => props.onSetStyle(s.id)}
+                  />
+                  <span className="t">
+                    <div>{s.id}</div>
+                    <div className="d">{s.description}</div>
+                    {s.secondPerson && (
+                      <div className="d">
+                        tôi → <b>{s.firstPerson}</b> · bạn → <b>{s.secondPerson}</b>
+                      </div>
+                    )}
+                  </span>
+                </label>
+              ))
+            )}
+          </div>
+
+          <div className="card">
+            <h3>Từ điển</h3>
+            <div className="sub">
+              Từ điển game, không phải từ điển thường: 装备 là “trang bị” chứ không phải “thiết
+              bị”, Guild là “bang hội” chứ không phải “hiệp hội”.
+            </div>
+            {usable.length === 0 ? (
+              <div className="banner bad">
+                <span>
+                  Không có từ điển nào cho {p.sourceLanguageName} → {target?.name ?? language}.
+                  Phần gợi ý thuật ngữ sẽ không hoạt động cho cặp này.
+                </span>
+              </div>
+            ) : (
+              usable.map((d) => (
+                <div className="cap" key={`${d.from}-${d.to}`}>
+                  <span className="id">
+                    {d.from} → {d.to}
+                  </span>
+                  <span className="cf">{d.entries}</span>
+                  <span className="ev">
+                    {d.fromName} sang {d.toName}
+                  </span>
+                </div>
+              ))
+            )}
+            <div className="row" style={{ marginTop: 12 }}>
+              <button disabled={busy !== null} onClick={props.onImportDictionary}>
+                Nhập gói từ điển…
+              </button>
+              <span style={{ color: "var(--text-faint)", fontSize: 11.5 }}>
+                {props.dictionaries.reduce((n, d) => n + d.entries, 0)} mục, tổng mọi hướng
+              </span>
+            </div>
+          </div>
+
+          <div className="card">
             <h3>Khả năng phát hiện được</h3>
             <div className="sub">
               Phần lõi hỏi game này <i>làm được gì</i>, không bao giờ hỏi nó <i>là game nào</i>.
             </div>
             {capabilities.length === 0 ? (
-              <div style={{ color: "var(--text-faint)", fontSize: 12.5 }}>
-                Chưa phân tích.
-              </div>
+              <div style={{ color: "var(--text-faint)", fontSize: 12.5 }}>Chưa phân tích.</div>
             ) : (
               capabilities.map((c) => (
                 <div className="cap" key={c.id}>
@@ -147,34 +320,7 @@ export function OverviewView(props: Props) {
               <dt>Phiên bản hồ sơ</dt>
               <dd>{p.revision}</dd>
             </dl>
-          </div>
-
-          <div className="card">
-            <h3>Thiết lập</h3>
-            <div className="sub">Ghi vào project.json và áp dụng cho lần build sau.</div>
-            <div className="row" style={{ marginBottom: 10 }}>
-              <label style={{ width: 108, color: "var(--text-faint)", fontSize: 12 }}>
-                Ngôn ngữ đích
-              </label>
-              <input
-                value={p.targetLanguage}
-                onChange={(e) => props.onSetLocalization(e.target.value, p.styleProfile)}
-              />
-            </div>
-            <div className="row" style={{ marginBottom: 12 }}>
-              <label style={{ width: 108, color: "var(--text-faint)", fontSize: 12 }}>
-                Văn phong
-              </label>
-              <select
-                value={p.styleProfile}
-                onChange={(e) => props.onSetLocalization(p.targetLanguage, e.target.value)}
-              >
-                <option value="natural-dialogue">natural-dialogue</option>
-                <option value="formal">formal</option>
-                <option value="literal">literal</option>
-              </select>
-            </div>
-            <label className="row" style={{ cursor: "pointer" }}>
+            <label className="row" style={{ cursor: "pointer", marginTop: 12 }}>
               <input
                 type="checkbox"
                 style={{ width: "auto" }}

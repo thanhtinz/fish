@@ -5,6 +5,7 @@
 //! and `main.rs` is only the entry point.
 
 pub mod commands;
+pub mod csvfmt;
 pub mod state;
 
 /// Builds and runs the application.
@@ -28,8 +29,19 @@ pub fn run() {
             commands::builds,
             commands::rollback,
             commands::set_branding,
-            commands::set_localization,
-            commands::output_path,
+            commands::set_source_language,
+            commands::set_style,
+            commands::add_target,
+            commands::remove_target,
+            commands::build_all,
+            commands::gloss,
+            commands::export_build,
+            commands::export_translations,
+            commands::import_translations,
+            commands::import_dictionary,
+            commands::languages,
+            commands::styles,
+            commands::dictionaries,
         ])
         .run(tauri::generate_context!())
         .expect("the application failed to start");

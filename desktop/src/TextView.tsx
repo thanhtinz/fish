@@ -1,9 +1,12 @@
-import { useMemo, useState } from "react";
-import type { NodeView } from "./types";
+import { useEffect, useMemo, useState } from "react";
+import type { GlossView, NodeView } from "./types";
 
 interface Props {
   nodes: NodeView[];
   onSetTranslation: (nodeId: string, target: string) => void;
+  onGloss: (nodeId: string) => Promise<GlossView | null>;
+  onExport: () => void;
+  onImport: () => void;
 }
 
 type StatusFilter = "all" | "untranslated" | "translated" | "suggested" | "issues";
@@ -15,13 +18,15 @@ type StatusFilter = "all" | "untranslated" | "translated" | "suggested" | "issue
  * to see that `/img/hud.png` was found and deliberately left alone, otherwise "where did that
  * string go?" has no answer.
  */
-export function TextView({ nodes, onSetTranslation }: Props) {
+export function TextView({ nodes, onSetTranslation, onGloss, onExport, onImport }: Props) {
   const [query, setQuery] = useState("");
   const [context, setContext] = useState("all");
   const [status, setStatus] = useState<StatusFilter>("all");
   const [showTechnical, setShowTechnical] = useState(false);
   const [selected, setSelected] = useState<string | null>(null);
   const [draft, setDraft] = useState<string>("");
+  const [gloss, setGloss] = useState<GlossView | null>(null);
+  const [glossing, setGlossing] = useState(false);
 
   const contexts = useMemo(
     () => Array.from(new Set(nodes.map((n) => n.context))).sort(),
@@ -44,6 +49,28 @@ export function TextView({ nodes, onSetTranslation }: Props) {
   }, [nodes, query, context, status, showTechnical]);
 
   const current = nodes.find((n) => n.id === selected) ?? null;
+
+  // The offline engine runs per row, on selection, rather than over the whole table: it is a
+  // starting point a translator asks for, not something to fill a column with.
+  useEffect(() => {
+    let cancelled = false;
+    setGloss(null);
+    if (!selected) return;
+    setGlossing(true);
+    onGloss(selected)
+      .then((g) => {
+        if (!cancelled) setGloss(g);
+      })
+      .catch(() => {
+        if (!cancelled) setGloss(null);
+      })
+      .finally(() => {
+        if (!cancelled) setGlossing(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [selected, onGloss]);
 
   function select(node: NodeView) {
     setSelected(node.id);
@@ -93,6 +120,12 @@ export function TextView({ nodes, onSetTranslation }: Props) {
           <span className="count">
             {shown.length}/{nodes.length}
           </span>
+          <button className="small ghost" onClick={onExport} title="Xuất ra CSV cho người dịch">
+            Xuất CSV…
+          </button>
+          <button className="small ghost" onClick={onImport} title="Nhập lại CSV người dịch gửi về">
+            Nhập CSV…
+          </button>
         </div>
 
         <div className="rows">
@@ -205,6 +238,54 @@ export function TextView({ nodes, onSetTranslation }: Props) {
                 )}
               </div>
             )}
+
+            <div className="block">
+              <h4>Từ điển đề xuất</h4>
+              {glossing ? (
+                <div style={{ color: "var(--text-faint)", fontSize: 12 }}>
+                  <span className="spin" /> đang tra…
+                </div>
+              ) : !gloss ? (
+                <div style={{ color: "var(--text-faint)", fontSize: 11.5, lineHeight: 1.6 }}>
+                  Từ điển không tra được đủ chuỗi này. Ghép vài từ nó tình cờ biết lại thành câu
+                  sẽ ra thứ trông như bản dịch mà không phải, nên nó không đề xuất gì.
+                </div>
+              ) : (
+                <div className="cand-box">
+                  <div className="row" style={{ flexWrap: "wrap" }}>
+                    <span className="pill">{gloss.engine}</span>
+                    <span className={gloss.completeness === "complete" ? "pill ok" : "pill warn"}>
+                      {gloss.completeness === "complete" ? "tra đủ" : "tra một phần"}
+                    </span>
+                    <span className="pill">{gloss.confidence.toFixed(2)}</span>
+                  </div>
+                  <div className="t">{gloss.text}</div>
+                  {gloss.terms.length > 0 && (
+                    <div className="wrap" style={{ marginBottom: 8 }}>
+                      {gloss.terms.map((t, k) => (
+                        <span className="pill" key={k} title={t.domain}>
+                          {t.source} → {t.target}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  {gloss.unresolved.length > 0 && (
+                    <div style={{ color: "var(--warn)", fontSize: 11.5, marginBottom: 8 }}>
+                      chưa tra được: {gloss.unresolved.join(" · ")}
+                    </div>
+                  )}
+                  <button className="small" onClick={() => setDraft(gloss.text)}>
+                    Dùng làm nháp
+                  </button>
+                </div>
+              )}
+              {gloss && (
+                <div style={{ color: "var(--text-faint)", fontSize: 11.5, marginTop: 8, lineHeight: 1.6 }}>
+                  Từ điển tra thuật ngữ, không dịch câu. Kể cả khi tra đủ, đây vẫn là điểm bắt đầu
+                  cho người dịch — không bao giờ được duyệt tự động.
+                </div>
+              )}
+            </div>
 
             <div className="block">
               <h4>Bản dịch</h4>

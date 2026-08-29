@@ -56,10 +56,19 @@ tjlocalizer build    projects/game
 tjlocalizer test     projects/game/output/game-vi-vn.jar
 ```
 
+Several languages at once:
+
+```sh
+tjlocalizer targets projects/game --add th
+tjlocalizer translate projects/game --all --apply-safe
+tjlocalizer build projects/game --all
+tjlocalizer export projects/game ~/Desktop --all
+```
+
 Or in one pass:
 
 ```sh
-tjlocalizer localize game.jar --target vi-VN --style natural-dialogue
+tjlocalizer localize game.jar --target vi-VN,en,th --style natural-dialogue
 ```
 
 A one-shot run over a game with no translation memory behind it approves almost nothing and
@@ -68,10 +77,11 @@ so rather than reporting success.
 
 ## What it will not do
 
-- **Translate on its own authority.** Candidates come from the project's own memory and glossary.
-  An exact memory hit or a locked glossary term may be approved automatically, because both
-  restate a decision the project already made. A fuzzy match never is: `Mở khóa` and `Mở khoá`
-  score as near-identical and one of them is wrong.
+- **Translate on its own authority.** Candidates come from the project's own memory, glossary and
+  dictionaries. An exact memory hit or a locked glossary term may be approved automatically,
+  because both restate a decision the project already made. A fuzzy match never is: `Mở khóa` and
+  `Mở khoá` score as near-identical and one of them is wrong. A dictionary gloss never is either,
+  however complete - see [docs/LANGUAGES.md](docs/LANGUAGES.md).
 - **Claim ownership of the game.** Attribution covers the localization only; the original
   manifest attributes are preserved and validation fails the build if any were changed or
   removed.
@@ -89,6 +99,7 @@ so rather than reporting success.
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for how the pieces fit,
 [docs/DESKTOP.md](docs/DESKTOP.md) for the application,
+[docs/LANGUAGES.md](docs/LANGUAGES.md) for dictionaries and register,
 [docs/SPEC-COVERAGE.md](docs/SPEC-COVERAGE.md) for what is built and what is not, and
 [docs/LEGAL.md](docs/LEGAL.md) for the attribution boundary.
 

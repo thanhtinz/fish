@@ -55,16 +55,44 @@ be mistakable for a screenshot of it working.
 ## The three screens
 
 **Tổng quan** - the pipeline in the order §22 runs it, with each step's state visible rather than
-inferred, the detected capabilities with their evidence, the project's facts (the original's hash,
-the profile revision), and the settings that go into project.json.
+inferred; the target languages and their progress; the register picker, which shows what each
+profile does to the pronouns; the dictionary directions actually usable for this project's
+language pair, said plainly when there are none; the detected capabilities with their evidence;
+and the project's facts.
 
-**Văn bản** - the translation table. Filters by context, status and free text; a detail panel with
+A banner stays up while the source language is still a guess. A wrong one silently disables every
+dictionary, so it is worth interrupting for.
+
+**Văn bản** - the translation table, for the language selected in the title bar. Filters by context, status and free text; a detail panel with
 the original, where it lives, the placeholders that must survive, the current candidate with its
 origin, and the quality warnings, recomputed on every read so a stale green row is impossible.
 Non-translatable strings are hidden by default rather than dropped, so "where did that string go?"
 has an answer.
 
-**Đóng gói** - build, the validation report, and the build history with rollback.
+**Đóng gói** - build one language or all of them, the validation report, the build history with
+rollback, and **Xuất file ra…**, which opens a native save dialog. Where the finished file goes is
+the user's business, not the tool's; the project directory is the tool's.
+
+## Files in and out
+
+Everything a desktop application should let you choose a path for:
+
+| | |
+| --- | --- |
+| Nhập file JAR… | pick the game, then pick where the project lives |
+| Xuất file ra… | save the built JAR anywhere, under any name |
+| Xuất CSV… | every string, for a translator working outside the app |
+| Nhập CSV… | read the translator's file back, matched by node id |
+| Nhập gói từ điển… | add a dictionary pack to the project |
+
+The CSV carries a byte-order mark, because Excel reads a CSV without one as the system's legacy
+encoding - which turns every Vietnamese diacritic and every Thai character into rubbish, and the
+translator's tool is Excel. Its quoting is written out and tested rather than pulled in: game text
+is full of commas and quotes, and a field that lands in the wrong column is approved as the
+translation of the wrong string, which nobody notices until the game ships.
+
+Import matches by node id, so a row whose source text was edited still lands in the right place,
+and a row for a string that no longer exists is reported rather than silently dropped.
 
 ## Checking it
 

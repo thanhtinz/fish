@@ -7,7 +7,8 @@
 use crate::classfile::ClassFile;
 use crate::graph::ContentGraph;
 use crate::jar::{Archive, Manifest};
-use crate::vietnamese::TranslationStore;
+use crate::lang::Language;
+use crate::translation::TranslationStore;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -60,18 +61,23 @@ impl ValidationReport {
 }
 
 /// Validates a built archive against the original it came from.
+///
+/// The languages are needed because the translation checks are language-specific: what counts as
+/// too long, or as wrongly spaced, has no answer that holds for Vietnamese and Chinese at once.
 pub fn validate(
     original: &Archive,
     built: &Archive,
     graph: &ContentGraph,
     translations: &TranslationStore,
+    from: &Language,
+    to: &Language,
 ) -> ValidationReport {
     let mut report = ValidationReport::default();
 
     check_nothing_lost(original, built, &mut report);
     check_classes_parse(built, &mut report);
     check_entry_points(built, &mut report);
-    check_placeholders(graph, translations, &mut report);
+    check_translations(graph, translations, from, to, &mut report);
     check_originals_preserved(original, built, &mut report);
 
     report
@@ -158,19 +164,32 @@ fn check_entry_points(built: &Archive, report: &mut ValidationReport) {
     }
 }
 
-/// Placeholders present in the source must survive into the approved translation.
-fn check_placeholders(
+/// Every approved translation must survive its own quality checks.
+///
+/// Placeholders are the ones that break a running game, so they are errors; the rest are
+/// warnings, because a translator may have had a reason.
+fn check_translations(
     graph: &ContentGraph,
     translations: &TranslationStore,
+    from: &Language,
+    to: &Language,
     report: &mut ValidationReport,
 ) {
     for node in &graph.nodes {
         let Some(target) = translations.get(&node.id) else {
             continue;
         };
-        for issue in
-            crate::vietnamese::check(&node.source_text, target, &node.constraints.placeholders)
-        {
+        let mut issues = crate::quality::check(
+            &node.source_text,
+            target,
+            &node.constraints.placeholders,
+            from,
+            to,
+        );
+        if to.base() == "vi" {
+            issues.extend(crate::vietnamese::check(target));
+        }
+        for issue in issues {
             let severity = if issue.code == "placeholder" || issue.code == "empty" {
                 Severity::Error
             } else {

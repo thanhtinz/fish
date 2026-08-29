@@ -1,0 +1,267 @@
+{
+  "from": "en",
+  "to": "id",
+  "sourceNote": "Game terminology, English to Indonesian.",
+  "entries": [
+    {
+      "source": "HP",
+      "target": "nyawa",
+      "domain": "stat"
+    },
+    {
+      "source": "MP",
+      "target": "mana",
+      "domain": "stat"
+    },
+    {
+      "source": "EXP",
+      "target": "pengalaman",
+      "domain": "stat"
+    },
+    {
+      "source": "Level",
+      "target": "level",
+      "domain": "stat"
+    },
+    {
+      "source": "Attack",
+      "target": "serangan",
+      "domain": "combat"
+    },
+    {
+      "source": "Defense",
+      "target": "pertahanan",
+      "domain": "combat"
+    },
+    {
+      "source": "Speed",
+      "target": "kecepatan",
+      "domain": "stat"
+    },
+    {
+      "source": "Damage",
+      "target": "kerusakan",
+      "domain": "combat"
+    },
+    {
+      "source": "Equipment",
+      "target": "perlengkapan",
+      "domain": "item"
+    },
+    {
+      "source": "Weapon",
+      "target": "senjata",
+      "domain": "item"
+    },
+    {
+      "source": "Armor",
+      "target": "baju zirah",
+      "domain": "item"
+    },
+    {
+      "source": "Item",
+      "target": "barang",
+      "domain": "item"
+    },
+    {
+      "source": "Inventory",
+      "target": "tas",
+      "domain": "ui"
+    },
+    {
+      "source": "Potion",
+      "target": "ramuan",
+      "domain": "item"
+    },
+    {
+      "source": "Material",
+      "target": "bahan",
+      "domain": "item"
+    },
+    {
+      "source": "Skill",
+      "target": "keahlian",
+      "domain": "skill"
+    },
+    {
+      "source": "Quest",
+      "target": "misi",
+      "domain": "quest"
+    },
+    {
+      "source": "Reward",
+      "target": "hadiah",
+      "domain": "quest"
+    },
+    {
+      "source": "Complete",
+      "target": "selesai",
+      "domain": "quest"
+    },
+    {
+      "source": "Guild",
+      "target": "guild",
+      "domain": "social"
+    },
+    {
+      "source": "Friend",
+      "target": "teman",
+      "domain": "social"
+    },
+    {
+      "source": "Chat",
+      "target": "obrolan",
+      "domain": "social"
+    },
+    {
+      "source": "Party",
+      "target": "kelompok",
+      "domain": "social"
+    },
+    {
+      "source": "Trade",
+      "target": "dagang",
+      "domain": "social"
+    },
+    {
+      "source": "OK",
+      "target": "oke",
+      "domain": "ui"
+    },
+    {
+      "source": "Cancel",
+      "target": "batal",
+      "domain": "ui"
+    },
+    {
+      "source": "Back",
+      "target": "kembali",
+      "domain": "ui"
+    },
+    {
+      "source": "Exit",
+      "target": "keluar",
+      "domain": "ui"
+    },
+    {
+      "source": "Settings",
+      "target": "pengaturan",
+      "domain": "ui"
+    },
+    {
+      "source": "Help",
+      "target": "bantuan",
+      "domain": "ui"
+    },
+    {
+      "source": "Shop",
+      "target": "toko",
+      "domain": "ui"
+    },
+    {
+      "source": "Buy",
+      "target": "beli",
+      "domain": "ui"
+    },
+    {
+      "source": "Sell",
+      "target": "jual",
+      "domain": "ui"
+    },
+    {
+      "source": "Use",
+      "target": "pakai",
+      "domain": "ui"
+    },
+    {
+      "source": "Yes",
+      "target": "ya",
+      "domain": "ui"
+    },
+    {
+      "source": "No",
+      "target": "tidak",
+      "domain": "ui"
+    },
+    {
+      "source": "Save",
+      "target": "simpan",
+      "domain": "ui"
+    },
+    {
+      "source": "Load",
+      "target": "muat",
+      "domain": "ui"
+    },
+    {
+      "source": "New Game",
+      "target": "permainan baru",
+      "domain": "ui"
+    },
+    {
+      "source": "Continue",
+      "target": "lanjutkan",
+      "domain": "ui"
+    },
+    {
+      "source": "Menu",
+      "target": "menu",
+      "domain": "ui"
+    },
+    {
+      "source": "Character",
+      "target": "karakter",
+      "domain": "ui"
+    },
+    {
+      "source": "Battle",
+      "target": "pertarungan",
+      "domain": "combat"
+    },
+    {
+      "source": "Victory",
+      "target": "menang",
+      "domain": "combat"
+    },
+    {
+      "source": "Defeat",
+      "target": "kalah",
+      "domain": "combat"
+    },
+    {
+      "source": "Monster",
+      "target": "monster",
+      "domain": "combat"
+    },
+    {
+      "source": "Gold",
+      "target": "emas",
+      "domain": "stat"
+    },
+    {
+      "source": "Server",
+      "target": "server",
+      "domain": "system"
+    },
+    {
+      "source": "Error",
+      "target": "kesalahan",
+      "domain": "system"
+    },
+    {
+      "source": "Loading",
+      "target": "memuat",
+      "domain": "system"
+    },
+    {
+      "source": "Map",
+      "target": "peta",
+      "domain": "ui"
+    },
+    {
+      "source": "Start Game",
+      "target": "mulai permainan",
+      "domain": "ui"
+    }
+  ]
+}

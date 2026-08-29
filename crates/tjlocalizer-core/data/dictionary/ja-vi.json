@@ -1,0 +1,309 @@
+{
+  "from": "ja",
+  "to": "vi-VN",
+  "sourceNote": "Game terminology for Japanese feature-phone titles; kana forms included because many write labels without kanji.",
+  "entries": [
+    {
+      "source": "たいりょく",
+      "target": "thể lực",
+      "domain": "stat"
+    },
+    {
+      "source": "体力",
+      "target": "thể lực",
+      "domain": "stat"
+    },
+    {
+      "source": "魔力",
+      "target": "phép lực",
+      "domain": "stat"
+    },
+    {
+      "source": "経験値",
+      "target": "điểm kinh nghiệm",
+      "domain": "stat"
+    },
+    {
+      "source": "レベル",
+      "target": "cấp độ",
+      "domain": "stat"
+    },
+    {
+      "source": "こうげき",
+      "target": "tấn công",
+      "domain": "combat"
+    },
+    {
+      "source": "攻撃",
+      "target": "tấn công",
+      "domain": "combat"
+    },
+    {
+      "source": "防御",
+      "target": "phòng thủ",
+      "domain": "combat"
+    },
+    {
+      "source": "素早さ",
+      "target": "tốc độ",
+      "domain": "stat"
+    },
+    {
+      "source": "装備",
+      "target": "trang bị",
+      "domain": "item",
+      "priority": 2
+    },
+    {
+      "source": "武器",
+      "target": "vũ khí",
+      "domain": "item"
+    },
+    {
+      "source": "防具",
+      "target": "phòng cụ",
+      "domain": "item"
+    },
+    {
+      "source": "道具",
+      "target": "vật phẩm",
+      "domain": "item"
+    },
+    {
+      "source": "アイテム",
+      "target": "vật phẩm",
+      "domain": "item"
+    },
+    {
+      "source": "持ち物",
+      "target": "hành trang",
+      "domain": "ui"
+    },
+    {
+      "source": "薬草",
+      "target": "dược thảo",
+      "domain": "item"
+    },
+    {
+      "source": "素材",
+      "target": "nguyên liệu",
+      "domain": "item"
+    },
+    {
+      "source": "スキル",
+      "target": "kỹ năng",
+      "domain": "skill"
+    },
+    {
+      "source": "魔法",
+      "target": "phép thuật",
+      "domain": "skill"
+    },
+    {
+      "source": "特技",
+      "target": "kỹ năng đặc biệt",
+      "domain": "skill"
+    },
+    {
+      "source": "クエスト",
+      "target": "nhiệm vụ",
+      "domain": "quest"
+    },
+    {
+      "source": "任務",
+      "target": "nhiệm vụ",
+      "domain": "quest"
+    },
+    {
+      "source": "報酬",
+      "target": "phần thưởng",
+      "domain": "quest"
+    },
+    {
+      "source": "なかま",
+      "target": "đồng đội",
+      "domain": "social"
+    },
+    {
+      "source": "仲間",
+      "target": "đồng đội",
+      "domain": "social"
+    },
+    {
+      "source": "ギルド",
+      "target": "bang hội",
+      "domain": "social",
+      "priority": 2
+    },
+    {
+      "source": "けってい",
+      "target": "xác nhận",
+      "domain": "ui"
+    },
+    {
+      "source": "決定",
+      "target": "xác nhận",
+      "domain": "ui"
+    },
+    {
+      "source": "キャンセル",
+      "target": "huỷ",
+      "domain": "ui"
+    },
+    {
+      "source": "もどる",
+      "target": "quay lại",
+      "domain": "ui"
+    },
+    {
+      "source": "戻る",
+      "target": "quay lại",
+      "domain": "ui"
+    },
+    {
+      "source": "せってい",
+      "target": "cài đặt",
+      "domain": "ui"
+    },
+    {
+      "source": "設定",
+      "target": "cài đặt",
+      "domain": "ui"
+    },
+    {
+      "source": "はい",
+      "target": "có",
+      "domain": "ui"
+    },
+    {
+      "source": "いいえ",
+      "target": "không",
+      "domain": "ui"
+    },
+    {
+      "source": "メニュー",
+      "target": "menu",
+      "domain": "ui"
+    },
+    {
+      "source": "ショップ",
+      "target": "cửa hàng",
+      "domain": "ui"
+    },
+    {
+      "source": "店",
+      "target": "cửa hàng",
+      "domain": "ui"
+    },
+    {
+      "source": "セーブ",
+      "target": "lưu",
+      "domain": "ui"
+    },
+    {
+      "source": "ロード",
+      "target": "tải",
+      "domain": "ui"
+    },
+    {
+      "source": "つづきから",
+      "target": "chơi tiếp",
+      "domain": "ui"
+    },
+    {
+      "source": "はじめから",
+      "target": "chơi mới",
+      "domain": "ui"
+    },
+    {
+      "source": "おわる",
+      "target": "thoát",
+      "domain": "ui"
+    },
+    {
+      "source": "たたかう",
+      "target": "chiến đấu",
+      "domain": "combat"
+    },
+    {
+      "source": "戦闘",
+      "target": "chiến đấu",
+      "domain": "combat"
+    },
+    {
+      "source": "にげる",
+      "target": "bỏ chạy",
+      "domain": "combat"
+    },
+    {
+      "source": "しょうり",
+      "target": "chiến thắng",
+      "domain": "combat"
+    },
+    {
+      "source": "勝利",
+      "target": "chiến thắng",
+      "domain": "combat"
+    },
+    {
+      "source": "敗北",
+      "target": "thất bại",
+      "domain": "combat"
+    },
+    {
+      "source": "モンスター",
+      "target": "quái vật",
+      "domain": "combat"
+    },
+    {
+      "source": "ダメージ",
+      "target": "sát thương",
+      "domain": "combat"
+    },
+    {
+      "source": "キャラクター",
+      "target": "nhân vật",
+      "domain": "ui"
+    },
+    {
+      "source": "じょうたい",
+      "target": "trạng thái",
+      "domain": "ui"
+    },
+    {
+      "source": "状態",
+      "target": "trạng thái",
+      "domain": "ui"
+    },
+    {
+      "source": "おかね",
+      "target": "tiền",
+      "domain": "stat"
+    },
+    {
+      "source": "ゴールド",
+      "target": "vàng",
+      "domain": "stat"
+    },
+    {
+      "source": "つうしん",
+      "target": "kết nối",
+      "domain": "system"
+    },
+    {
+      "source": "エラー",
+      "target": "lỗi",
+      "domain": "system"
+    },
+    {
+      "source": "よみこみちゅう",
+      "target": "đang tải",
+      "domain": "system"
+    },
+    {
+      "source": "読み込み中",
+      "target": "đang tải",
+      "domain": "system"
+    }
+  ]
+}

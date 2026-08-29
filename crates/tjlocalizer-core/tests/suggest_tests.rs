@@ -2,7 +2,7 @@
 
 use tjlocalizer_core::graph::{Constraints, ContentGraph, ContextType, TextNode, TextSource};
 use tjlocalizer_core::suggest::{apply_safe, candidates, learn, Origin};
-use tjlocalizer_core::vietnamese::{Glossary, GlossaryEntry, TranslationMemory, TranslationStore};
+use tjlocalizer_core::translation::{Glossary, GlossaryEntry, TranslationMemory, TranslationStore};
 
 fn node(id: &str, text: &str) -> TextNode {
     TextNode {

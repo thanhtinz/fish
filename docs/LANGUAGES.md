@@ -1,0 +1,124 @@
+# Languages, dictionaries and register
+
+What the tool can honestly do about turning one language into another, and where the line is.
+
+## The line, stated first
+
+**A dictionary cannot translate a sentence.** Word order, agreement, classifiers and idiom are not
+in a dictionary, and stitching readings together in source order produces something that looks
+like a translation and is not one.
+
+What a dictionary *can* do is resolve terminology, and terminology is most of what makes a game
+translation read like a game rather than like a manual:
+
+| Source | A general dictionary says | A game dictionary says |
+| --- | --- | --- |
+| `装备` | thiết bị (hardware) | **trang bị** |
+| `Guild` | hiệp hội (a trade body) | **bang hội** |
+| `法力` | pháp lực | **nội lực** in wuxia |
+| `EXP` | — | **kinh nghiệm** |
+
+For short interface strings - the majority of a J2ME game's text - that is a complete answer. For
+a sentence it is a starting point, and the tool says so rather than presenting a gloss as finished
+work.
+
+Three rules enforce that, and they are tested:
+
+1. **No gloss is ever auto-approved**, however complete. `Proposal::is_approvable` returns false
+   unconditionally. What may be approved without a person is a decision a person already made: an
+   exact translation-memory hit, or a locked glossary term.
+2. **A mostly unresolved string is not glossed at all.** "Dragon Quest Online" is a title; the
+   dictionary knows only "Quest", and substituting it gives "Dragon nhiệm vụ Online" - which looks
+   like an attempt, invites a tired reviewer to accept it, and is worse than proposing nothing.
+   Below half covered, the engine says nothing.
+3. **Unresolved text is named, not hidden.** A gloss reports which stretches nothing covered, so
+   the gap is visible.
+
+## Register: why this matters more in Vietnamese
+
+Vietnamese has no neutral second person. "Are you sure?" has one dictionary reading and several
+right answers, and choosing between them is not a vocabulary question:
+
+| Register | The same line |
+| --- | --- |
+| `natural-dialogue` (kiếm hiệp / tiên hiệp) | Ngươi chắc chứ? |
+| `modern` | Bạn có chắc không? |
+| `formal` (shops, payments) | Quý khách có chắc chắn không? |
+| `terse-ui` (buttons and labels) | *no pronoun at all* |
+
+A translator who ignores this produces text that reads as a machine's. Worse, a game translated by
+several people drifts between registers, which readers notice even when they cannot name it.
+
+So the register is a project setting, applied to every line, and wording that breaks it is
+reported: `bạn` in a wuxia game, `ngươi` in a modern one. The check is word-boundary aware, because
+Vietnamese words are short and sit inside one another - `ta` is inside `hoàn tất` and `tay`, and
+neither is the pronoun.
+
+The register is **reported, never rewritten**. Substituting `ngươi` for `bạn` inside a finished
+sentence leaves the rest of the sentence built around the wrong reading.
+
+The same problem exists in Japanese and Korean, and more weakly in the T/V distinction of Russian,
+German and French. This build models it for Vietnamese only; other languages get a profile that
+checks nothing, and says so rather than pretending.
+
+## What ships
+
+628 entries across eight directions:
+
+| Direction | Entries |
+| --- | --- |
+| zh → vi-VN | 159 |
+| en → vi-VN | 139 |
+| ja → vi-VN | 60 |
+| ko → vi-VN | 60 |
+| ru → vi-VN | 54 |
+| en → zh-Hans | 52 |
+| en → th | 52 |
+| en → id | 52 |
+
+Embedded in the binary, so the tool works without a data directory beside it. A project's own packs
+go in its `dictionary/` folder and are loaded on top.
+
+Entries carry a **domain** - `ui`, `combat`, `item`, `skill`, `quest`, `social`, `stat`, `system`,
+`story` - matched against the content node's context, so a term can read differently in a menu and
+in combat text.
+
+## The source language matters more than it looks
+
+Every dictionary is keyed by direction, so a wrong source language silently disables all of them
+and the tool quietly stops proposing anything. It is therefore **detected** on import, by counting
+scripts across the extracted strings, and recorded as a guess - the interface says so, in a banner
+that does not go away until someone confirms it.
+
+Japanese is checked before Chinese: Japanese text is mostly Han characters with some kana, so any
+kana at all outweighs a large Han count.
+
+## Several target languages at once
+
+One project, one body of extracted text, several targets. Each target owns its translations,
+glossary, memory, register and builds; they are separate bodies of work, reviewed separately.
+
+```
+translations/vi-vn.json      builds/vi-vn/0001/     output/game-vi-vn.jar
+translations/th.json         builds/th/0001/        output/game-th.jar
+memory/en-vi-vn.json         glossary/vi-vn.json
+```
+
+Removing a language from the profile leaves its files alone. Deleting a body of reviewed work
+because a checkbox was cleared is not a thing a tool should do; re-adding the language picks it
+straight back up.
+
+## An external engine
+
+`translate::Provider` is the seam. `DictionaryProvider` is the offline implementation, and no
+network provider is built in - one would send the game's text to a third party, which is the user's
+decision and their key to supply.
+
+## What is not built
+
+- Register modelling for any language but Vietnamese.
+- Grammar beyond spacing, length, script and placeholder checks.
+- A speaker and relationship model that assigns a stance per line automatically (§15). The types
+  exist and default to neutral; nothing populates them yet.
+- Segmentation for Thai and Japanese, which run words together. Dictionary matching works on those
+  scripts because it does not need word boundaries, but a length or word-count rule would.

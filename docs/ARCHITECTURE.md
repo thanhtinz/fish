@@ -83,10 +83,45 @@ earn their place:
   plain "is this text?" check happily offers `MIDlet-1: Game,/icon.png,Main` for translation, and
   translating it renames the entry point.
 
-### `vietnamese` — glossary, memory, quality
+### `lang` — language identity
 
-Glossary terms (optionally locked), a translation memory with exact and fuzzy lookup, and quality
-checks for lost placeholders, spacing and length growth.
+Tags read by their parts (`vi-VN` is `vi` in region `VN`; `zh-Hans` is `zh` in script `Hans`),
+the script each implies, and the typographic rules that follow. This exists because none of the
+quality rules are universal: "no space before a comma" is true in Vietnamese and meaningless in
+Thai, and a length budget tuned for Vietnamese flags every correct Chinese translation, because
+Chinese says the same thing in a third of the characters.
+
+### `translation` — glossary, memory, store
+
+Glossary terms (optionally locked), a translation memory with exact and fuzzy lookup, and the
+approved store. Nothing here is language-specific; one store per target language, because a
+project translating into five languages has five bodies of work reviewed separately.
+
+### `quality` and `vietnamese` — is it publishable
+
+`quality` holds the checks parameterised by language: placeholders, spacing, a length budget that
+accounts for script density, and text left in the source script (which is text nobody translated,
+and passes every other check). `vietnamese` holds what genuinely cannot be said about any other
+language: Vietnamese written without diacritics, and unconverted Telex or VNI input.
+
+### `dictionary` and `dictionary_data` — terminology
+
+Game dictionaries, not general ones, with entries tagged by domain so a term reads differently in
+a menu and in combat text. Longest-match segmentation, because matching `攻击` inside `攻击力`
+leaves a stray character behind.
+
+### `register` — how a line should sound
+
+Pronoun sets per speaker and stance, per style profile. Vietnamese has no neutral second person,
+so "Are you sure?" has several right answers and the choice cannot be avoided. See
+[LANGUAGES.md](LANGUAGES.md).
+
+### `translate` — assembling a proposal
+
+Where the dictionary, the glossary, the memory and the register meet, and where the tool's honesty
+is decided. A `Provider` is the seam for an external engine; the built-in one is offline and
+deterministic. No proposal it produces is ever auto-approvable, and a mostly unresolved string is
+not glossed at all.
 
 ### `suggest` — candidates
 

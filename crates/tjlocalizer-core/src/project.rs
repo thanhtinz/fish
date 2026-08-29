@@ -13,16 +13,22 @@
 
 use crate::build::{self, Branding, BuildReport};
 use crate::detect::{self, CapabilityManifest};
+use crate::dictionary::Dictionary;
 use crate::graph::{self, ContentGraph};
 use crate::jar::{sha256_hex, Archive};
+use crate::lang::Language;
 use crate::suggest::{self, CandidateSet};
+use crate::translation::{Glossary, TranslationMemory, TranslationStore};
 use crate::validate::{validate, ValidationReport};
-use crate::vietnamese::{Glossary, TranslationMemory, TranslationStore};
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 
 /// The project.json schema this build reads and writes.
-pub const SCHEMA_VERSION: u32 = 2;
+///
+/// Version 3 replaced the single `localization` object with a list of targets, so one project can
+/// be shipped in several languages from one body of extracted text. A version 2 project is
+/// migrated on open rather than refused: its one target becomes the first entry.
+pub const SCHEMA_VERSION: u32 = 3;
 
 /// Directories created for every project. Listed once so `create` and the documentation cannot
 /// drift apart.
@@ -55,20 +61,61 @@ pub struct Source {
     pub jad: Option<String>,
 }
 
-/// What is being produced, in terms of language and register rather than of any one game.
+/// One language this project is being shipped in.
+///
+/// A project has a list of these rather than one. The extracted text, the glossary decisions
+/// about the *source* and the capability manifest are shared; the approved translations, the
+/// register and the builds are per target, because they are separate bodies of work reviewed
+/// separately.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Localization {
-    pub source_language: String,
-    pub target_language: String,
+#[serde(rename_all = "camelCase")]
+pub struct Target {
+    pub language: Language,
+    /// The register to write in, by id from `register::builtin_profiles`.
     pub style_profile: String,
+    /// Set aside without deleting its translations, so a language can be paused.
+    #[serde(default = "yes")]
+    pub enabled: bool,
 }
 
-impl Default for Localization {
+fn yes() -> bool {
+    true
+}
+
+impl Target {
+    pub fn new(language: Language, style_profile: impl Into<String>) -> Self {
+        Self {
+            language,
+            style_profile: style_profile.into(),
+            enabled: true,
+        }
+    }
+
+    /// A file-name-safe form of the language tag: `vi-VN` gives `vi-vn`.
+    pub fn slug(&self) -> String {
+        self.language
+            .tag()
+            .to_lowercase()
+            .replace(|c: char| !c.is_ascii_alphanumeric(), "-")
+    }
+}
+
+/// The language the game is written in, and how that was decided.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SourceLanguage {
+    pub language: Language,
+    /// True when detection chose it rather than a person. Kept because a wrong source language
+    /// silently disables every dictionary, and a translator needs to see that it was a guess.
+    #[serde(default)]
+    pub detected: bool,
+}
+
+impl Default for SourceLanguage {
     fn default() -> Self {
         Self {
-            source_language: "auto".to_string(),
-            target_language: "vi-VN".to_string(),
-            style_profile: "natural-dialogue".to_string(),
+            language: Language::new("und"),
+            detected: false,
         }
     }
 }
@@ -84,7 +131,11 @@ pub struct ProjectProfile {
     pub revision: u32,
     pub source: Source,
     #[serde(default)]
-    pub localization: Localization,
+    pub source_language: SourceLanguage,
+    /// The languages being produced. Never empty: a project with no target cannot be built, and
+    /// an empty list is more likely a migration bug than an intention.
+    #[serde(default)]
+    pub targets: Vec<Target>,
     #[serde(default)]
     pub branding: Branding,
     /// A license or permission reference the owner has for this game (§26). Free text: this tool
@@ -93,11 +144,14 @@ pub struct ProjectProfile {
     pub permission_reference: Option<String>,
 }
 
-/// One recorded build, enough to reproduce or undo it.
+/// One recorded build of one language, enough to reproduce or undo it.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BuildRecord {
     pub revision: u32,
+    /// Which target this build was for.
+    #[serde(default)]
+    pub language: Language,
     /// The profile revision this was built from.
     pub profile_revision: u32,
     /// Hash of the original, so a build can never be attributed to the wrong source.
@@ -121,7 +175,7 @@ impl Project {
     /// should not leave a half-created project behind.
     pub fn create(root: impl AsRef<Path>, name: &str, jar: &[u8]) -> crate::Result<Self> {
         let root = root.as_ref().to_path_buf();
-        Archive::read(jar)?;
+        let archive = Archive::read(jar)?;
 
         if root.join("project.json").exists() {
             return Err(crate::Error::InvalidProject {
@@ -137,6 +191,11 @@ impl Project {
         let jar_path = format!("original/{name}.jar");
         std::fs::write(root.join(&jar_path), jar)?;
 
+        // Guessing the source language from the archive beats defaulting to English: a wrong
+        // source language silently disables every dictionary, and the guess is recorded as a
+        // guess so a person can see it was never confirmed.
+        let detected = crate::detect::detect_source_language(&archive);
+
         let profile = ProjectProfile {
             schema_version: SCHEMA_VERSION,
             name: name.to_string(),
@@ -146,7 +205,11 @@ impl Project {
                 sha256: sha256_hex(jar),
                 jad: None,
             },
-            localization: Localization::default(),
+            source_language: SourceLanguage {
+                language: detected.0,
+                detected: true,
+            },
+            targets: vec![Target::new(Language::new("vi-VN"), "natural-dialogue")],
             branding: Branding::default(),
             permission_reference: None,
         };
@@ -164,26 +227,48 @@ impl Project {
             path: root.clone(),
             reason: format!("cannot read project.json: {e}"),
         })?;
-        let profile: ProjectProfile =
+        let raw: serde_json::Value =
             serde_json::from_str(&text).map_err(|e| crate::Error::InvalidProject {
                 path: root.clone(),
                 reason: format!("project.json is not valid: {e}"),
             })?;
 
+        let version = raw
+            .get("schemaVersion")
+            .and_then(|v| v.as_u64())
+            .unwrap_or(0) as u32;
+
         // A newer schema may use fields this build would silently drop on the next save, taking
         // the translator's work with them. Refusing is the safe direction.
-        if profile.schema_version > SCHEMA_VERSION {
+        if version > SCHEMA_VERSION {
             return Err(crate::Error::InvalidProject {
                 path: root,
                 reason: format!(
-                    "project uses schema version {} but this build understands up to {SCHEMA_VERSION}",
-                    profile.schema_version
+                    "project uses schema version {version} but this build understands up to {SCHEMA_VERSION}"
                 ),
             });
         }
 
-        let project = Project { root, profile };
+        let raw = if version < SCHEMA_VERSION {
+            migrate(raw, version)
+        } else {
+            raw
+        };
+
+        let profile: ProjectProfile =
+            serde_json::from_value(raw).map_err(|e| crate::Error::InvalidProject {
+                path: root.clone(),
+                reason: format!("project.json is not valid: {e}"),
+            })?;
+
+        let mut project = Project { root, profile };
         project.verify_original()?;
+
+        // An older project is rewritten in the new shape on open, so the migration happens once
+        // rather than on every read, and the file on disk matches what the tool now believes.
+        if version < SCHEMA_VERSION {
+            project.save()?;
+        }
         Ok(project)
     }
 
@@ -206,10 +291,56 @@ impl Project {
         write_json(&self.root.join("project.json"), &self.profile)
     }
 
-    /// Re-hashes the original and refuses to continue if it changed.
+    /// The language the game is written in.
+    pub fn source_language(&self) -> &Language {
+        &self.profile.source_language.language
+    }
+
+    /// The targets that are switched on.
+    pub fn active_targets(&self) -> Vec<&Target> {
+        self.profile.targets.iter().filter(|t| t.enabled).collect()
+    }
+
+    /// The target for a language, if the project has one.
+    pub fn target(&self, language: &Language) -> Option<&Target> {
+        self.profile
+            .targets
+            .iter()
+            .find(|t| t.language.same_language_as(language) || t.language == *language)
+    }
+
+    fn require_target(&self, language: &Language) -> crate::Result<&Target> {
+        self.target(language)
+            .ok_or_else(|| crate::Error::InvalidProject {
+                path: self.root.clone(),
+                reason: format!("this project has no {language} target"),
+            })
+    }
+
+    /// Adds a language, or returns the existing one unchanged.
+    pub fn add_target(&mut self, language: Language, style_profile: &str) -> crate::Result<()> {
+        if self.target(&language).is_some() {
+            return Ok(());
+        }
+        self.profile
+            .targets
+            .push(Target::new(language, style_profile));
+        self.save()
+    }
+
+    /// Removes a language from the profile.
     ///
-    /// Without this, editing the file under `original/` would produce builds whose recorded
-    /// source hash is a lie, and a rollback would restore something that never existed.
+    /// Its translations and builds are left on disk. Deleting a body of reviewed work because a
+    /// checkbox was cleared is not a thing a tool should do; re-adding the language picks them
+    /// straight back up.
+    pub fn remove_target(&mut self, language: &Language) -> crate::Result<()> {
+        self.profile
+            .targets
+            .retain(|t| !(t.language == *language || t.language.same_language_as(language)));
+        self.save()
+    }
+
+    /// Re-hashes the original and refuses to continue if it changed.
     pub fn verify_original(&self) -> crate::Result<()> {
         let bytes = self.original_bytes()?;
         let actual = sha256_hex(&bytes);
@@ -242,8 +373,7 @@ impl Project {
 
     /// Extracts the content graph (§22, step 5-6).
     ///
-    /// Node ids are derived from location plus original text, so re-extracting after the analyser
-    /// improves keeps every existing translation attached to its node.
+    /// Shared by every target: the source text is the same whatever it is being translated into.
     pub fn extract(&self) -> crate::Result<ContentGraph> {
         let graph = graph::extract(&self.original()?);
         write_json(&self.root.join("content/graph.json"), &graph)?;
@@ -254,83 +384,170 @@ impl Project {
         read_json(&self.root.join("content/graph.json"))
     }
 
-    pub fn translations(&self) -> crate::Result<TranslationStore> {
-        read_json_or_default(&self.root.join("translations/approved.json"))
+    // ---- per-target paths -------------------------------------------------
+    //
+    // Everything a target owns is filed under its language slug, so adding a language cannot
+    // disturb an existing one and removing one leaves the rest intact.
+
+    fn translations_path(&self, target: &Target) -> PathBuf {
+        self.root
+            .join("translations")
+            .join(format!("{}.json", target.slug()))
     }
 
-    pub fn save_translations(&self, store: &TranslationStore) -> crate::Result<()> {
-        write_json(&self.root.join("translations/approved.json"), store)
+    fn candidates_path(&self, target: &Target) -> PathBuf {
+        self.root
+            .join("translations")
+            .join(format!("{}.candidates.json", target.slug()))
     }
 
-    pub fn glossary(&self) -> crate::Result<Glossary> {
-        read_json_or_default(&self.root.join("glossary/glossary.json"))
+    fn glossary_path(&self, target: &Target) -> PathBuf {
+        self.root
+            .join("glossary")
+            .join(format!("{}.json", target.slug()))
     }
 
-    pub fn save_glossary(&self, glossary: &Glossary) -> crate::Result<()> {
-        write_json(&self.root.join("glossary/glossary.json"), glossary)
+    fn memory_path(&self, target: &Target) -> PathBuf {
+        self.root.join("memory").join(format!(
+            "{}-{}.json",
+            self.source_language()
+                .tag()
+                .to_lowercase()
+                .replace(|c: char| !c.is_ascii_alphanumeric(), "-"),
+            target.slug()
+        ))
     }
 
-    pub fn memory(&self) -> crate::Result<TranslationMemory> {
-        read_json_or_default(&self.root.join("memory/memory.json"))
+    fn builds_dir(&self, target: &Target) -> PathBuf {
+        self.root.join("builds").join(target.slug())
     }
 
-    pub fn save_memory(&self, memory: &TranslationMemory) -> crate::Result<()> {
-        write_json(&self.root.join("memory/memory.json"), memory)
+    pub fn translations(&self, language: &Language) -> crate::Result<TranslationStore> {
+        let target = self.require_target(language)?;
+        read_json_or_default(&self.translations_path(target))
     }
 
-    /// Generates translation candidates from the project's memory and glossary (§22, step 9).
-    ///
-    /// Written to translations/candidates.json for review. Nothing is approved here; see
-    /// `suggest::apply_safe` for the narrow case that can be.
-    pub fn suggest(&self, fuzzy_threshold: f32) -> crate::Result<CandidateSet> {
+    pub fn save_translations(
+        &self,
+        language: &Language,
+        store: &TranslationStore,
+    ) -> crate::Result<()> {
+        let target = self.require_target(language)?;
+        write_json(&self.translations_path(target), store)
+    }
+
+    pub fn glossary(&self, language: &Language) -> crate::Result<Glossary> {
+        let target = self.require_target(language)?;
+        read_json_or_default(&self.glossary_path(target))
+    }
+
+    pub fn save_glossary(&self, language: &Language, glossary: &Glossary) -> crate::Result<()> {
+        let target = self.require_target(language)?;
+        write_json(&self.glossary_path(target), glossary)
+    }
+
+    pub fn memory(&self, language: &Language) -> crate::Result<TranslationMemory> {
+        let target = self.require_target(language)?;
+        read_json_or_default(&self.memory_path(target))
+    }
+
+    pub fn save_memory(
+        &self,
+        language: &Language,
+        memory: &TranslationMemory,
+    ) -> crate::Result<()> {
+        let target = self.require_target(language)?;
+        write_json(&self.memory_path(target), memory)
+    }
+
+    /// The dictionary packs available to this project: the ones it carries plus any built in.
+    pub fn dictionary(&self) -> crate::Result<Dictionary> {
+        let mut dictionary = crate::dictionary_data::builtin();
+        let dir = self.root.join("dictionary");
+        if !dir.exists() {
+            return Ok(dictionary);
+        }
+        let mut files: Vec<PathBuf> = std::fs::read_dir(&dir)?
+            .filter_map(|e| e.ok())
+            .map(|e| e.path())
+            .filter(|p| p.extension().is_some_and(|e| e == "json"))
+            .collect();
+        files.sort();
+        for file in files {
+            // A malformed pack a user dropped in should name itself rather than failing the whole
+            // project, so the error carries the file.
+            let pack: crate::dictionary::Pack =
+                read_json(&file).map_err(|e| crate::Error::InvalidProject {
+                    path: file.clone(),
+                    reason: format!("dictionary pack is not valid: {e}"),
+                })?;
+            dictionary.add(pack);
+        }
+        Ok(dictionary)
+    }
+
+    /// Generates translation candidates for one target (§22, step 9).
+    pub fn suggest(
+        &self,
+        language: &Language,
+        fuzzy_threshold: f32,
+    ) -> crate::Result<CandidateSet> {
+        let target = self.require_target(language)?;
         let set = suggest::candidates(
             &self.graph()?,
-            &self.memory()?,
-            &self.glossary()?,
-            &self.translations()?,
+            &self.memory(language)?,
+            &self.glossary(language)?,
+            &self.translations(language)?,
             fuzzy_threshold,
         );
-        write_json(&self.root.join("translations/candidates.json"), &set)?;
+        write_json(&self.candidates_path(target), &set)?;
         Ok(set)
     }
 
-    pub fn candidates(&self) -> crate::Result<CandidateSet> {
-        read_json_or_default(&self.root.join("translations/candidates.json"))
+    pub fn candidates(&self, language: &Language) -> crate::Result<CandidateSet> {
+        let target = self.require_target(language)?;
+        read_json_or_default(&self.candidates_path(target))
     }
 
-    /// Folds every approved translation back into the memory, so later projects reuse this work.
-    pub fn learn(&self) -> crate::Result<usize> {
-        let mut memory = self.memory()?;
-        suggest::learn(&self.graph()?, &self.translations()?, &mut memory);
+    /// Folds approved translations back into this direction's memory.
+    pub fn learn(&self, language: &Language) -> crate::Result<usize> {
+        let mut memory = self.memory(language)?;
+        suggest::learn(&self.graph()?, &self.translations(language)?, &mut memory);
         let count = memory.entries.len();
-        self.save_memory(&memory)?;
+        self.save_memory(language, &memory)?;
         Ok(count)
     }
 
-    /// Builds, validates, records and publishes (§22 steps 15-18, §23).
-    ///
-    /// The output is written under `builds/<revision>/` first and copied to `output/` second, so
-    /// `output/` only ever holds a build that was fully written and whose record exists.
-    pub fn build(&self) -> crate::Result<BuildRecord> {
+    /// Builds, validates, records and publishes one target (§22 steps 15-18, §23).
+    pub fn build(&self, language: &Language) -> crate::Result<BuildRecord> {
         self.verify_original()?;
+        let target = self.require_target(language)?;
         let original = self.original()?;
         let graph = self.graph()?;
-        let translations = self.translations()?;
+        let translations = self.translations(language)?;
 
         let (built, report) =
             build::apply(&original, &graph, &translations, &self.profile.branding)?;
         let bytes = built.write()?;
-        let validation = validate(&original, &built, &graph, &translations);
+        let validation = validate(
+            &original,
+            &built,
+            &graph,
+            &translations,
+            self.source_language(),
+            &target.language,
+        );
 
-        let revision = self.next_build_revision()?;
-        let dir = self.root.join("builds").join(format!("{revision:04}"));
+        let revision = self.next_build_revision(target)?;
+        let dir = self.builds_dir(target).join(format!("{revision:04}"));
         std::fs::create_dir_all(&dir)?;
 
-        let name = self.output_name();
+        let name = self.output_name(target);
         std::fs::write(dir.join(&name), &bytes)?;
 
         let record = BuildRecord {
             revision,
+            language: target.language.clone(),
             profile_revision: self.profile.revision,
             source_sha256: self.profile.source.sha256.clone(),
             translations_applied: translations.len(),
@@ -339,30 +556,45 @@ impl Project {
         };
         write_json(&dir.join("build.json"), &record)?;
 
+        // Written under builds/ first and copied to output/ second, so output/ only ever holds a
+        // build that finished and has a record.
+        std::fs::create_dir_all(self.root.join("output"))?;
         std::fs::write(self.root.join("output").join(&name), &bytes)?;
         Ok(record)
     }
 
-    /// Restores a previous build's output as the current one.
+    /// Builds every enabled target.
     ///
-    /// Nothing is deleted: the earlier build directory stays where it is, so a rollback can
-    /// itself be rolled back.
-    pub fn rollback(&self, revision: u32) -> crate::Result<BuildRecord> {
-        let dir = self.root.join("builds").join(format!("{revision:04}"));
+    /// Each is independent, so one language failing validation does not stop the others: the
+    /// caller gets a record per language and decides what to ship.
+    pub fn build_all(&self) -> crate::Result<Vec<BuildRecord>> {
+        let languages: Vec<Language> = self
+            .active_targets()
+            .iter()
+            .map(|t| t.language.clone())
+            .collect();
+        languages.iter().map(|l| self.build(l)).collect()
+    }
+
+    /// Restores a previous build's output as the current one for that language.
+    pub fn rollback(&self, language: &Language, revision: u32) -> crate::Result<BuildRecord> {
+        let target = self.require_target(language)?;
+        let dir = self.builds_dir(target).join(format!("{revision:04}"));
         let record: BuildRecord =
             read_json(&dir.join("build.json")).map_err(|_| crate::Error::InvalidProject {
                 path: dir.clone(),
                 reason: format!("no build {revision} to roll back to"),
             })?;
-        let name = self.output_name();
+        let name = self.output_name(target);
         let bytes = std::fs::read(dir.join(&name))?;
         std::fs::write(self.root.join("output").join(&name), bytes)?;
         Ok(record)
     }
 
-    /// Recorded builds, oldest first.
-    pub fn builds(&self) -> crate::Result<Vec<BuildRecord>> {
-        let dir = self.root.join("builds");
+    /// Recorded builds for one language, oldest first.
+    pub fn builds(&self, language: &Language) -> crate::Result<Vec<BuildRecord>> {
+        let target = self.require_target(language)?;
+        let dir = self.builds_dir(target);
         let mut records = Vec::new();
         if !dir.exists() {
             return Ok(records);
@@ -381,18 +613,75 @@ impl Project {
         Ok(records)
     }
 
-    /// The localized artifact's file name, derived from the project and target language.
-    pub fn output_name(&self) -> String {
-        format!(
-            "{}-{}.jar",
-            self.profile.name,
-            self.profile.localization.target_language.to_lowercase()
-        )
+    /// The localized artifact's file name for one target.
+    pub fn output_name(&self, target: &Target) -> String {
+        format!("{}-{}.jar", self.profile.name, target.slug())
     }
 
-    fn next_build_revision(&self) -> crate::Result<u32> {
-        Ok(self.builds()?.iter().map(|b| b.revision).max().unwrap_or(0) + 1)
+    /// Where the last build for a language was published, if it is there.
+    pub fn output_path(&self, language: &Language) -> crate::Result<Option<PathBuf>> {
+        let target = self.require_target(language)?;
+        let path = self.root.join("output").join(self.output_name(target));
+        Ok(path.exists().then_some(path))
     }
+
+    fn next_build_revision(&self, target: &Target) -> crate::Result<u32> {
+        Ok(self
+            .builds(&target.language)?
+            .iter()
+            .map(|b| b.revision)
+            .max()
+            .unwrap_or(0)
+            + 1)
+    }
+}
+
+/// Brings an older project.json into the current shape.
+///
+/// Version 2 had one `localization` object; version 3 has a source language and a list of
+/// targets. The old fields are read and translated rather than dropped, so a project started
+/// before multi-language support keeps its target, its register and all of its work.
+fn migrate(mut raw: serde_json::Value, from_version: u32) -> serde_json::Value {
+    if from_version < 3 {
+        let localization = raw.get("localization").cloned().unwrap_or_default();
+        let target_language = localization
+            .get("targetLanguage")
+            .and_then(|v| v.as_str())
+            .unwrap_or("vi-VN")
+            .to_string();
+        let style = localization
+            .get("styleProfile")
+            .and_then(|v| v.as_str())
+            .unwrap_or("natural-dialogue")
+            .to_string();
+        let source_language = localization
+            .get("sourceLanguage")
+            .and_then(|v| v.as_str())
+            .unwrap_or("auto");
+
+        if let Some(object) = raw.as_object_mut() {
+            object.remove("localization");
+            object.insert(
+                "sourceLanguage".into(),
+                serde_json::json!({
+                    // "auto" was version 2's way of saying "not decided", which version 3 writes
+                    // as the undetermined tag so it reads as a language everywhere else.
+                    "language": if source_language == "auto" { "und" } else { source_language },
+                    "detected": source_language == "auto",
+                }),
+            );
+            object.insert(
+                "targets".into(),
+                serde_json::json!([{
+                    "language": target_language,
+                    "styleProfile": style,
+                    "enabled": true,
+                }]),
+            );
+            object.insert("schemaVersion".into(), serde_json::json!(SCHEMA_VERSION));
+        }
+    }
+    raw
 }
 
 fn write_json<T: Serialize>(path: &Path, value: &T) -> crate::Result<()> {

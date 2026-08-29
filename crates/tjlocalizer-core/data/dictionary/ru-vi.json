@@ -1,0 +1,279 @@
+{
+  "from": "ru",
+  "to": "vi-VN",
+  "sourceNote": "Game terminology, Russian to Vietnamese.",
+  "entries": [
+    {
+      "source": "Здоровье",
+      "target": "sinh lực",
+      "domain": "stat"
+    },
+    {
+      "source": "Мана",
+      "target": "nội lực",
+      "domain": "stat"
+    },
+    {
+      "source": "Опыт",
+      "target": "kinh nghiệm",
+      "domain": "stat"
+    },
+    {
+      "source": "Уровень",
+      "target": "cấp độ",
+      "domain": "stat"
+    },
+    {
+      "source": "Атака",
+      "target": "tấn công",
+      "domain": "combat"
+    },
+    {
+      "source": "Защита",
+      "target": "phòng thủ",
+      "domain": "combat"
+    },
+    {
+      "source": "Скорость",
+      "target": "tốc độ",
+      "domain": "stat"
+    },
+    {
+      "source": "Сила",
+      "target": "sức mạnh",
+      "domain": "stat"
+    },
+    {
+      "source": "Ловкость",
+      "target": "nhanh nhẹn",
+      "domain": "stat"
+    },
+    {
+      "source": "Урон",
+      "target": "sát thương",
+      "domain": "combat"
+    },
+    {
+      "source": "Снаряжение",
+      "target": "trang bị",
+      "domain": "item",
+      "priority": 2
+    },
+    {
+      "source": "Оружие",
+      "target": "vũ khí",
+      "domain": "item"
+    },
+    {
+      "source": "Броня",
+      "target": "giáp",
+      "domain": "item"
+    },
+    {
+      "source": "Предмет",
+      "target": "vật phẩm",
+      "domain": "item"
+    },
+    {
+      "source": "Предметы",
+      "target": "vật phẩm",
+      "domain": "item"
+    },
+    {
+      "source": "Инвентарь",
+      "target": "hành trang",
+      "domain": "ui"
+    },
+    {
+      "source": "Зелье",
+      "target": "thuốc",
+      "domain": "item"
+    },
+    {
+      "source": "Материал",
+      "target": "nguyên liệu",
+      "domain": "item"
+    },
+    {
+      "source": "Навык",
+      "target": "kỹ năng",
+      "domain": "skill"
+    },
+    {
+      "source": "Умение",
+      "target": "kỹ năng",
+      "domain": "skill"
+    },
+    {
+      "source": "Заклинание",
+      "target": "phép",
+      "domain": "skill"
+    },
+    {
+      "source": "Задание",
+      "target": "nhiệm vụ",
+      "domain": "quest"
+    },
+    {
+      "source": "Квест",
+      "target": "nhiệm vụ",
+      "domain": "quest"
+    },
+    {
+      "source": "Награда",
+      "target": "phần thưởng",
+      "domain": "quest"
+    },
+    {
+      "source": "Гильдия",
+      "target": "bang hội",
+      "domain": "social",
+      "priority": 2
+    },
+    {
+      "source": "Друзья",
+      "target": "bạn bè",
+      "domain": "social"
+    },
+    {
+      "source": "Чат",
+      "target": "trò chuyện",
+      "domain": "social"
+    },
+    {
+      "source": "Группа",
+      "target": "tổ đội",
+      "domain": "social"
+    },
+    {
+      "source": "Торговля",
+      "target": "giao dịch",
+      "domain": "social"
+    },
+    {
+      "source": "Да",
+      "target": "có",
+      "domain": "ui"
+    },
+    {
+      "source": "Нет",
+      "target": "không",
+      "domain": "ui"
+    },
+    {
+      "source": "Отмена",
+      "target": "huỷ",
+      "domain": "ui"
+    },
+    {
+      "source": "Назад",
+      "target": "quay lại",
+      "domain": "ui"
+    },
+    {
+      "source": "Выход",
+      "target": "thoát",
+      "domain": "ui"
+    },
+    {
+      "source": "Настройки",
+      "target": "cài đặt",
+      "domain": "ui"
+    },
+    {
+      "source": "Помощь",
+      "target": "trợ giúp",
+      "domain": "ui"
+    },
+    {
+      "source": "Магазин",
+      "target": "cửa hàng",
+      "domain": "ui"
+    },
+    {
+      "source": "Купить",
+      "target": "mua",
+      "domain": "ui"
+    },
+    {
+      "source": "Продать",
+      "target": "bán",
+      "domain": "ui"
+    },
+    {
+      "source": "Сохранить",
+      "target": "lưu",
+      "domain": "ui"
+    },
+    {
+      "source": "Загрузить",
+      "target": "tải",
+      "domain": "ui"
+    },
+    {
+      "source": "Новая игра",
+      "target": "trò chơi mới",
+      "domain": "ui"
+    },
+    {
+      "source": "Продолжить",
+      "target": "chơi tiếp",
+      "domain": "ui"
+    },
+    {
+      "source": "Меню",
+      "target": "menu",
+      "domain": "ui"
+    },
+    {
+      "source": "Персонаж",
+      "target": "nhân vật",
+      "domain": "ui"
+    },
+    {
+      "source": "Бой",
+      "target": "chiến đấu",
+      "domain": "combat"
+    },
+    {
+      "source": "Победа",
+      "target": "chiến thắng",
+      "domain": "combat"
+    },
+    {
+      "source": "Поражение",
+      "target": "thất bại",
+      "domain": "combat"
+    },
+    {
+      "source": "Монстр",
+      "target": "quái vật",
+      "domain": "combat"
+    },
+    {
+      "source": "Золото",
+      "target": "vàng",
+      "domain": "stat"
+    },
+    {
+      "source": "Сервер",
+      "target": "máy chủ",
+      "domain": "system"
+    },
+    {
+      "source": "Ошибка",
+      "target": "lỗi",
+      "domain": "system"
+    },
+    {
+      "source": "Загрузка",
+      "target": "đang tải",
+      "domain": "system"
+    },
+    {
+      "source": "Карта",
+      "target": "bản đồ",
+      "domain": "ui"
+    }
+  ]
+}

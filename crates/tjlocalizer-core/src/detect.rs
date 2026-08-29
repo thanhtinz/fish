@@ -219,3 +219,79 @@ fn detect_obfuscation(archive: &Archive, out: &mut CapabilityManifest) {
         );
     }
 }
+
+/// Guesses the language a game is written in, from the text it actually contains.
+///
+/// Returns the tag and a confidence. This matters more than it looks: every dictionary is keyed
+/// by direction, so a wrong source language silently disables all of them and the tool quietly
+/// stops proposing anything. Guessing and saying it was a guess beats defaulting to English.
+///
+/// The method is script counting over the extracted strings. It cannot tell Simplified from
+/// Traditional reliably from a handful of strings, so it reports `zh` and lets a person narrow it.
+pub fn detect_source_language(archive: &Archive) -> (crate::lang::Language, f32) {
+    use crate::lang::Language;
+
+    let mut han = 0usize;
+    let mut kana = 0usize;
+    let mut hangul = 0usize;
+    let mut cyrillic = 0usize;
+    let mut thai = 0usize;
+    let mut latin = 0usize;
+    let mut vietnamese = 0usize;
+
+    for entry in archive.classes() {
+        let Ok(class) = ClassFile::parse(&entry.data) else {
+            continue;
+        };
+        for literal in class.string_literals() {
+            let Some(text) = &literal.decoded else {
+                continue;
+            };
+            for c in text.chars() {
+                match c as u32 {
+                    0x3040..=0x30FF => kana += 1,
+                    0xAC00..=0xD7AF | 0x1100..=0x11FF => hangul += 1,
+                    0x4E00..=0x9FFF | 0x3400..=0x4DBF => han += 1,
+                    0x0400..=0x04FF => cyrillic += 1,
+                    0x0E00..=0x0E7F => thai += 1,
+                    // Latin letters carrying a mark, which in this range is overwhelmingly
+                    // Vietnamese in a game archive.
+                    0x00C0..=0x024F | 0x1E00..=0x1EFF => {
+                        vietnamese += 1;
+                        latin += 1;
+                    }
+                    0x41..=0x5A | 0x61..=0x7A => latin += 1,
+                    _ => {}
+                }
+            }
+        }
+    }
+
+    let total = han + kana + hangul + cyrillic + thai + latin;
+    if total == 0 {
+        return (Language::new("und"), 0.0);
+    }
+
+    // Japanese is checked before Chinese: Japanese text is mostly Han characters with some kana,
+    // so any kana at all outweighs a large Han count.
+    let share = |n: usize| n as f32 / total as f32;
+    if kana > 0 && share(kana + han) > 0.2 {
+        return (Language::new("ja"), (share(kana) * 4.0).clamp(0.5, 0.95));
+    }
+    if hangul > 0 && share(hangul) > 0.1 {
+        return (Language::new("ko"), share(hangul).clamp(0.5, 0.95));
+    }
+    if share(han) > 0.1 {
+        return (Language::new("zh"), share(han).clamp(0.5, 0.95));
+    }
+    if share(thai) > 0.1 {
+        return (Language::new("th"), share(thai).clamp(0.5, 0.95));
+    }
+    if share(cyrillic) > 0.1 {
+        return (Language::new("ru"), share(cyrillic).clamp(0.5, 0.95));
+    }
+    if vietnamese > 0 && share(vietnamese) > 0.02 {
+        return (Language::new("vi-VN"), 0.7);
+    }
+    (Language::new("en"), share(latin).clamp(0.4, 0.9))
+}

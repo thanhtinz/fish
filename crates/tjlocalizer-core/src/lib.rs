@@ -9,12 +9,19 @@
 pub mod build;
 pub mod classfile;
 pub mod detect;
+pub mod dictionary;
+pub mod dictionary_data;
 pub mod encoding;
 pub mod error;
 pub mod graph;
 pub mod jar;
+pub mod lang;
 pub mod project;
+pub mod quality;
+pub mod register;
 pub mod suggest;
+pub mod translate;
+pub mod translation;
 pub mod validate;
 pub mod vietnamese;
 

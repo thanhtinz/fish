@@ -1,0 +1,267 @@
+{
+  "from": "en",
+  "to": "th",
+  "sourceNote": "Game terminology, English to Thai.",
+  "entries": [
+    {
+      "source": "HP",
+      "target": "พลังชีวิต",
+      "domain": "stat"
+    },
+    {
+      "source": "MP",
+      "target": "พลังเวท",
+      "domain": "stat"
+    },
+    {
+      "source": "EXP",
+      "target": "ค่าประสบการณ์",
+      "domain": "stat"
+    },
+    {
+      "source": "Level",
+      "target": "เลเวล",
+      "domain": "stat"
+    },
+    {
+      "source": "Attack",
+      "target": "โจมตี",
+      "domain": "combat"
+    },
+    {
+      "source": "Defense",
+      "target": "ป้องกัน",
+      "domain": "combat"
+    },
+    {
+      "source": "Speed",
+      "target": "ความเร็ว",
+      "domain": "stat"
+    },
+    {
+      "source": "Damage",
+      "target": "ความเสียหาย",
+      "domain": "combat"
+    },
+    {
+      "source": "Equipment",
+      "target": "อุปกรณ์สวมใส่",
+      "domain": "item"
+    },
+    {
+      "source": "Weapon",
+      "target": "อาวุธ",
+      "domain": "item"
+    },
+    {
+      "source": "Armor",
+      "target": "เกราะ",
+      "domain": "item"
+    },
+    {
+      "source": "Item",
+      "target": "ไอเทม",
+      "domain": "item"
+    },
+    {
+      "source": "Inventory",
+      "target": "กระเป๋า",
+      "domain": "ui"
+    },
+    {
+      "source": "Potion",
+      "target": "ยา",
+      "domain": "item"
+    },
+    {
+      "source": "Material",
+      "target": "วัตถุดิบ",
+      "domain": "item"
+    },
+    {
+      "source": "Skill",
+      "target": "สกิล",
+      "domain": "skill"
+    },
+    {
+      "source": "Quest",
+      "target": "เควส",
+      "domain": "quest"
+    },
+    {
+      "source": "Reward",
+      "target": "รางวัล",
+      "domain": "quest"
+    },
+    {
+      "source": "Complete",
+      "target": "สำเร็จ",
+      "domain": "quest"
+    },
+    {
+      "source": "Guild",
+      "target": "กิลด์",
+      "domain": "social"
+    },
+    {
+      "source": "Friend",
+      "target": "เพื่อน",
+      "domain": "social"
+    },
+    {
+      "source": "Chat",
+      "target": "แชท",
+      "domain": "social"
+    },
+    {
+      "source": "Party",
+      "target": "ปาร์ตี้",
+      "domain": "social"
+    },
+    {
+      "source": "Trade",
+      "target": "แลกเปลี่ยน",
+      "domain": "social"
+    },
+    {
+      "source": "OK",
+      "target": "ตกลง",
+      "domain": "ui"
+    },
+    {
+      "source": "Cancel",
+      "target": "ยกเลิก",
+      "domain": "ui"
+    },
+    {
+      "source": "Back",
+      "target": "ย้อนกลับ",
+      "domain": "ui"
+    },
+    {
+      "source": "Exit",
+      "target": "ออก",
+      "domain": "ui"
+    },
+    {
+      "source": "Settings",
+      "target": "ตั้งค่า",
+      "domain": "ui"
+    },
+    {
+      "source": "Help",
+      "target": "ช่วยเหลือ",
+      "domain": "ui"
+    },
+    {
+      "source": "Shop",
+      "target": "ร้านค้า",
+      "domain": "ui"
+    },
+    {
+      "source": "Buy",
+      "target": "ซื้อ",
+      "domain": "ui"
+    },
+    {
+      "source": "Sell",
+      "target": "ขาย",
+      "domain": "ui"
+    },
+    {
+      "source": "Use",
+      "target": "ใช้",
+      "domain": "ui"
+    },
+    {
+      "source": "Yes",
+      "target": "ใช่",
+      "domain": "ui"
+    },
+    {
+      "source": "No",
+      "target": "ไม่",
+      "domain": "ui"
+    },
+    {
+      "source": "Save",
+      "target": "บันทึก",
+      "domain": "ui"
+    },
+    {
+      "source": "Load",
+      "target": "โหลด",
+      "domain": "ui"
+    },
+    {
+      "source": "New Game",
+      "target": "เกมใหม่",
+      "domain": "ui"
+    },
+    {
+      "source": "Continue",
+      "target": "เล่นต่อ",
+      "domain": "ui"
+    },
+    {
+      "source": "Menu",
+      "target": "เมนู",
+      "domain": "ui"
+    },
+    {
+      "source": "Character",
+      "target": "ตัวละคร",
+      "domain": "ui"
+    },
+    {
+      "source": "Battle",
+      "target": "ต่อสู้",
+      "domain": "combat"
+    },
+    {
+      "source": "Victory",
+      "target": "ชนะ",
+      "domain": "combat"
+    },
+    {
+      "source": "Defeat",
+      "target": "แพ้",
+      "domain": "combat"
+    },
+    {
+      "source": "Monster",
+      "target": "มอนสเตอร์",
+      "domain": "combat"
+    },
+    {
+      "source": "Gold",
+      "target": "ทอง",
+      "domain": "stat"
+    },
+    {
+      "source": "Server",
+      "target": "เซิร์ฟเวอร์",
+      "domain": "system"
+    },
+    {
+      "source": "Error",
+      "target": "ข้อผิดพลาด",
+      "domain": "system"
+    },
+    {
+      "source": "Loading",
+      "target": "กำลังโหลด",
+      "domain": "system"
+    },
+    {
+      "source": "Map",
+      "target": "แผนที่",
+      "domain": "ui"
+    },
+    {
+      "source": "Start Game",
+      "target": "เริ่มเกม",
+      "domain": "ui"
+    }
+  ]
+}
