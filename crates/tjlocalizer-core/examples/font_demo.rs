@@ -3,7 +3,8 @@
 //! The tests assert that the tones differ from one another; only an eye can say whether they are
 //! the right shapes at this size.
 
-use tjlocalizer_core::font::sheet::{extend, Grid, Image, Sheet};
+use tjlocalizer_core::font::outline::MarkSource;
+use tjlocalizer_core::font::sheet::{extend_with_marks, Grid, Image, Sheet};
 use tjlocalizer_core::font::vietnamese_compositions;
 
 /// A 5x7 blocky letter for each ASCII character, in the style of a J2ME game's own font.
@@ -142,13 +143,19 @@ fn scaled(image: &Image, scale: u32) -> Image {
 
 fn main() {
     let out = std::env::args().nth(1).unwrap_or_else(|| "font.png".into());
+    let marks = std::env::args()
+        .nth(2)
+        .map(|p| MarkSource::from_path(std::path::Path::new(&p)).expect("font"));
     let sheet = stroke_font();
-    let (extended, report) = extend(&sheet, &vietnamese_compositions()).expect("composition");
+    let (extended, report) =
+        extend_with_marks(&sheet, &vietnamese_compositions(), marks.as_ref()).expect("composition");
 
     println!(
-        "{} glyphs added, {} skipped",
+        "{} glyphs added, {} skipped, {} marks from {}",
         report.added.len(),
-        report.skipped.len()
+        report.skipped.len(),
+        report.from_typeface,
+        report.typeface.as_deref().unwrap_or("(drawn by hand)")
     );
     for skipped in &report.skipped {
         println!("  {} - {}", skipped.composed, skipped.reason);

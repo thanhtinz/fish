@@ -14,7 +14,8 @@
 use crate::build::{self, Branding, BuildReport};
 use crate::detect::{self, CapabilityManifest};
 use crate::dictionary::Dictionary;
-use crate::font::sheet::{extend, Grid, Image, Sheet};
+use crate::font::outline::MarkSource;
+use crate::font::sheet::{extend_with_marks, Grid, Image, Sheet};
 use crate::font::{self, Coverage, CoverageReport};
 use crate::graph::{self, ContentGraph};
 use crate::jar::{sha256_hex, Archive};
@@ -596,11 +597,15 @@ impl Project {
     /// It does not install the sheet. Making the game *use* the new glyphs means changing how it
     /// looks them up, which is per-game and belongs to the rule engine (§19) - not built. This
     /// produces the artwork and says so.
-    pub fn compose_font(&self) -> crate::Result<Option<(PathBuf, font::sheet::Extension)>> {
+    pub fn compose_font(
+        &self,
+        marks: Option<&MarkSource>,
+    ) -> crate::Result<Option<(PathBuf, font::sheet::Extension)>> {
         let Some(sheet) = self.font_sheet()? else {
             return Ok(None);
         };
-        let (extended, report) = extend(&sheet, &font::vietnamese_compositions())?;
+        let (extended, report) =
+            extend_with_marks(&sheet, &font::vietnamese_compositions(), marks)?;
 
         let dir = self.root.join("fonts");
         std::fs::create_dir_all(&dir)?;
@@ -616,6 +621,8 @@ impl Project {
                 "grid": extended.grid,
                 "order": extended.order.iter().collect::<String>(),
                 "added": report.added.iter().collect::<String>(),
+                "marksFromTypeface": report.from_typeface,
+                "typeface": report.typeface,
                 "skipped": report.skipped,
                 "note": "Glyphs only. Making the game use them requires changing its font lookup, which is per-game and is not done here.",
             }),

@@ -67,6 +67,47 @@ the dot), the glyph is **skipped and reported** with the measurement:
 skipped á - only 0 clear rows above the letter, 2 needed
 ```
 
+## Borrowing the diacritic shapes from a typeface
+
+The letter has to come from the game or the result does not belong. The **mark** does not — a tone
+mark is the same shape in every typeface, and drawing one by hand in four pixels gives a blunt
+approximation of it. So a font can be pointed at:
+
+```sh
+tjlocalizer font projects/game --compose --marks-from ~/fonts/SomeFont.otf
+```
+
+The mark is lifted by subtraction: rasterise `ế` and `e` at a size where the base matches the
+game's letter, and the mark is what the first has that the second does not. Any font with
+Vietnamese letters serves.
+
+**The font is read from where you keep it and never copied into the project.** A font is somebody's
+work under somebody's licence, and a localization tool has no business redistributing one.
+
+### Why it is not simply better
+
+A typeface's diacritics are drawn for reading sizes. Rasterised into the cells these games
+actually use, they thin out. Measured on a real font, against a sheet with the same letters:
+
+| Cell | Drawn by hand | Borrowed from the typeface |
+| --- | --- | --- |
+| 12 px | 0 identical pairs | **55 identical pairs** |
+| 16 px | 0 | **16** |
+| 24 px | 0 | 5 |
+| 32 px | 0 | 0 |
+
+Fifty-five identical pairs at 12 px means `à` and `á` are the same picture, and "bà" and "bá" are
+the same word on screen. J2ME games use 12 and 16 pixel cells.
+
+So a borrowed mark is kept **only where the letter it produces stays unlike every other one on the
+sheet**, and the drawn mark — built for this size — is used everywhere else. The check is per
+glyph, against every cell already on the sheet including the game's own, so an invisible mark
+cannot make `á` a picture of `a` either. With that rule the same font yields 48 of 134 marks at
+12 px and about 101 at 24 px, with no identical pairs at any size.
+
+The report says which: "48 of 134 marks taken from …; the rest were drawn, because a borrowed one
+would have made two letters identical."
+
 ## What it does not do
 
 **It does not install the font.** Making the game *use* the new glyphs means changing how it looks
@@ -101,6 +142,9 @@ Worth recording, because both would have shipped as "the font looks a bit odd":
 - **`â` and `ã` were drawn identically.** The circumflex and the tilde were both a three-pixel
   caret — pixel for pixel the same mark. `ân` and `ãn` are different words. The tilde is now a
   four-pixel wave, and a test asserts no two composed letters share a bitmap.
+- **Borrowed diacritics made 55 pairs of letters identical** at the size these games use. Caught
+  by measuring rather than by looking: the marks are individually plausible, and only comparing
+  every pair shows that `à` and `á` had become the same bitmap.
 - **A blank cell crashed the bounds scan.** `then_some` evaluates its argument eagerly, so a cell
   with no ink underflowed on `max_x - min_x`. The space character is a blank cell, so this was
   reachable on any ordinary sheet.

@@ -11,6 +11,7 @@ use clap::{Parser, Subcommand};
 use std::path::{Path, PathBuf};
 use tjlocalizer_core::build::Branding;
 use tjlocalizer_core::dictionary::Dictionary;
+use tjlocalizer_core::font::outline::MarkSource;
 use tjlocalizer_core::font::sheet::Grid;
 use tjlocalizer_core::graph::ContentGraph;
 use tjlocalizer_core::jar::Archive;
@@ -202,6 +203,14 @@ enum Command {
         /// Build a sheet with the missing Vietnamese letters composed from the game's own.
         #[arg(long)]
         compose: bool,
+        /// Take the diacritic shapes from this font file rather than drawing them.
+        ///
+        /// The font is read from where it is and never copied into the project. A borrowed mark
+        /// is used only where the letter it makes stays unlike every other: at the sizes these
+        /// games use, a real typeface's diacritics thin out until a grave and an acute are the
+        /// same two pixels.
+        #[arg(long)]
+        marks_from: Option<PathBuf>,
     },
 
     /// List the register profiles this build ships.
@@ -658,6 +667,7 @@ fn run(cli: Cli) -> Result<()> {
             columns,
             device_font,
             compose,
+            marks_from,
         } => {
             let mut project = Project::open(&project)?;
 
@@ -747,7 +757,21 @@ fn run(cli: Cli) -> Result<()> {
             }
 
             if compose {
-                match project.compose_font()? {
+                let marks = match &marks_from {
+                    Some(path) => {
+                        let source = MarkSource::from_path(path)?;
+                        if !source.covers_vietnamese() {
+                            eprintln!(
+                                "warning: {} does not cover every Vietnamese letter; the ones it \
+                                 lacks will be drawn instead",
+                                path.display()
+                            );
+                        }
+                        Some(source)
+                    }
+                    None => None,
+                };
+                match project.compose_font(marks.as_ref())? {
                     None => bail!("declare a glyph sheet first, with --sheet"),
                     Some((path, report)) => {
                         println!(
@@ -755,6 +779,14 @@ fn run(cli: Cli) -> Result<()> {
                             report.added.len(),
                             path.display()
                         );
+                        if let Some(typeface) = &report.typeface {
+                            println!(
+                                "  {} of {} marks taken from {typeface}; the rest were drawn, \
+                                 because a borrowed one would have made two letters identical",
+                                report.from_typeface,
+                                report.added.len()
+                            );
+                        }
                         for skipped in report.skipped.iter().take(8) {
                             println!("  skipped {} - {}", skipped.composed, skipped.reason);
                         }

@@ -9,6 +9,7 @@
 //! Nothing here decides *where* a game's font lives or how it indexes into it. Those are
 //! game-specific and belong to rules and plugins; this module is handed a sheet and a geometry.
 
+use crate::font::outline::MarkSource;
 use crate::font::{Composition, Tone, VowelMark};
 use crate::Result;
 use serde::{Deserialize, Serialize};
@@ -308,6 +309,13 @@ pub struct Extension {
     pub skipped: Vec<Skipped>,
     pub columns: u32,
     pub rows: u32,
+    /// How many marks came from a typeface rather than being drawn. The rest fell back, which
+    /// happens when the typeface lacks the letter or the mark does not fit at this size.
+    #[serde(default)]
+    pub from_typeface: usize,
+    /// Which typeface, when one was used. Its name only - the font itself is never copied.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub typeface: Option<String>,
 }
 
 /// Builds a new sheet holding the original glyphs followed by the composed ones.
@@ -317,6 +325,18 @@ pub struct Extension {
 /// means the game must be told about them - that wiring is a per-game patch and belongs to the
 /// rule engine, not here. This function makes the glyphs; it does not claim to install them.
 pub fn extend(sheet: &Sheet, compositions: &[Composition]) -> Result<(Sheet, Extension)> {
+    extend_with_marks(sheet, compositions, None)
+}
+
+/// The same, taking the mark shapes from a typeface rather than drawing them.
+///
+/// A tone mark is the same shape in every typeface, and drawing one by hand in four pixels gives a
+/// blunt approximation of it. The letter still comes from the game - only the mark is borrowed.
+pub fn extend_with_marks(
+    sheet: &Sheet,
+    compositions: &[Composition],
+    marks: Option<&MarkSource>,
+) -> Result<(Sheet, Extension)> {
     let grid = sheet.grid;
     let mut order = sheet.order.clone();
     let mut added = Vec::new();
@@ -366,8 +386,40 @@ pub fn extend(sheet: &Sheet, compositions: &[Composition]) -> Result<(Sheet, Ext
 
     let mut extended = Sheet::new(image, Grid { rows, ..grid }, order, sheet.background);
 
+    // Every cell already on the sheet, so a composed letter can never come out looking like one
+    // the game already draws - an invisible mark would make á a picture of a.
+    let mut seen: std::collections::HashMap<Vec<[u8; 4]>, char> = Default::default();
+    for (i, c) in sheet.order.iter().enumerate() {
+        seen.insert(fingerprint(&extended, i as u32), *c);
+    }
+
+    let mut from_typeface = 0usize;
     for (composition, index) in plan {
-        draw(sheet, &mut extended, composition, index);
+        let used_typeface = draw(sheet, &mut extended, composition, index, marks);
+        let mut print = fingerprint(&extended, index);
+
+        // A typeface's diacritics are drawn for reading sizes. Rasterised into a twelve-pixel
+        // cell they thin out until a grave and an acute are the same two pixels - measured at 55
+        // identical pairs out of 134 on a real font, which would make "bà" and "bá" the same
+        // word on screen. So a borrowed mark is kept only when the letter it produces is still
+        // unlike every other; otherwise the drawn mark, which is built for this size, is used.
+        if used_typeface && seen.contains_key(&print) {
+            clear_cell(&mut extended, index);
+            draw(sheet, &mut extended, composition, index, None);
+            print = fingerprint(&extended, index);
+        } else if used_typeface {
+            from_typeface += 1;
+        }
+
+        if let Some(other) = seen.insert(print, composition.composed) {
+            skipped.push(Skipped {
+                composed: composition.composed,
+                reason: format!(
+                    "at this size it draws exactly like {other:?}, which would make them the \
+                     same word on screen"
+                ),
+            });
+        }
     }
 
     Ok((
@@ -377,8 +429,32 @@ pub fn extend(sheet: &Sheet, compositions: &[Composition]) -> Result<(Sheet, Ext
             skipped,
             columns,
             rows,
+            from_typeface,
+            typeface: marks.map(|m| m.name.clone()),
         },
     ))
+}
+
+/// Every pixel of one cell, for comparing glyphs.
+fn fingerprint(sheet: &Sheet, index: u32) -> Vec<[u8; 4]> {
+    let (ox, oy) = sheet.grid.cell_origin(index);
+    let mut out = Vec::with_capacity((sheet.grid.cell_width * sheet.grid.cell_height) as usize);
+    for y in 0..sheet.grid.cell_height {
+        for x in 0..sheet.grid.cell_width {
+            out.push(sheet.image.get(ox + x, oy + y));
+        }
+    }
+    out
+}
+
+fn clear_cell(sheet: &mut Sheet, index: u32) {
+    let (ox, oy) = sheet.grid.cell_origin(index);
+    let background = sheet.background;
+    for y in 0..sheet.grid.cell_height {
+        for x in 0..sheet.grid.cell_width {
+            sheet.image.set(ox + x, oy + y, background);
+        }
+    }
 }
 
 /// Whether a composed glyph has room for its marks.
@@ -416,9 +492,17 @@ fn no_room(base: &InkBounds, composition: &Composition, cell_height: u32) -> Opt
 }
 
 /// Copies the base letter into its new cell and adds the marks.
-fn draw(source: &Sheet, target: &mut Sheet, composition: &Composition, index: u32) {
+///
+/// Returns whether the marks came from a typeface.
+fn draw(
+    source: &Sheet,
+    target: &mut Sheet,
+    composition: &Composition,
+    index: u32,
+    marks: Option<&MarkSource>,
+) -> bool {
     let Some(base) = source.ink_bounds(composition.base) else {
-        return;
+        return false;
     };
     let colour = source
         .ink_colour(composition.base)
@@ -434,6 +518,17 @@ fn draw(source: &Sheet, target: &mut Sheet, composition: &Composition, index: u3
         }
     }
 
+    // A typeface gives the whole difference between the base letter and the composed one in one
+    // piece - modification and tone together, already positioned relative to each other - so it
+    // is stamped as a unit rather than reconstructed mark by mark.
+    if let Some(source_font) = marks {
+        if let Some(mark) = source_font.mark_for(composition, base.height) {
+            if !mark.is_empty() && stamp(target, dx, dy, &base, &mark, colour) {
+                return true;
+            }
+        }
+    }
+
     // The vowel modification goes on first; the tone stacks above whatever is there.
     let mut ceiling = base.top();
     if let Some(mark) = composition.vowel_mark {
@@ -442,6 +537,47 @@ fn draw(source: &Sheet, target: &mut Sheet, composition: &Composition, index: u3
     if let Some(tone) = composition.tone {
         draw_tone(target, dx, dy, &base, ceiling, tone, colour);
     }
+    false
+}
+
+/// Stamps a rasterised mark over the letter, centred on it.
+///
+/// Returns false when it would fall outside the cell: a clipped tone mark is a different word, so
+/// the caller falls back to a drawn one rather than shipping a cropped shape.
+fn stamp(
+    target: &mut Sheet,
+    dx: u32,
+    dy: u32,
+    base: &InkBounds,
+    mark: &crate::font::outline::Mark,
+    colour: [u8; 4],
+) -> bool {
+    // The typeface's own horizontal offset is for its own letterforms, which are not the game's,
+    // so the mark is centred over the game's letter instead. The vertical offset is kept: how far
+    // a mark sits above a letter is part of the mark.
+    let left = base.x as i32 + (base.width as i32 - mark.width as i32) / 2;
+    let top = base.y as i32 + mark.dy;
+
+    if left < 0
+        || top < 0
+        || left as u32 + mark.width > target.grid.cell_width
+        || top as u32 + mark.height > target.grid.cell_height
+    {
+        return false;
+    }
+
+    for y in 0..mark.height {
+        for x in 0..mark.width {
+            // Half coverage or more counts as ink: these sheets have no antialiasing, and a game
+            // that colour-keys its font would treat a blended pixel as background.
+            if mark.coverage[(y * mark.width + x) as usize] >= 128 {
+                target
+                    .image
+                    .set(dx + left as u32 + x, dy + top as u32 + y, colour);
+            }
+        }
+    }
+    true
 }
 
 /// Draws the vowel modification and returns the new topmost ink row.

@@ -21,3 +21,4 @@ zip.workspace = true
 encoding_rs.workspace = true
 ureq.workspace = true
 png.workspace = true
+ab_glyph.workspace = true

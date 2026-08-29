@@ -15,6 +15,7 @@
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 
+pub mod outline;
 pub mod sheet;
 
 /// A modification to the vowel itself, not a tone.
