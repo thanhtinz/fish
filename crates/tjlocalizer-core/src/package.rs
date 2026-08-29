@@ -116,6 +116,22 @@ pub struct OpaqueResource {
     pub reason: String,
 }
 
+/// Identifies a game that was imported as a directory.
+///
+/// A directory cannot be told apart from a zip by looking at the entries - once ingested they are
+/// the same shape - so the kind is *given* here rather than guessed. What is guessed is the
+/// engine, and that comes from the file names the scan already listed, which is why it arrives as
+/// evidence a person can argue with rather than as a verdict.
+pub fn detect_tree(archive: &Archive, evidence: Vec<String>) -> Detected {
+    let (readable, opaque) = survey(archive);
+    Detected {
+        kind: Kind::Directory,
+        evidence,
+        readable,
+        opaque,
+    }
+}
+
 /// Identifies a package from what is inside it.
 pub fn detect(archive: &Archive) -> Detected {
     let names: Vec<&str> = archive.entries().iter().map(|e| e.name.as_str()).collect();

@@ -65,7 +65,9 @@ pub fn apply(
     translations: &TranslationStore,
     branding: &Branding,
 ) -> Result<(Archive, BuildReport)> {
-    let mut archive = Archive::read(&original.write()?)?;
+    // A plain clone. This used to zip the whole archive and parse it straight back, which for a
+    // game directory would mean compressing forty thousand files in order to change three strings.
+    let mut archive = original.clone();
     let mut report = BuildReport::default();
 
     let mut by_class: BTreeMap<&str, Vec<(u16, &str)>> = BTreeMap::new();

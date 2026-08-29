@@ -23,6 +23,7 @@ use tjlocalizer_core::register;
 use tjlocalizer_core::secrets::Keys;
 use tjlocalizer_core::suggest::{self, Origin};
 use tjlocalizer_core::translate::{self, Completeness, DictionaryProvider, Request};
+use tjlocalizer_core::tree;
 use tjlocalizer_core::validate::{inspect, Severity, ValidationReport};
 
 #[derive(Parser)]
@@ -46,8 +47,13 @@ enum Command {
     /// A J2ME or Java JAR, an Android APK, an iOS IPA, or a zip of files: all of them are ZIP
     /// archives underneath, and which one it is is worked out from what is inside rather than
     /// from the extension. `analyze` then says what can and cannot be done with it.
+    ///
+    /// A PC game installed on disk is a directory rather than a file, and that works too: the
+    /// tree is walked without opening anything, and only the files in a format this build reads
+    /// are copied into the project.
     Import {
-        /// The game: .jar, .apk, .ipa or .zip.
+        /// The game: a .jar, .apk, .ipa or .zip file, or the directory a PC game is installed
+        /// in. A directory is scanned and only the files worth reading are copied in.
         jar: PathBuf,
         /// Where to create the project. Defaults to projects/<name>.
         #[arg(long)]
@@ -397,7 +403,7 @@ fn run(cli: Cli) -> Result<()> {
                 jar.display(),
                 project.root().display()
             );
-            println!("  sha256 {}", p.source.sha256);
+            println!("  sha256 {}", p.source.sha256());
             println!(
                 "  source {} ({})",
                 p.source_language.language.display_name(),
@@ -1604,14 +1610,33 @@ fn import(
     targets: &[String],
     source_language: Option<String>,
 ) -> Result<Project> {
-    let bytes = std::fs::read(jar).with_context(|| format!("cannot read {}", jar.display()))?;
+    // A game is either one file or a directory, and which it is decides everything below. For a
+    // directory the name comes from the folder, which is what a person would have called it.
     let name = name.unwrap_or_else(|| {
-        jar.file_stem()
-            .map(|s| s.to_string_lossy().to_string())
+        jar.file_name()
+            .map(|s| {
+                let full = s.to_string_lossy().to_string();
+                if jar.is_dir() {
+                    full
+                } else {
+                    jar.file_stem()
+                        .map(|s| s.to_string_lossy().to_string())
+                        .unwrap_or(full)
+                }
+            })
             .unwrap_or_else(|| "game".to_string())
     });
     let root = into.unwrap_or_else(|| PathBuf::from("projects").join(&name));
-    let mut project = Project::create(&root, &name, &bytes)?;
+
+    let mut project = if jar.is_dir() {
+        let (project, ingested) =
+            Project::create_from_tree(&root, &name, jar, &tree::Limits::default())?;
+        report_ingest(&ingested);
+        project
+    } else {
+        let bytes = std::fs::read(jar).with_context(|| format!("cannot read {}", jar.display()))?;
+        Project::create(&root, &name, &bytes)?
+    };
 
     if let Some(tag) = source_language {
         let profile = project.profile_mut();
@@ -1634,6 +1659,48 @@ fn import(
     }
     project.save()?;
     Ok(project)
+}
+
+/// What a directory game gave up, before anything else is said about it.
+///
+/// The two numbers people need are how big the game is and how little of it was read, and they
+/// need them in that order: "41 812 files, 23 read" is reassuring, "23 files" on its own sounds
+/// like a mistake. Files passed over for a reason are listed individually, because a 300 MB JSON
+/// skipped for its size is exactly what somebody needs to know about.
+fn report_ingest(ingested: &tree::Ingested) {
+    println!(
+        "{} files ({}), read {} ({})",
+        ingested.scanned,
+        human_size(ingested.total_size),
+        ingested.files.len(),
+        human_size(ingested.files.iter().map(|f| f.size).sum()),
+    );
+    for line in &ingested.evidence {
+        println!("  {line}");
+    }
+    if !ingested.skipped.is_empty() {
+        println!();
+        println!("passed over, and worth knowing about:");
+        for skipped in &ingested.skipped {
+            println!(
+                "  {:<44} {:>10}  {}",
+                skipped.path,
+                human_size(skipped.size),
+                skipped.reason
+            );
+        }
+    }
+}
+
+fn human_size(bytes: u64) -> String {
+    const MIB: u64 = 1024 * 1024;
+    if bytes >= MIB {
+        format!("{:.1} MB", bytes as f64 / MIB as f64)
+    } else if bytes >= 1024 {
+        format!("{} kB", bytes / 1024)
+    } else {
+        format!("{bytes} B")
+    }
 }
 
 /// Shows what the engines make of the strings nobody has translated.

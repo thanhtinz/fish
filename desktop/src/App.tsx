@@ -178,6 +178,25 @@ export function App() {
     }
   }
 
+  /// A PC game is installed as a folder, not shipped as a file. The two numbers reported back are
+  /// the point: how big the game is, and how little of it needed reading.
+  async function doImportFolder() {
+    const game = await pickFolder("Chọn thư mục game đã cài");
+    if (!game) return;
+    const into = await pickFolder("Chọn thư mục chứa dự án");
+    if (!into) return;
+    const found = await run("import", () => api.importTree(game, into, null, []));
+    if (found) {
+      await loadProject(found.project.path);
+      const skipped = found.skipped.length
+        ? `; ${found.skipped.length} file bị bỏ qua, xem tab Tổng quan`
+        : "";
+      say(
+        `${found.scanned.toLocaleString("vi-VN")} file, đọc ${found.read}${skipped}`,
+      );
+    }
+  }
+
   async function doOpen() {
     const dir = await pickFolder("Chọn thư mục dự án");
     if (dir) await loadProject(dir);
@@ -331,6 +350,9 @@ export function App() {
             <button className="primary" disabled={busy !== null} onClick={doImport}>
               Nhập file game…
             </button>
+            <button disabled={busy !== null} onClick={doImportFolder}>
+              Nhập thư mục game…
+            </button>
             <button disabled={busy !== null} onClick={doOpen}>
               Mở dự án có sẵn…
             </button>
@@ -343,12 +365,15 @@ export function App() {
               <div className="inner">
                 <h2>Chưa mở dự án nào</h2>
                 <p>
-                  Nhập một file game (.jar, .apk, .ipa, .zip) để bắt đầu. Bản gốc được băm và giữ nguyên vẹn; mọi thứ khác
-                  đều dựng lại được từ nó.
+                  Nhập một file game (.jar, .apk, .ipa, .zip), hoặc trỏ thẳng vào thư mục một game PC
+                  đã cài. Bản gốc được băm và giữ nguyên vẹn; mọi thứ khác đều dựng lại được từ nó.
                 </p>
-                <button className="primary" onClick={doImport}>
-                  Nhập file game…
-                </button>
+                <div className="row" style={{ justifyContent: "center" }}>
+                  <button className="primary" onClick={doImport}>
+                    Nhập file game…
+                  </button>
+                  <button onClick={doImportFolder}>Nhập thư mục game…</button>
+                </div>
               </div>
             </div>
           ) : (

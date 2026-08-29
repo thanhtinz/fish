@@ -161,7 +161,7 @@ fn removing_a_language_keeps_its_translations() {
 fn a_schema_2_project_is_migrated_rather_than_refused() {
     let dir = TempDir::new("migrate");
     let project = Project::create(&dir.0, "game", &fixture()).unwrap();
-    let sha = project.profile().source.sha256.clone();
+    let sha = project.profile().source.sha256().to_string();
     drop(project);
 
     let legacy = serde_json::json!({

@@ -308,3 +308,20 @@ export interface ReviewNoteView {
   detail: string;
   suggestion?: string;
 }
+
+/** What importing a game directory found, and what it passed over. */
+export interface IngestView {
+  project: ProjectSummary;
+  scanned: number;
+  totalSize: number;
+  read: number;
+  readSize: number;
+  evidence: string[];
+  skipped: SkippedView[];
+}
+
+export interface SkippedView {
+  path: string;
+  size: number;
+  reason: string;
+}

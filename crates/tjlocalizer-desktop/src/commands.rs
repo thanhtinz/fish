@@ -23,6 +23,7 @@ use tjlocalizer_core::register;
 use tjlocalizer_core::secrets::Keys;
 use tjlocalizer_core::translate::Provider as _;
 use tjlocalizer_core::translate::{self, DictionaryProvider, Request};
+use tjlocalizer_core::tree;
 use tjlocalizer_core::{dictionary_data, suggest};
 
 /// Errors reach the interface as text, because that is all it can do with them: show them. The
@@ -107,6 +108,65 @@ pub fn import_jar(
     let summary = ProjectSummary::of(&project);
     Recents::load(&config_dir(&app)).remember(&config_dir(&app), &summary.path);
     Ok(summary)
+}
+
+/// Imports a game that is installed on disk as a directory.
+///
+/// The tree is walked without opening anything, and only the files in a format this build reads
+/// are copied in. What comes back says how many files the game holds and how few of them were
+/// read, because "23 files" on its own reads like a mistake and "41 812 files, 23 read" does not.
+#[tauri::command]
+pub fn import_tree(
+    app: tauri::AppHandle,
+    game_path: String,
+    into: String,
+    name: Option<String>,
+    targets: Vec<String>,
+) -> Reply<IngestView> {
+    let game = Path::new(&game_path);
+    let name = name.filter(|n| !n.trim().is_empty()).unwrap_or_else(|| {
+        game.file_name()
+            .map(|s| s.to_string_lossy().to_string())
+            .unwrap_or_else(|| "game".to_string())
+    });
+    let root = Path::new(&into).join(&name);
+
+    let (mut project, ingested) =
+        Project::create_from_tree(&root, &name, game, &tree::Limits::default()).map_err(err)?;
+
+    if !targets.is_empty() {
+        project.profile_mut().targets = targets
+            .iter()
+            .map(|tag| {
+                let language = Language::new(tag.as_str());
+                let style = default_style(&language);
+                tjlocalizer_core::project::Target::new(language, style)
+            })
+            .collect();
+        project.save().map_err(err)?;
+    }
+
+    let dir = config_dir(&app);
+    let summary = ProjectSummary::of(&project);
+    Recents::load(&dir).remember(&dir, &summary.path);
+
+    Ok(IngestView {
+        project: summary,
+        scanned: ingested.scanned,
+        total_size: ingested.total_size,
+        read: ingested.files.len(),
+        read_size: ingested.files.iter().map(|f| f.size).sum(),
+        evidence: ingested.evidence,
+        skipped: ingested
+            .skipped
+            .into_iter()
+            .map(|s| SkippedView {
+                path: s.path,
+                size: s.size,
+                reason: s.reason,
+            })
+            .collect(),
+    })
 }
 
 #[tauri::command]

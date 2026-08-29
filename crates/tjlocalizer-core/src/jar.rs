@@ -52,13 +52,29 @@ impl ArchiveEntry {
 }
 
 /// A JAR loaded into memory, with entry order preserved.
-#[derive(Debug)]
+///
+/// `Clone` because the build needs a writable copy of the original and used to get one by zipping
+/// the whole archive and parsing it back - which for a game directory means compressing forty
+/// thousand files to change three strings.
+#[derive(Debug, Clone)]
 pub struct Archive {
     entries: Vec<ArchiveEntry>,
     pub sha256: String,
 }
 
 impl Archive {
+    /// An archive with nothing in it, for a source that is not a zip.
+    ///
+    /// A directory has no container bytes to hash, so the `sha256` here is empty and the caller
+    /// pins the tree by its own manifest instead. Everything downstream reads `entries()`, not
+    /// this field.
+    pub fn empty() -> Self {
+        Archive {
+            entries: Vec::new(),
+            sha256: String::new(),
+        }
+    }
+
     pub fn read(bytes: &[u8]) -> Result<Self> {
         Self::read_with_limits(bytes, &ArchiveLimits::default())
     }

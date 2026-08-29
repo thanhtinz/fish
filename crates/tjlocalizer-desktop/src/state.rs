@@ -169,7 +169,7 @@ impl ProjectSummary {
             source_language_name: profile.source_language.language.display_name(),
             source_language_detected: profile.source_language.detected,
             targets,
-            source_sha256: profile.source.sha256.clone(),
+            source_sha256: profile.source.sha256().to_string(),
             revision: profile.revision,
             branding_enabled: profile.branding.enabled,
             needs_analyze: !project.root().join("extracted/capabilities.json").exists(),
@@ -324,6 +324,31 @@ pub struct SuggestionView {
     pub confidence: f32,
     /// The model that said so, so a stale suggestion can be told from a fresh one.
     pub model: String,
+}
+
+/// What importing a game directory found, and what it passed over.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct IngestView {
+    pub project: ProjectSummary,
+    /// How many files the game holds in total. Shown first, because "23 files" on its own reads
+    /// like something went wrong and "41 812 files, 23 read" reads like the tool did its job.
+    pub scanned: usize,
+    pub total_size: u64,
+    pub read: usize,
+    pub read_size: u64,
+    /// What the game looks like it was made with, from names alone.
+    pub evidence: Vec<String>,
+    pub skipped: Vec<SkippedView>,
+}
+
+/// A file that was found and not read, with the reason.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SkippedView {
+    pub path: String,
+    pub size: u64,
+    pub reason: String,
 }
 
 /// A direction the dictionary covers, for the settings screen.

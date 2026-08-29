@@ -30,9 +30,10 @@ use std::path::{Path, PathBuf};
 /// The project.json schema this build reads and writes.
 ///
 /// Version 3 replaced the single `localization` object with a list of targets, so one project can
-/// be shipped in several languages from one body of extracted text. A version 2 project is
-/// migrated on open rather than refused: its one target becomes the first entry.
-pub const SCHEMA_VERSION: u32 = 3;
+/// be shipped in several languages from one body of extracted text. Version 4 made the source a
+/// tagged union, because a game can now be a directory rather than a file. Older projects are
+/// migrated on open rather than refused.
+pub const SCHEMA_VERSION: u32 = 4;
 
 /// Directories created for every project. Listed once so `create` and the documentation cannot
 /// drift apart.
@@ -54,15 +55,53 @@ pub const DIRECTORIES: &[&str] = &[
     "output",
 ];
 
-/// The imported artifact, pinned by hash.
+/// Where the game came from, pinned by hash.
+///
+/// Tagged rather than untagged: `#[serde(untagged)]` would pick whichever variant happened to
+/// deserialize, and a project file matched to the wrong variant is the kind of bug that eats
+/// somebody's work quietly. The tag makes a wrong file an error instead.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Source {
-    /// Project-relative path to the untouched original.
-    pub jar: String,
-    pub sha256: String,
-    /// Companion descriptor, when the game shipped with one.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub jad: Option<String>,
+#[serde(tag = "kind", rename_all = "kebab-case")]
+pub enum Source {
+    /// One file - a JAR, an APK, an IPA, a zip - copied whole into the project.
+    Archive {
+        /// Project-relative path to the untouched original.
+        jar: String,
+        sha256: String,
+        /// Companion descriptor, when the game shipped with one.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        jad: Option<String>,
+    },
+    /// A game that sits on disk as a directory, of which the files worth reading were copied in.
+    Tree {
+        /// Where the game was when it was imported. Recorded so a person can find it again, never
+        /// trusted: a game moves, and a drive gets remounted somewhere else.
+        root: String,
+        /// The hash of a manifest of everything ingested - see `tree::manifest_sha256`. A
+        /// directory has no bytes of its own to hash.
+        sha256: String,
+    },
+}
+
+impl Source {
+    /// The hash that pins this source, whichever kind it is.
+    pub fn sha256(&self) -> &str {
+        match self {
+            Source::Archive { sha256, .. } | Source::Tree { sha256, .. } => sha256,
+        }
+    }
+
+    /// What to call this source in a message to a person.
+    pub fn label(&self) -> &str {
+        match self {
+            Source::Archive { jar, .. } => jar,
+            Source::Tree { root, .. } => root,
+        }
+    }
+
+    pub fn is_tree(&self) -> bool {
+        matches!(self, Source::Tree { .. })
+    }
 }
 
 /// One language this project is being shipped in.
@@ -271,7 +310,7 @@ impl Project {
             schema_version: SCHEMA_VERSION,
             name: name.to_string(),
             revision: 0,
-            source: Source {
+            source: Source::Archive {
                 jar: jar_path,
                 sha256: sha256_hex(jar),
                 jad: None,
@@ -292,6 +331,105 @@ impl Project {
         let mut project = Project { root, profile };
         project.save()?;
         Ok(project)
+    }
+
+    /// Imports a game that sits on disk as a directory.
+    ///
+    /// A sibling of `create` rather than a wider `create`, because `create`'s signature is used by
+    /// nineteen tests that have nothing to do with directories, and widening it would mean editing
+    /// all of them to say the same thing they say now.
+    ///
+    /// Only the files worth reading are copied in - see `tree::ingest`. They are *copied*, not
+    /// only hashed, because the original has to stay reachable byte for byte after Steam has
+    /// updated over the game.
+    pub fn create_from_tree(
+        root: impl AsRef<Path>,
+        name: &str,
+        game: impl AsRef<Path>,
+        limits: &crate::tree::Limits,
+    ) -> crate::Result<(Self, crate::tree::Ingested)> {
+        let root = root.as_ref().to_path_buf();
+        let game = game.as_ref();
+
+        if root.join("project.json").exists() {
+            return Err(crate::Error::InvalidProject {
+                path: root,
+                reason: "a project already exists here".to_string(),
+            });
+        }
+        if !game.is_dir() {
+            return Err(crate::Error::InvalidProject {
+                path: game.to_path_buf(),
+                reason: "not a directory".to_string(),
+            });
+        }
+
+        let scan = crate::tree::scan(game, limits);
+        let ingested = crate::tree::ingest(game, scan, limits)?;
+        if ingested.files.is_empty() {
+            return Err(crate::Error::InvalidProject {
+                path: game.to_path_buf(),
+                reason: format!(
+                    "none of the {} files here are in a format this build can read",
+                    ingested.scanned
+                ),
+            });
+        }
+
+        for dir in DIRECTORIES {
+            std::fs::create_dir_all(root.join(dir))?;
+        }
+
+        // The copies, written from the bytes already read rather than by reading the game again:
+        // a second read could catch a different version of the file than the one that was hashed.
+        // Written before project.json, so a run that fails halfway leaves no project claiming to
+        // have pinned an original it does not hold.
+        let pinned = root.join("original/tree");
+        for entry in ingested.archive.entries() {
+            let destination = pinned.join(&entry.name);
+            if let Some(parent) = destination.parent() {
+                std::fs::create_dir_all(parent)?;
+            }
+            std::fs::write(&destination, &entry.data)?;
+        }
+
+        let record = crate::tree::TreeRecord {
+            root: game.to_string_lossy().to_string(),
+            files: ingested.files.clone(),
+            skipped: ingested.skipped.clone(),
+            scanned: ingested.scanned,
+            total_size: ingested.total_size,
+            unread_files_are_not_hashed: true,
+            evidence: ingested.evidence.clone(),
+        };
+        write_json(&root.join("original/tree.json"), &record)?;
+
+        let detected = crate::detect::detect_source_language(&ingested.archive);
+
+        let profile = ProjectProfile {
+            schema_version: SCHEMA_VERSION,
+            name: name.to_string(),
+            revision: 0,
+            source: Source::Tree {
+                root: game.to_string_lossy().to_string(),
+                sha256: crate::tree::manifest_sha256(&ingested.files),
+            },
+            source_language: SourceLanguage {
+                language: detected.0,
+                detected: true,
+            },
+            targets: vec![Target::new(Language::new("vi-VN"), "natural-dialogue")],
+            branding: Branding::default(),
+            permission_reference: None,
+            provider: None,
+            claude: None,
+            text_assets: Vec::new(),
+            font: None,
+        };
+
+        let mut project = Project { root, profile };
+        project.save()?;
+        Ok((project, ingested))
     }
 
     /// Opens an existing project and verifies the original has not been touched.
@@ -416,33 +554,98 @@ impl Project {
     }
 
     /// Re-hashes the original and refuses to continue if it changed.
+    ///
+    /// A tree is hashed through its manifest, so this stays one comparison for both kinds of
+    /// source rather than becoming a loop with failure modes of its own.
     pub fn verify_original(&self) -> crate::Result<()> {
-        let bytes = self.original_bytes()?;
-        let actual = sha256_hex(&bytes);
-        if actual != self.profile.source.sha256 {
+        let actual = match &self.profile.source {
+            Source::Archive { .. } => sha256_hex(&self.original_bytes()?),
+            // Re-hashed from the copies on disk, not read back out of tree.json. Comparing the
+            // record with itself always passes, which is a check that checks nothing.
+            Source::Tree { .. } => crate::tree::manifest_sha256(&self.pinned_now()?),
+        };
+        if actual != self.profile.source.sha256() {
             return Err(crate::Error::InvalidProject {
                 path: self.root.clone(),
                 reason: format!(
                     "the original has been modified: project.json records {} but {} is {actual}",
-                    self.profile.source.sha256, self.profile.source.jar
+                    self.profile.source.sha256(),
+                    self.profile.source.label()
                 ),
             });
         }
         Ok(())
     }
 
-    pub fn original_bytes(&self) -> crate::Result<Vec<u8>> {
-        Ok(std::fs::read(self.root.join(&self.profile.source.jar))?)
+    /// What was pinned when a directory game was imported.
+    pub fn tree_record(&self) -> crate::Result<crate::tree::TreeRecord> {
+        read_json(&self.root.join("original/tree.json"))
     }
 
+    /// The pinned originals as they are on disk right now, hashed afresh.
+    ///
+    /// A file that has gone missing hashes as absent rather than being skipped: a manifest that
+    /// silently shrank would match nothing and say nothing about why.
+    fn pinned_now(&self) -> crate::Result<Vec<crate::tree::Pinned>> {
+        let root = self.root.join("original/tree");
+        self.tree_record()?
+            .files
+            .into_iter()
+            .map(|file| {
+                let data = std::fs::read(root.join(&file.path)).unwrap_or_default();
+                Ok(crate::tree::Pinned {
+                    size: data.len() as u64,
+                    sha256: sha256_hex(&data),
+                    path: file.path,
+                })
+            })
+            .collect()
+    }
+
+    /// The imported file's bytes. Only an archive source has any.
+    pub fn original_bytes(&self) -> crate::Result<Vec<u8>> {
+        match &self.profile.source {
+            Source::Archive { jar, .. } => Ok(std::fs::read(self.root.join(jar))?),
+            Source::Tree { .. } => Err(crate::Error::InvalidProject {
+                path: self.root.clone(),
+                reason: "this project's game is a directory, so it has no single file".into(),
+            }),
+        }
+    }
+
+    /// The original, as the twenty-six functions downstream want it.
+    ///
+    /// For a directory this rebuilds the archive from the copies under `original/tree/` rather
+    /// than from the game itself. That is the point of copying rather than only hashing: the
+    /// original stays reachable byte for byte after Steam has updated over the game.
     pub fn original(&self) -> crate::Result<Archive> {
-        Archive::read(&self.original_bytes()?)
+        match &self.profile.source {
+            Source::Archive { .. } => Archive::read(&self.original_bytes()?),
+            Source::Tree { .. } => {
+                let record = self.tree_record()?;
+                let pinned = self.root.join("original/tree");
+                let mut archive = Archive::empty();
+                for file in &record.files {
+                    archive.insert(file.path.clone(), std::fs::read(pinned.join(&file.path))?);
+                }
+                Ok(archive)
+            }
+        }
     }
 
     /// Detects capabilities and writes the manifest (§22, step 4).
     /// What kind of package this is, and how far this tool can take it (§7).
     pub fn package(&self) -> crate::Result<crate::package::Detected> {
-        Ok(crate::package::detect(&self.original()?))
+        let archive = self.original()?;
+        match &self.profile.source {
+            Source::Archive { .. } => Ok(crate::package::detect(&archive)),
+            // A directory cannot be recognised from its entries once ingested - it looks like a
+            // zip - so the kind is given and the engine evidence comes from the scan.
+            Source::Tree { .. } => Ok(crate::package::detect_tree(
+                &archive,
+                self.tree_record()?.evidence,
+            )),
+        }
     }
 
     pub fn analyze(&self) -> crate::Result<CapabilityManifest> {
@@ -1117,6 +1320,17 @@ impl Project {
 
     /// Builds, validates, records and publishes one target (§22 steps 15-18, §23).
     pub fn build(&self, language: &Language) -> crate::Result<BuildRecord> {
+        // A directory game has no single file to write, and writing one anyway would produce an
+        // extensionless zip nobody asked for and nothing can install. It builds to a patch
+        // directory instead, which this build does not write yet - so it says so.
+        if self.profile.source.is_tree() {
+            return Err(crate::Error::InvalidProject {
+                path: self.root.clone(),
+                reason: "this game is a directory: it builds to a patch directory of changed \
+                         files, which this build cannot write yet"
+                    .into(),
+            });
+        }
         self.verify_original()?;
         let target = self.require_target(language)?;
         let original = self.original()?;
@@ -1180,7 +1394,7 @@ impl Project {
             revision,
             language: target.language.clone(),
             profile_revision: self.profile.revision,
-            source_sha256: self.profile.source.sha256.clone(),
+            source_sha256: self.profile.source.sha256().to_string(),
             translations_applied: translations.len(),
             report,
             rules,
@@ -1247,11 +1461,18 @@ impl Project {
 
     /// The localized artifact's file name for one target.
     pub fn output_name(&self, target: &Target) -> String {
-        let extension = std::path::Path::new(&self.profile.source.jar)
-            .extension()
-            .map(|e| e.to_string_lossy().to_string())
-            .unwrap_or_else(|| "jar".into());
-        format!("{}-{}.{extension}", self.profile.name, target.slug())
+        match &self.profile.source {
+            Source::Archive { jar, .. } => {
+                let extension = std::path::Path::new(jar)
+                    .extension()
+                    .map(|e| e.to_string_lossy().to_string())
+                    .unwrap_or_else(|| "jar".into());
+                format!("{}-{}.{extension}", self.profile.name, target.slug())
+            }
+            // A directory game builds to a directory of changed files, so there is no extension
+            // to keep - and offering one would name a folder as though it were a file.
+            Source::Tree { .. } => format!("{}-{}", self.profile.name, target.slug()),
+        }
     }
 
     /// Where the last build for a language was published, if it is there.
@@ -1314,8 +1535,22 @@ fn migrate(mut raw: serde_json::Value, from_version: u32) -> serde_json::Value {
                     "enabled": true,
                 }]),
             );
-            object.insert("schemaVersion".into(), serde_json::json!(SCHEMA_VERSION));
         }
+    }
+
+    // Version 4 made the source a tagged union. A version 3 source is the archive variant; saying
+    // so here is the whole migration.
+    if from_version < 4 {
+        if let Some(source) = raw.get_mut("source").and_then(|s| s.as_object_mut()) {
+            source.insert("kind".into(), serde_json::json!("archive"));
+        }
+    }
+
+    // Stamped once, outside the per-version blocks. It used to sit inside the version 3 block,
+    // so a version 3 file came out of here still labelled 3 - harmless only because `save`
+    // rewrites the struct afterwards.
+    if let Some(object) = raw.as_object_mut() {
+        object.insert("schemaVersion".into(), serde_json::json!(SCHEMA_VERSION));
     }
     raw
 }

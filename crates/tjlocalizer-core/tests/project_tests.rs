@@ -50,13 +50,18 @@ fn import_lays_out_the_directory_and_pins_the_original() {
         assert!(dir.0.join(name).is_dir(), "{name} should have been created");
     }
     assert_eq!(project.profile().schema_version, SCHEMA_VERSION);
-    assert_eq!(project.profile().source.jar, "original/sample-game.jar");
-    assert_eq!(project.profile().source.sha256.len(), 64);
+    // A tagged union on disk since version 4: a file game and a directory game are told apart by
+    // the tag, not by which shape happens to deserialize.
+    assert!(matches!(
+        project.profile().source,
+        tjlocalizer_core::project::Source::Archive { ref jar, .. } if jar == "original/sample-game.jar"
+    ));
+    assert_eq!(project.profile().source.sha256().len(), 64);
     assert_eq!(project.profile().targets[0].language.tag(), "vi-VN");
 
     // The recorded hash must be the hash of the bytes that were handed in, not of a re-zip.
     assert_eq!(
-        project.profile().source.sha256,
+        project.profile().source.sha256(),
         tjlocalizer_core::jar::sha256_hex(&fixture())
     );
 }
@@ -74,8 +79,8 @@ fn reopening_gives_back_the_same_profile() {
     let reopened = Project::open(&dir.0).unwrap();
     assert_eq!(reopened.profile().name, project.profile().name);
     assert_eq!(
-        reopened.profile().source.sha256,
-        project.profile().source.sha256
+        reopened.profile().source.sha256(),
+        project.profile().source.sha256()
     );
 }
 
@@ -96,7 +101,7 @@ fn saving_bumps_the_revision() {
 fn a_modified_original_is_reported_rather_than_used() {
     let (dir, project) = new_project("tampered");
     std::fs::write(
-        dir.0.join(&project.profile().source.jar),
+        dir.0.join(project.profile().source.label()),
         b"not a jar any more",
     )
     .unwrap();
@@ -187,7 +192,7 @@ fn build_records_what_it_produced_and_publishes_the_output() {
     let record = project.build(&vi()).unwrap();
     assert_eq!(record.revision, 1);
     assert_eq!(record.profile_revision, project.profile().revision);
-    assert_eq!(record.source_sha256, project.profile().source.sha256);
+    assert_eq!(record.source_sha256, project.profile().source.sha256());
     assert_eq!(record.translations_applied, 1);
     assert_eq!(record.report.literals_patched, 1);
     assert!(

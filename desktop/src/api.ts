@@ -19,6 +19,7 @@ import type {
   GridView,
   ImageAssetView,
   ImportReport,
+  IngestView,
   InspectionView,
   LanguageView,
   NodeView,
@@ -90,6 +91,9 @@ export const api = {
 
   importJar: (jarPath: string, into: string, name: string | null, targets: string[]) =>
     call<ProjectSummary>("import_jar", { jarPath, into, name, targets }),
+
+  importTree: (gamePath: string, into: string, name: string | null, targets: string[]) =>
+    call<IngestView>("import_tree", { gamePath, into, name, targets }),
 
   openProject: (path: string) => call<ProjectSummary>("open_project", { path }),
   projectSummary: (path: string) => call<ProjectSummary>("project_summary", { path }),

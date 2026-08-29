@@ -18,6 +18,42 @@ From what is inside, never from the extension:
 | Android package | `AndroidManifest.xml` and a `classes.dex` | **no** |
 | iOS application | a `Payload/*.app/` directory | **no** |
 | Zip of files | none of the above | yes |
+| Directory | given, not guessed — see below | yes, as a patch |
+
+## A game that is a folder
+
+A PC game is installed, not shipped: it sits on disk as a directory of forty thousand files. That
+does not fit "read the bytes of one archive", so importing a directory is two steps, and keeping
+them apart is the design.
+
+**The scan opens nothing.** It walks the tree and records paths and sizes. That is what lets the
+tool say *"41 812 files, 23 read"* before a single file is opened — and the order of those two
+numbers matters, because "23 files" on its own reads like something went wrong.
+
+**Ingestion then reads only what is worth reading**: files whose extension is one this build
+actually does something with (`properties`, `strings`, `xml`, `json`, `po`, `ini`, `txt`, `rpy`,
+`locres`, `csv` and a few more), under 8 MiB each and 64 MiB in total. What it produces is an
+`Archive` — the same type an APK or a JAR becomes — which is why detection, extraction, the build,
+the rules and validation all run on a directory without a line of change.
+
+Files passed over come in two kinds and are treated differently. A texture is not mentioned: four
+hundred lines saying "this PNG is not text" would bury the one line that matters. A **text file
+skipped for its size is named, with its size and the reason**, because a 300 MB JSON quietly
+dropped is exactly what a translator finds out about far too late.
+
+What was read is **copied** into `original/tree/`, not merely hashed — so the project still holds
+the bytes it started from after Steam has updated over the game, or the drive was unplugged. The
+tree is pinned by the hash of a manifest of those copies, which keeps `verify_original` a single
+comparison; and it re-hashes the copies on disk rather than reading the recorded hashes back,
+because comparing a record with itself is a check that checks nothing.
+
+The files that were **not** read were not hashed either. `original/tree.json` says so in as many
+words rather than leaving a whole-game guarantee to be assumed: hashing forty gigabytes on every
+open is not something anyone would wait for.
+
+The engine is guessed from the file names the scan already collected — a Unity `*_Data` directory,
+`project.godot`, `Engine/Binaries/`, `steam_api64` — and reported as **evidence**, beside what was
+concluded, so a wrong answer can be argued with.
 
 ## The two that cannot be rebuilt
 

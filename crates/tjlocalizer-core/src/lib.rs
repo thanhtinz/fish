@@ -32,6 +32,7 @@ pub mod shorten;
 pub mod suggest;
 pub mod translate;
 pub mod translation;
+pub mod tree;
 pub mod validate;
 pub mod vietnamese;
 pub mod writeback;
