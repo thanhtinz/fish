@@ -864,6 +864,16 @@ impl From<tjlocalizer_core::shorten::Alternative> for AlternativeView {
     }
 }
 
+/// Something in a game's code that looks like part of its font lookup (§16).
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct FontLookupView {
+    pub class: String,
+    /// `columns`, `rows`, `cell-width`, `cell-height` or `character-order`.
+    pub what: String,
+    pub value: String,
+}
+
 /// What changed in the drawing since the one somebody accepted (§25).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]

@@ -1865,15 +1865,52 @@ fn run(cli: Cli) -> Result<()> {
             if install_font {
                 let rule = project.font_install_rule()?;
                 let id = rule.id.clone();
+                let actions = rule.then.len();
                 project.put_rule(rule)?;
                 println!("wrote rule {id}, switched off");
                 println!("  it replaces the sheet.");
-                println!(
-                    "  Making the game read the new rows needs a change this cannot guess: add it"
-                );
-                println!(
-                    "  as setIntConstant or setStringConstant in rules/rules.json, then enable it."
-                );
+
+                let candidates = project.font_lookup_candidates()?;
+                if candidates.is_empty() {
+                    println!(
+                        "  Nothing in this game looked like where the sheet's shape is written \
+                         down,"
+                    );
+                    println!(
+                        "  so making it read the new rows is left for a person: add it as \
+                         setIntConstant"
+                    );
+                    println!("  or setStringConstant in rules/rules.json, then enable it.");
+                } else {
+                    println!(
+                        "  These look like the game's own record of the sheet's shape - what was \
+                         found,"
+                    );
+                    println!("  not what was verified:");
+                    for candidate in &candidates {
+                        println!(
+                            "    {} holds {} as {}",
+                            candidate.class,
+                            if candidate.value.chars().count() > 24 {
+                                format!(
+                                    "{:?}…",
+                                    &candidate.value.chars().take(24).collect::<String>()
+                                )
+                            } else {
+                                format!("{:?}", candidate.value)
+                            },
+                            candidate.what.key()
+                        );
+                    }
+                    if actions > 1 {
+                        println!(
+                            "  {} of them are in the rule as proposed changes. Read them against \
+                             the game",
+                            actions - 1
+                        );
+                        println!("  you know, delete what does not belong, then enable it.");
+                    }
+                }
             }
             for (id, state) in [(enable, true), (disable, false)] {
                 if let Some(id) = id {

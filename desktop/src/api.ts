@@ -19,6 +19,7 @@ import type {
   GridView,
   ImageAssetView,
   ContextView,
+  FontLookupView,
   RegressionView,
   PluginsView,
   ReadingView,
@@ -209,6 +210,9 @@ export const api = {
 
   proofSheet: (path: string, language: string, scale: number | null) =>
     call<string | null>("proof_sheet", { path, language, scale }),
+
+  fontLookupCandidates: (path: string) =>
+    call<FontLookupView[]>("font_lookup_candidates", { path }),
 
   visualRegression: (path: string, language: string, scale: number | null) =>
     call<RegressionView>("visual_regression", { path, language, scale }),

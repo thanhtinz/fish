@@ -216,6 +216,43 @@ pub struct ProjectProfile {
     pub emulator: Option<crate::regress::Emulator>,
 }
 
+/// Something in a game's code that looks like part of its font lookup (§16).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FontLookup {
+    pub class: String,
+    pub what: LookupEvidence,
+    /// What was found there, as text: a number, or the string listing the characters.
+    pub value: String,
+}
+
+/// What kind of thing was found.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum LookupEvidence {
+    /// A number equal to the sheet's column count.
+    Columns,
+    /// A number equal to its row count - the one a taller sheet changes.
+    Rows,
+    CellWidth,
+    CellHeight,
+    /// A string listing the sheet's characters, in the sheet's order.
+    Order,
+}
+
+impl LookupEvidence {
+    /// What this is, for an interface that has to say it.
+    pub fn key(self) -> &'static str {
+        match self {
+            LookupEvidence::Columns => "columns",
+            LookupEvidence::Rows => "rows",
+            LookupEvidence::CellWidth => "cell-width",
+            LookupEvidence::CellHeight => "cell-height",
+            LookupEvidence::Order => "character-order",
+        }
+    }
+}
+
 /// Where a game's glyph sheet is and how it is laid out.
 ///
 /// Given rather than guessed at: a grid inferred from one sheet is a guess about that sheet, and
@@ -1407,6 +1444,70 @@ impl Project {
     /// It refuses to pretend otherwise. A rule that replaced the image and stopped would leave a
     /// game drawing its old letters from a taller sheet, which is a display bug rather than a
     /// missing feature, and much harder to see.
+    /// Where in the game's code the shape of its glyph sheet appears to be written down (§16).
+    ///
+    /// The half of a font swap this tool could not do: replacing the image is the same in every
+    /// game, and telling the game the sheet is now taller - and which character each new cell
+    /// holds - is per-game code. It cannot be inferred. It can, however, be *looked for*, and
+    /// what turns up is far more useful than an empty box: a class holding the number 16 when the
+    /// sheet has 16 columns, or a string listing the sheet's characters in the sheet's order, is
+    /// almost always the lookup.
+    ///
+    /// Evidence, never a decision. Every candidate says what was found and where, a person reads
+    /// it against the game they know, and nothing is patched until they enable the rule.
+    pub fn font_lookup_candidates(&self) -> crate::Result<Vec<FontLookup>> {
+        let Some(sheet) = self.font_sheet()? else {
+            return Ok(Vec::new());
+        };
+        let archive = self.original()?;
+        let order: String = sheet.order.iter().collect();
+
+        let mut found = Vec::new();
+        for entry in archive.classes() {
+            let Ok(class) = crate::classfile::ClassFile::parse(&entry.data) else {
+                continue;
+            };
+
+            for (_, value) in class.integers() {
+                let what = if value == sheet.grid.columns as i32 {
+                    LookupEvidence::Columns
+                } else if value == sheet.grid.rows as i32 {
+                    LookupEvidence::Rows
+                } else if value == sheet.grid.cell_width as i32 {
+                    LookupEvidence::CellWidth
+                } else if value == sheet.grid.cell_height as i32 {
+                    LookupEvidence::CellHeight
+                } else {
+                    continue;
+                };
+                found.push(FontLookup {
+                    class: entry.name.clone(),
+                    what,
+                    value: value.to_string(),
+                });
+            }
+
+            for literal in class.string_literals() {
+                let Some(text) = literal.decoded else {
+                    continue;
+                };
+                // The character order, as the game lists it. Matched as a run of the sheet's own
+                // characters in the sheet's own order rather than by equality, because a game
+                // usually lists the part of the sheet it uses rather than all of it.
+                if text.chars().count() >= 16 && order.contains(&text) {
+                    found.push(FontLookup {
+                        class: entry.name.clone(),
+                        what: LookupEvidence::Order,
+                        value: text,
+                    });
+                }
+            }
+        }
+        found.sort_by(|a, b| a.class.cmp(&b.class).then(a.value.cmp(&b.value)));
+        found.dedup_by(|a, b| a.class == b.class && a.what == b.what && a.value == b.value);
+        Ok(found)
+    }
+
     pub fn font_install_rule(&self) -> crate::Result<crate::rules::Rule> {
         use crate::rules::{Action, Condition, Rule};
 
@@ -1440,13 +1541,83 @@ impl Project {
                 reason: format!("the archive has no entry {}", profile.entry),
             })?;
 
-        let mut rule = Rule::new(
-            "install-font",
+        // What the composed sheet became, from the sidecar written beside it: the row count and
+        // the character order both change when letters are added, and both are numbers the game
+        // is likely to hold somewhere.
+        let composed_shape: serde_json::Value =
+            read_json(&self.root.join("fonts/extended.json")).unwrap_or_default();
+        let new_rows = composed_shape
+            .get("grid")
+            .and_then(|g| g.get("rows"))
+            .and_then(|r| r.as_u64())
+            .unwrap_or(0) as i32;
+        let new_order = composed_shape
+            .get("order")
+            .and_then(|o| o.as_str())
+            .unwrap_or_default()
+            .to_string();
+
+        let candidates = self.font_lookup_candidates()?;
+        let mut proposed: Vec<Action> = Vec::new();
+        let mut notes: Vec<String> = Vec::new();
+        for candidate in &candidates {
+            match candidate.what {
+                LookupEvidence::Rows if new_rows > 0 => {
+                    let Ok(from) = candidate.value.parse::<i32>() else {
+                        continue;
+                    };
+                    if from == new_rows {
+                        continue;
+                    }
+                    proposed.push(Action::SetIntConstant {
+                        class: candidate.class.clone(),
+                        from,
+                        to: new_rows,
+                    });
+                    notes.push(format!(
+                        "{} holds {from}, which is the sheet's row count",
+                        candidate.class
+                    ));
+                }
+                LookupEvidence::Order if !new_order.is_empty() => {
+                    // The game lists the part of the sheet it uses; the composed sheet keeps that
+                    // run at the front and adds to the end, so the new listing is the old one
+                    // plus what was added.
+                    let extended = new_order
+                        .strip_prefix(candidate.value.as_str())
+                        .map(|rest| format!("{}{rest}", candidate.value));
+                    let Some(extended) = extended else { continue };
+                    if extended == candidate.value {
+                        continue;
+                    }
+                    proposed.push(Action::SetStringConstant {
+                        class: candidate.class.clone(),
+                        from: candidate.value.clone(),
+                        to: extended,
+                    });
+                    notes.push(format!(
+                        "{} holds a string listing the sheet's characters in order",
+                        candidate.class
+                    ));
+                }
+                _ => {}
+            }
+        }
+
+        let description = if proposed.is_empty() {
             format!(
-                "Replace {} with the sheet holding the Vietnamese letters. The game must also be told the sheet is taller and which character each new cell holds; that part is per-game and is not written here.",
+                "Replace {} with the sheet holding the Vietnamese letters. The game must also be told the sheet is taller and which character each new cell holds; nothing in this game looked like where that is written, so that part is left for a person to add.",
                 profile.entry
-            ),
-        );
+            )
+        } else {
+            format!(
+                "Replace {} with the sheet holding the Vietnamese letters, and change what looks like the game's own record of the sheet's shape: {}. Read those against the game you know - they are what was found, not what was verified.",
+                profile.entry,
+                notes.join("; ")
+            )
+        };
+
+        let mut rule = Rule::new("install-font", description);
         rule.when = vec![
             // By hash rather than by name: a rule written against one version of the artwork must
             // not run against another, because the composed sheet was measured from that one.
@@ -1462,6 +1633,7 @@ impl Project {
             entry: profile.entry.clone(),
             from: "fonts/extended.png".into(),
         }];
+        rule.then.extend(proposed);
         Ok(rule)
     }
 

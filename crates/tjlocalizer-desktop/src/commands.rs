@@ -1155,6 +1155,26 @@ pub fn proof_sheet(path: String, language: String, scale: Option<u32>) -> Reply<
         .map_err(err)
 }
 
+/// Where the game looks like it writes down the shape of its own glyph sheet (§16).
+///
+/// The half of a font swap that is per-game. It still cannot be known from here - it can be
+/// looked for, and a class holding the sheet's row count or a string listing its characters in
+/// order is almost always it. Evidence for a person to read, never a patch.
+#[tauri::command]
+pub fn font_lookup_candidates(path: String) -> Reply<Vec<FontLookupView>> {
+    let project = open(&path)?;
+    Ok(project
+        .font_lookup_candidates()
+        .map_err(err)?
+        .into_iter()
+        .map(|candidate| FontLookupView {
+            class: candidate.class,
+            what: candidate.what.key().to_string(),
+            value: candidate.value,
+        })
+        .collect())
+}
+
 /// Compares the drawing against the one somebody accepted, and marks what moved (§25).
 ///
 /// The failure this catches is not a wrong translation - it is everything else moving. Six lines

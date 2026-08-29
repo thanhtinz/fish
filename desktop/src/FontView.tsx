@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { api, pickFolder } from "./api";
 import type {
   CompositionView,
+  FontLookupView,
   FontScan,
   FontView as Font,
   RuleView,
@@ -34,6 +35,7 @@ export function FontView({ path, say }: Props) {
   const [sample, setSample] = useState("Cá đã cắn câu\nBạn nhận được 5 vàng\nThoát trò chơi");
   const [order, setOrder] = useState("");
   const [rules, setRules] = useState<RuleView[]>([]);
+  const [lookups, setLookups] = useState<FontLookupView[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -52,6 +54,20 @@ export function FontView({ path, say }: Props) {
     setPreview(null);
     void load();
   }, [load]);
+
+  // Where the game looks like it writes down its sheet's shape. Loaded on its own because it is
+  // evidence about the game rather than about anything the person just did.
+  useEffect(() => {
+    let alive = true;
+    api
+      .fontLookupCandidates(path)
+      .then((found) => {
+        if (alive) setLookups(found);
+      })
+      .catch(() => {
+        if (alive) setLookups([]);
+      });
+  }, [path]);
 
   async function run<T>(tag: string, work: () => Promise<T>): Promise<T | null> {
     setBusy(tag);
@@ -473,9 +489,27 @@ export function FontView({ path, say }: Props) {
             <div className="sub">
               Đây là phần <b>riêng của từng game</b>: đổi ảnh font thì game nào cũng như nhau,
               nhưng dạy game biết bảng chữ đã cao thêm và ô mới chứa chữ gì thì mỗi game một kiểu.
-              Công cụ viết sẵn phần giống nhau; phần còn lại phải người thêm vào — nên luật viết ra
-              luôn ở trạng thái <b>tắt</b>.
+              Công cụ viết sẵn phần giống nhau, và <i>đi tìm</i> phần còn lại — nên luật viết ra
+              luôn ở trạng thái <b>tắt</b> cho tới khi bạn đọc lại.
             </div>
+
+            {lookups.length > 0 && (
+              <div style={{ marginBottom: 12 }}>
+                <div style={{ color: "var(--text-dim)", fontSize: 12, marginBottom: 4 }}>
+                  Những chỗ này trông giống nơi game tự ghi lại hình dạng bảng font — là thứ{" "}
+                  <i>tìm được</i>, không phải thứ đã kiểm chứng:
+                </div>
+                {lookups.slice(0, 12).map((lookup) => (
+                  <div
+                    key={`${lookup.class}-${lookup.what}-${lookup.value}`}
+                    style={{ color: "var(--text-faint)", fontSize: 11.5, marginTop: 2 }}
+                  >
+                    · <span style={{ fontFamily: "var(--mono)" }}>{lookup.class}</span> giữ{" "}
+                    {lookup.value.length > 24 ? `${lookup.value.slice(0, 24)}…` : lookup.value} ({lookup.what})
+                  </div>
+                ))}
+              </div>
+            )}
             <div className="wrap" style={{ marginBottom: rules.length > 0 ? 14 : 0 }}>
               <button
                 disabled={busy !== null}

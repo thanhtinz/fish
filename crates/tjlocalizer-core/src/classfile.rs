@@ -390,6 +390,17 @@ impl ClassFile {
         Ok((self.constants.len() - 1) as u16)
     }
 
+    /// Adds a `CONSTANT_Integer`, returning its index.
+    ///
+    /// Appending only, like `add_string`, so every existing index keeps meaning what it meant.
+    pub fn add_integer(&mut self, value: i32) -> u16 {
+        self.constants.push(Constant::Other {
+            tag: 3,
+            payload: value.to_be_bytes().to_vec(),
+        });
+        (self.constants.len() - 1) as u16
+    }
+
     /// Points one load instruction at a different constant.
     ///
     /// The instruction keeps its length, so every jump offset, every exception range and every

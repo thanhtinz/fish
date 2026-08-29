@@ -271,16 +271,36 @@ Once that rule is enabled *and* its conditions hold, two things change: the buil
 the composed sheet, and the coverage the build is judged against becomes that sheet - otherwise
 installing a Vietnamese font would still fail the missing-glyph check.
 
-The generated rule covers replacing the image, which is the same in every game. Teaching the game
-that the sheet grew taller is not, and is left to a hand-written `setIntConstant` or
-`setStringConstant`. See `docs/RULES.md`.
+Replacing the image is the same in every game. Teaching the game that the sheet grew taller is
+not - but it can be *looked for*, and it usually turns up: a class holding the number 6 when the
+sheet has six rows, or a string listing the sheet's characters in the sheet's own order. Both are
+almost always the lookup.
+
+```
+tjlocalizer rules <project> --install-font
+wrote rule install-font, switched off
+  it replaces the sheet.
+  These look like the game's own record of the sheet's shape - what was found, not what was
+  verified:
+    Font.class holds "6" as rows
+    Font.class holds " !\"#$%&'()*+,-./0123…" as character-order
+  2 of them are in the rule as proposed changes. Read them against the game you know,
+  delete what does not belong, then enable it.
+```
+
+The proposals are `setIntConstant` and `setStringConstant` actions like any other, scoped to the
+class and to the exact value they expect to find, and the character listing keeps the game's own
+characters at the front - the composed sheet adds to the end, and a listing that reordered them
+would move every glyph the game already draws. Where nothing recognisable turns up the rule says
+so and carries the image swap alone. See `docs/RULES.md`.
 
 ## What it does not do
 
-**It does not install the font.** Making the game *use* the new glyphs means changing how it looks
-characters up, and every J2ME game does that differently — some index `char - 32`, some carry
-their own table, some pack widths into a second file. That is a per-game patch and belongs to the
-rule engine (§19), which is not built. This produces the artwork and a sidecar describing it:
+**It does not decide how the game looks characters up.** Every J2ME game does that differently —
+some index `char - 32`, some carry their own table, some pack widths into a second file. What is
+found in the game's constants is offered as evidence and written into the rule as a proposal, off
+until a person reads it; nothing here verifies that the number it found is the number it thinks it
+is. Alongside the sheet it produces a sidecar describing it:
 
 ```
 fonts/extended.png     the sheet

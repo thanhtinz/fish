@@ -494,3 +494,160 @@ fn a_site_rule_for_a_method_that_is_not_there_does_nothing() {
     assert!(applied.rules.is_empty());
     assert_eq!(archive.get("SampleGame.class").unwrap().data, before);
 }
+
+/// Looking for where a game writes down the shape of its own glyph sheet (§16).
+///
+/// The half of a font swap this tool could not do. It still cannot *know* where a game keeps that,
+/// and it can look - a class holding the sheet's row count, or a string listing the sheet's
+/// characters in the sheet's order, is almost always the lookup. What comes back is evidence, and
+/// the rule it writes is off until a person has read it against the game they know.
+#[test]
+fn the_generated_rule_proposes_what_the_game_looks_like_it_records() {
+    use tjlocalizer_core::font::sheet::{Grid, Image};
+    use tjlocalizer_core::project::{FontProfile, LookupEvidence};
+
+    let cell = 12u32;
+    let columns = 16u32;
+    let characters: Vec<char> = (0x20u8..=0x7E).map(|b| b as char).collect();
+    let rows = (characters.len() as u32).div_ceil(columns);
+    let grid = Grid {
+        cell_width: cell,
+        cell_height: cell,
+        columns,
+        rows,
+    };
+    let mut image = Image::new(columns * cell, rows * cell);
+    for (i, c) in characters.iter().enumerate() {
+        if *c == ' ' {
+            continue;
+        }
+        let (ox, oy) = grid.cell_origin(i as u32);
+        for y in 0..4u32 {
+            for x in 0..6u32 {
+                image.set(ox + 3 + x, oy + 6 + y, [220, 200, 120, 255]);
+            }
+        }
+    }
+
+    // A game that records its font's shape the way many do: the number of rows in the sheet, and
+    // a string listing the characters in the order they are laid out.
+    let mut class = ClassFile::parse(
+        &Archive::read(&fixture())
+            .unwrap()
+            .get("SampleGame.class")
+            .unwrap()
+            .data,
+    )
+    .unwrap();
+    class.add_integer(rows as i32);
+    let order: String = characters.iter().collect();
+    class.add_string(&order).unwrap();
+
+    let mut source = Archive::read(&fixture()).unwrap();
+    source.insert("font.png", image.encode_png().unwrap());
+    source.replace("SampleGame.class", class.write().unwrap());
+
+    let dir = TempDir::new("font-lookup");
+    let mut project = Project::create(&dir.0, "sample-game", &source.write().unwrap()).unwrap();
+    project.profile_mut().font = Some(FontProfile {
+        entry: "font.png".into(),
+        grid: Some(grid),
+        order: String::new(),
+        device_font: false,
+        mark_library: None,
+        marks_from: None,
+    });
+    project.save().unwrap();
+    project.extract().unwrap();
+
+    let candidates = project.font_lookup_candidates().unwrap();
+    assert!(
+        candidates
+            .iter()
+            .any(|c| c.what == LookupEvidence::Rows && c.value == rows.to_string()),
+        "the row count should have been found: {candidates:?}"
+    );
+    assert!(
+        candidates.iter().any(|c| c.what == LookupEvidence::Order),
+        "the character order should have been found: {candidates:?}"
+    );
+
+    project.compose_font(None).unwrap().unwrap();
+    let rule = project.font_install_rule().unwrap();
+
+    // The rule now carries the other half: the sheet, the taller row count, and the longer
+    // character listing.
+    let mut kinds: Vec<&str> = rule
+        .then
+        .iter()
+        .map(|action| match action {
+            Action::ReplaceEntry { .. } => "replace",
+            Action::SetIntConstant { .. } => "int",
+            Action::SetStringConstant { .. } => "string",
+            Action::SetStringAtSite { .. } => "site",
+        })
+        .collect();
+    kinds.sort();
+    assert_eq!(kinds, vec!["int", "replace", "string"]);
+
+    // Still off, and still saying what it found rather than claiming to have verified it.
+    assert!(!rule.enabled);
+    assert!(
+        rule.description.contains("not what was verified"),
+        "{}",
+        rule.description
+    );
+
+    // The proposed listing keeps the game's own characters at the front: the composed sheet adds
+    // to the end, and a listing that reordered them would move every glyph the game draws.
+    let extended = rule.then.iter().find_map(|a| match a {
+        Action::SetStringConstant { from, to, .. } => Some((from.clone(), to.clone())),
+        _ => None,
+    });
+    let (from, to) = extended.unwrap();
+    assert!(to.starts_with(&from), "{to:?} should extend {from:?}");
+    assert!(to.chars().count() > from.chars().count());
+}
+
+/// A game that records nothing recognisable gets a rule that says so, rather than a guess.
+#[test]
+fn a_game_that_records_nothing_recognisable_gets_no_proposals() {
+    use tjlocalizer_core::font::sheet::{Grid, Image};
+    use tjlocalizer_core::project::FontProfile;
+
+    let grid = Grid {
+        cell_width: 12,
+        cell_height: 12,
+        columns: 16,
+        rows: 6,
+    };
+    let mut image = Image::new(16 * 12, 6 * 12);
+    for y in 0..image.height {
+        image.set(0, y, [255, 255, 255, 255]);
+    }
+
+    let mut source = Archive::read(&fixture()).unwrap();
+    source.insert("font.png", image.encode_png().unwrap());
+
+    let dir = TempDir::new("font-lookup-none");
+    let mut project = Project::create(&dir.0, "sample-game", &source.write().unwrap()).unwrap();
+    project.profile_mut().font = Some(FontProfile {
+        entry: "font.png".into(),
+        grid: Some(grid),
+        order: String::new(),
+        device_font: false,
+        mark_library: None,
+        marks_from: None,
+    });
+    project.save().unwrap();
+    project.compose_font(None).unwrap().unwrap();
+
+    assert!(project.font_lookup_candidates().unwrap().is_empty());
+    let rule = project.font_install_rule().unwrap();
+    assert_eq!(rule.then.len(), 1, "only the image swap");
+    assert!(
+        rule.description.contains("left for a person"),
+        "{}",
+        rule.description
+    );
+}

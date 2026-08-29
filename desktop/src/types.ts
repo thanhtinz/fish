@@ -255,6 +255,13 @@ export type Hint =
   | { kind: "fewColours"; colours: number; inkPercent: number }
   | { kind: "shapeOfALine"; width: number; height: number; bands: number };
 
+/** Chỗ trong code game trông giống nơi ghi lại hình dạng bảng font. */
+export interface FontLookupView {
+  class: string;
+  what: string;
+  value: string;
+}
+
 /** Bản vẽ lần này khác bản đã duyệt ở đâu. */
 export interface RegressionView {
   compared: boolean;

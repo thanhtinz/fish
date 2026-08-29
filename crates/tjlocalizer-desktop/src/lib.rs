@@ -74,6 +74,7 @@ pub fn run() {
             commands::read_text_assets,
             commands::plugins,
             commands::context,
+            commands::font_lookup_candidates,
             commands::visual_regression,
             commands::accept_baseline,
             commands::mark_text_asset,
