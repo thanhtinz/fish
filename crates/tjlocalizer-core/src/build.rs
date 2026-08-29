@@ -65,6 +65,27 @@ pub fn apply(
     translations: &TranslationStore,
     branding: &Branding,
 ) -> Result<(Archive, BuildReport)> {
+    apply_with(
+        original,
+        graph,
+        translations,
+        branding,
+        &crate::plugin::Formats::default(),
+    )
+}
+
+/// The same, where plugins have named files this build would not have recognised (§20).
+///
+/// The extractor and the build have to be told the same thing: a plugin that made a file
+/// translatable at extraction and not at build time would collect translations nobody could
+/// ship, which is the failure this crate spends `writeback` avoiding.
+pub fn apply_with(
+    original: &Archive,
+    graph: &ContentGraph,
+    translations: &TranslationStore,
+    branding: &Branding,
+    formats: &crate::plugin::Formats,
+) -> Result<(Archive, BuildReport)> {
     // A plain clone. This used to zip the whole archive and parse it straight back, which for a
     // game directory would mean compressing forty thousand files in order to change three strings.
     let mut archive = original.clone();
@@ -132,7 +153,7 @@ pub fn apply(
         // One question, asked in one place. Before this, the fallback below decoded every patched
         // resource with `from_utf8_lossy` and wrote it back - which for a binary file means every
         // invalid byte becomes U+FFFD and the file is destroyed while the build reports success.
-        match crate::writeback::plan(resource_name, &entry.data) {
+        match crate::writeback::plan_with(resource_name, &entry.data, formats) {
             crate::writeback::Plan::ReadOnly { reason } => {
                 report.refused.push(Refusal {
                     resource: resource_name.to_string(),

@@ -864,6 +864,56 @@ impl From<tjlocalizer_core::shorten::Alternative> for AlternativeView {
     }
 }
 
+/// One adapter the project carries, and what it contributes to this game (§20).
+///
+/// What *fired* is separate from what the plugin claims, because those are the two questions a
+/// person has: what does this file say, and did any of it apply here.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct PluginView {
+    pub id: String,
+    pub description: String,
+    pub author: String,
+    /// Where it was loaded from.
+    pub path: String,
+    /// Capabilities it would report, and whether each matches this game.
+    pub capabilities: Vec<PluginClaimView>,
+    /// Files it claims as text, with how many entries of this game each pattern matches.
+    pub resources: Vec<PluginClaimView>,
+    pub fonts: Vec<PluginClaimView>,
+    /// Rules it offers, by the id they carry once merged.
+    pub rules: Vec<String>,
+    pub dictionary_entries: usize,
+    /// What is wrong with the file, if anything.
+    pub problems: Vec<String>,
+}
+
+/// One thing a plugin claims, and whether it applies to this game.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct PluginClaimView {
+    pub what: String,
+    pub detail: String,
+    /// How many entries of this game it matches. Zero means it claims nothing here.
+    pub matches: usize,
+}
+
+/// A plugin file that would not parse, kept rather than raised.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct BrokenPluginView {
+    pub path: String,
+    pub reason: String,
+}
+
+/// Every plugin, loaded or not.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct PluginsView {
+    pub loaded: Vec<PluginView>,
+    pub broken: Vec<BrokenPluginView>,
+}
+
 /// What an image was read to say, and how well it matched (§17).
 ///
 /// The score travels with the text because the text alone invites being believed. A reading with

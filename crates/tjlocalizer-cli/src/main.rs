@@ -388,6 +388,15 @@ enum Command {
         remove: Option<String>,
     },
 
+    /// Adapters for one game or engine, written as data (§20).
+    ///
+    /// A plugin is a JSON file under the project's `plugins/` directory. It says what to look for
+    /// and what to conclude: capabilities to report, files to read as a format this build already
+    /// writes, glyph sheets to suggest, rules to offer, terms to add. It is data and only data -
+    /// nothing in it is executed - so what it contributes is listed here, against this game, with
+    /// what fired and what did not.
+    Plugins { project: PathBuf },
+
     /// Import, analyze, extract, propose, build and validate in one pass.
     Localize {
         jar: PathBuf,
@@ -1541,6 +1550,109 @@ fn run(cli: Cli) -> Result<()> {
                     "nothing to draw: this needs a declared glyph sheet and at least one approved \n\
                      translation"
                 ),
+            }
+            Ok(())
+        }
+
+        Command::Plugins { project } => {
+            let project = Project::open(&project)?;
+            let plugins = project.plugins()?;
+
+            if plugins.is_empty() {
+                println!("no plugins.");
+                println!();
+                println!(
+                    "A plugin is a JSON file in {}/plugins/ naming what to look for in this",
+                    project.root().display()
+                );
+                println!("game and what to conclude. See docs/PLUGINS.md for the shape of one.");
+                return Ok(());
+            }
+
+            for (path, reason) in &plugins.broken {
+                println!("{} could not be read: {reason}", path.display());
+            }
+
+            let archive = project.original()?;
+            let fired = plugins.capabilities(&archive);
+            let claimed: Vec<String> = archive
+                .entries()
+                .iter()
+                .filter(|e| plugins.formats().of(&e.name).is_some())
+                .map(|e| e.name.clone())
+                .collect();
+
+            for plugin in &plugins.loaded {
+                println!("{}", plugin.id);
+                if !plugin.description.is_empty() {
+                    println!("  {}", plugin.description);
+                }
+                if !plugin.author.is_empty() {
+                    println!("  written by {}", plugin.author);
+                }
+                for problem in plugin.problems() {
+                    println!("  broken: {problem}");
+                }
+                for rule in &plugin.capabilities {
+                    let holds = fired.iter().any(|c| c.id == rule.id);
+                    println!(
+                        "  capability {} - {}",
+                        rule.id,
+                        if holds {
+                            "matches this game"
+                        } else {
+                            "does not match this game"
+                        }
+                    );
+                }
+                for resource in &plugin.resources {
+                    let hits = archive
+                        .entries()
+                        .iter()
+                        .filter(|e| tjlocalizer_core::plugin::glob(&resource.pattern, &e.name))
+                        .count();
+                    println!(
+                        "  resource {} as {} - {hits} file{} in this game",
+                        resource.pattern,
+                        resource.format,
+                        if hits == 1 { "" } else { "s" }
+                    );
+                }
+                for font in &plugin.fonts {
+                    println!(
+                        "  font {} - {}x{} cells, {} columns",
+                        font.pattern, font.cell_width, font.cell_height, font.columns
+                    );
+                }
+                for rule in &plugin.rules {
+                    println!(
+                        "  rule {}:{} - offered, off until switched on",
+                        plugin.id, rule.id
+                    );
+                }
+                if let Some(pack) = &plugin.dictionary {
+                    println!(
+                        "  dictionary {} entries, {} to {}",
+                        pack.entries.len(),
+                        pack.from.tag(),
+                        pack.to.tag()
+                    );
+                }
+            }
+
+            println!();
+            println!(
+                "{} capabilit{} fired, {} file{} claimed as text",
+                fired.len(),
+                if fired.len() == 1 { "y" } else { "ies" },
+                claimed.len(),
+                if claimed.len() == 1 { "" } else { "s" }
+            );
+            for entry in claimed.iter().take(20) {
+                println!("  {entry}");
+            }
+            if claimed.len() > 20 {
+                println!("  ... and {} more", claimed.len() - 20);
             }
             Ok(())
         }

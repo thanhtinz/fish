@@ -649,7 +649,15 @@ impl Project {
     }
 
     pub fn analyze(&self) -> crate::Result<CapabilityManifest> {
-        let manifest = detect::detect(&self.original()?);
+        let archive = self.original()?;
+        let mut manifest = detect::detect(&archive);
+        // What a plugin recognised goes in the same manifest as what the detectors did, each
+        // carrying the plugin that claimed it. Kept apart it would be a second kind of truth
+        // nothing downstream knew to ask about; merged without the evidence it would be
+        // untraceable.
+        manifest
+            .capabilities
+            .extend(self.plugins()?.capabilities(&archive));
         write_json(&self.root.join("extracted/capabilities.json"), &manifest)?;
         Ok(manifest)
     }
@@ -658,7 +666,7 @@ impl Project {
     ///
     /// Shared by every target: the source text is the same whatever it is being translated into.
     pub fn extract(&self) -> crate::Result<ContentGraph> {
-        let graph = graph::extract(&self.original()?);
+        let graph = graph::extract_with(&self.original()?, &self.plugin_formats()?);
         write_json(&self.root.join("content/graph.json"), &graph)?;
         Ok(graph)
     }
@@ -765,7 +773,7 @@ impl Project {
         let mut dictionary = crate::dictionary_data::builtin();
         let dir = self.root.join("dictionary");
         if !dir.exists() {
-            return Ok(dictionary);
+            return Ok(add_plugin_terms(dictionary, &self.plugins()?));
         }
         let mut files: Vec<PathBuf> = std::fs::read_dir(&dir)?
             .filter_map(|e| e.ok())
@@ -783,7 +791,7 @@ impl Project {
                 })?;
             dictionary.add(pack);
         }
-        Ok(dictionary)
+        Ok(add_plugin_terms(dictionary, &self.plugins()?))
     }
 
     /// The register this project writes a language in, if this build ships that profile.
@@ -1163,9 +1171,34 @@ impl Project {
         Ok(removed)
     }
 
+    /// The adapters this project carries (§20).
+    ///
+    /// Loaded on every call rather than cached: a person editing a plugin file expects the next
+    /// command to see it, and these are a handful of small JSON files.
+    pub fn plugins(&self) -> crate::Result<crate::plugin::Plugins> {
+        crate::plugin::Plugins::load(&crate::plugin::dir(&self.root))
+    }
+
+    /// The file formats plugins claim, in the shape extraction and the build both take.
+    pub fn plugin_formats(&self) -> crate::Result<crate::plugin::Formats> {
+        Ok(self.plugins()?.formats())
+    }
+
     /// The per-game patches this project holds (§19).
+    /// The rules this project can run: the ones it wrote down, and the ones its plugins offer.
+    ///
+    /// A plugin's rule is offered, never applied - it arrives switched off like every other rule,
+    /// and switching it on writes it into the project's own `rules/rules.json`, where it is then
+    /// this project's rule. A plugin cannot change a rule somebody already accepted: an id the
+    /// project holds wins over the same id from a plugin.
     pub fn rules(&self) -> crate::Result<Vec<crate::rules::Rule>> {
-        crate::rules::load(&self.root)
+        let mut rules = crate::rules::load(&self.root)?;
+        for offered in self.plugins()?.rules() {
+            if !rules.iter().any(|r| r.id == offered.id) {
+                rules.push(offered);
+            }
+        }
+        Ok(rules)
     }
 
     pub fn save_rules(&self, rules: &[crate::rules::Rule]) -> crate::Result<()> {
@@ -1473,7 +1506,13 @@ impl Project {
         } else {
             self.profile.branding.clone()
         };
-        let (mut built, report) = build::apply(&original, &graph, &translations, &branding)?;
+        let (mut built, report) = build::apply_with(
+            &original,
+            &graph,
+            &translations,
+            &branding,
+            &self.plugin_formats()?,
+        )?;
 
         // Rules run last, on the archive the text has already been patched into. They are the
         // per-game part of the work - installing a font sheet, changing a layout constant - and
@@ -1769,4 +1808,16 @@ fn copy_tree(from: &Path, to: &Path) -> crate::Result<()> {
         std::fs::copy(entry.path(), destination)?;
     }
     Ok(())
+}
+
+/// Adds what a project's plugins say its engine's words mean (§12, §20).
+///
+/// Listed after the project's own packs, because a tie between two readings goes to whichever was
+/// listed first: a term the people on this project decided about should not be re-decided by an
+/// adapter somebody downloaded.
+fn add_plugin_terms(mut dictionary: Dictionary, plugins: &crate::plugin::Plugins) -> Dictionary {
+    for pack in plugins.dictionary_packs() {
+        dictionary.add(pack);
+    }
+    dictionary
 }

@@ -1316,6 +1316,93 @@ pub fn unmark_text_asset(path: String, entry: String) -> Reply<Vec<ImageAssetVie
 }
 
 // ---------------------------------------------------------------------------------------------
+// Adapters written as data (§20).
+//
+// A plugin says what to look for in one game or one engine and what to conclude. It is data and
+// only data - nothing in it is executed - so what it can contribute is exactly what this build
+// can already do to any archive, and the panel shows both what it claims and whether any of it
+// applied here.
+// ---------------------------------------------------------------------------------------------
+
+#[tauri::command]
+pub fn plugins(path: String) -> Reply<PluginsView> {
+    let project = open(&path)?;
+    let plugins = project.plugins().map_err(err)?;
+    let archive = project.original().map_err(err)?;
+    let fired = plugins.capabilities(&archive);
+
+    let count = |pattern: &str| {
+        archive
+            .entries()
+            .iter()
+            .filter(|e| tjlocalizer_core::plugin::glob(pattern, &e.name))
+            .count()
+    };
+
+    Ok(PluginsView {
+        loaded: plugins
+            .loaded
+            .iter()
+            .map(|plugin| PluginView {
+                id: plugin.id.clone(),
+                description: plugin.description.clone(),
+                author: plugin.author.clone(),
+                path: plugin.path.display().to_string(),
+                capabilities: plugin
+                    .capabilities
+                    .iter()
+                    .map(|rule| PluginClaimView {
+                        what: rule.id.clone(),
+                        detail: format!("{:.0}%", rule.confidence * 100.0),
+                        matches: usize::from(fired.iter().any(|c| c.id == rule.id)),
+                    })
+                    .collect(),
+                resources: plugin
+                    .resources
+                    .iter()
+                    .map(|resource| PluginClaimView {
+                        what: resource.pattern.clone(),
+                        detail: resource.format.clone(),
+                        matches: count(&resource.pattern),
+                    })
+                    .collect(),
+                fonts: plugin
+                    .fonts
+                    .iter()
+                    .map(|font| PluginClaimView {
+                        what: font.pattern.clone(),
+                        detail: format!(
+                            "{}x{}, {} cột",
+                            font.cell_width, font.cell_height, font.columns
+                        ),
+                        matches: count(&font.pattern),
+                    })
+                    .collect(),
+                rules: plugin
+                    .rules
+                    .iter()
+                    .map(|rule| format!("{}:{}", plugin.id, rule.id))
+                    .collect(),
+                dictionary_entries: plugin
+                    .dictionary
+                    .as_ref()
+                    .map(|pack| pack.entries.len())
+                    .unwrap_or(0),
+                problems: plugin.problems(),
+            })
+            .collect(),
+        broken: plugins
+            .broken
+            .iter()
+            .map(|(path, reason)| BrokenPluginView {
+                path: path.display().to_string(),
+                reason: reason.clone(),
+            })
+            .collect(),
+    })
+}
+
+// ---------------------------------------------------------------------------------------------
 // Per-game patches (§19).
 //
 // Everything else the application does works on any JAR. These do not: they change one game,

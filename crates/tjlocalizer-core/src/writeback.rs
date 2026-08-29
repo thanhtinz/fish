@@ -66,6 +66,16 @@ impl Plan {
 /// renamed is still a `.locres` - and the bytes alone are not either, since a gettext catalogue
 /// and a properties file both look like lines with an equals sign in them.
 pub fn plan(entry_name: &str, data: &[u8]) -> Plan {
+    plan_with(entry_name, data, &crate::plugin::Formats::default())
+}
+
+/// The same question, asked where a plugin may have claimed the file (§20).
+///
+/// A plugin claim is consulted after the binary readers and before the text detectors: a plugin
+/// exists to name a file whose *shape* nothing here recognises - a game's `data/lang/en.txt` that
+/// is really a properties file - and it has no business overruling a reader that parsed the bytes
+/// and knows what they are. What it does overrule is the guess, which is the part that was wrong.
+pub fn plan_with(entry_name: &str, data: &[u8], formats: &crate::plugin::Formats) -> Plan {
     if crate::locres::Locres::looks_like(data) {
         return match crate::locres::Locres::parse(data) {
             Ok(_) => Plan::Binary(BinaryFormat::Locres),
@@ -94,6 +104,12 @@ pub fn plan(entry_name: &str, data: &[u8]) -> Plan {
         };
     };
     let text = decode(data, &candidate.label);
+    if let Some(claim) = formats.of(entry_name) {
+        return Plan::Text {
+            format: claim.format,
+            encoding: candidate.label,
+        };
+    }
     let format = crate::resource::detect(entry_name, &text);
 
     // A `.rpy` that `detect` could not place is the game's own script, not a resource - and it

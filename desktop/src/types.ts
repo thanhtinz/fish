@@ -255,6 +255,37 @@ export type Hint =
   | { kind: "fewColours"; colours: number; inkPercent: number }
   | { kind: "shapeOfALine"; width: number; height: number; bands: number };
 
+/** Một thứ plugin khai báo, và nó có khớp game này không. */
+export interface PluginClaimView {
+  what: string;
+  detail: string;
+  matches: number;
+}
+
+/** Một plugin và những gì nó đóng góp cho game này. */
+export interface PluginView {
+  id: string;
+  description: string;
+  author: string;
+  path: string;
+  capabilities: PluginClaimView[];
+  resources: PluginClaimView[];
+  fonts: PluginClaimView[];
+  rules: string[];
+  dictionaryEntries: number;
+  problems: string[];
+}
+
+export interface BrokenPluginView {
+  path: string;
+  reason: string;
+}
+
+export interface PluginsView {
+  loaded: PluginView[];
+  broken: BrokenPluginView[];
+}
+
 /** Chữ đọc được từ một ảnh, cùng với độ khớp. */
 export interface ReadingView {
   entry: string;

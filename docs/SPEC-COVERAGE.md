@@ -7,7 +7,7 @@ are built, because a reader needs to know what is missing as much as what is the
 | --- | --- | --- | --- |
 | 1 | Product vision | n/a | |
 | 2 | No-hardcode architecture | **Built** | Enforced throughout; no game name, class name or resource path appears in the core. |
-| 3 | Genre and game scope | **Partial** | Anything whose text is in a Java constant pool or in a text resource this build reads - which now covers Android, iOS and a good deal of what PC games ship. Genre register is handled by style profiles; genre-specific *code* handling would come from plugins (§20), which are not built. |
+| 3 | Genre and game scope | **Built** | Anything whose text is in a Java constant pool or in a text resource this build reads - which covers Android, iOS and a good deal of what PC games ship - plus whatever a plugin names as a resource of a format this build writes (§20). Genre register is handled by style profiles. |
 | 4 | System architecture | **Built** | The pipeline in `docs/ARCHITECTURE.md`. |
 | 5 | Generic game model | **Partial** | `CapabilityManifest`, `ContentGraph`, language and register model. The character and relationship layer is typed but not populated. |
 | 6 | Capability detection | **Built** | `detect`: platform, text storage, resources, obfuscation, each with confidence and evidence. |
@@ -24,7 +24,7 @@ are built, because a reader needs to know what is missing as much as what is the
 | 17 | Asset and OCR pipeline | **Built** | Every image is inventoried with structured evidence about whether it looks like a label, and where the project knows the game's glyph sheet the words are read straight off the picture by matching each shape against the game's own letters - accepted only where every shape matched, and reported as unread otherwise rather than guessed. A person marks the images that carry words, and from then on the build reports each marked image that still ships its original artwork - including one that was redrawn but never installed. Reading artwork lettered outside the game's font is not attempted, on purpose. See `docs/ASSETS.md`. |
 | 18 | Bytecode analysis and patching | **Partial** | Constant-pool rewriting is complete and JVM-verified, including integer constants, and reachable from rules (§19). Semantic patching beyond the pool is not built and rules cannot express it. |
 | 19 | Rule engine | **Built** | Rules are data in `rules/rules.json`: conditions checked against the actual archive, three actions (replace an entry, change an int or string constant in a named class), off until switched on, planned before they run and recorded in the build. Deliberately cannot add bytecode. See `docs/RULES.md`. |
-| 20 | Plugin and adapter SDK | **Not built** | The design leaves room for it - detection is already decoupled from action - but no plugin boundary exists. |
+| 20 | Plugin and adapter SDK | **Built** | `plugin`: adapters as JSON in the project's `plugins/`, contributing capabilities with evidence, resource formats, font hints, rules and dictionary packs. Data and only data - nothing is loaded or executed, because a plugin arrives by the same route as the untrusted archive (§29). See `docs/PLUGINS.md`. |
 | 21 | Project system | **Built** | `project`: immutable original, versioned profile, recorded builds, rollback. |
 | 22 | Localization workflow | **Built** | Every step, including font generation, rules, and an asset inventory that both tracks artwork carrying words and reads them where the game's own font drew them. |
 | 23 | Build and repackaging | **Built** | Deterministic output, manifest preservation, SHA-256, build record. |
@@ -36,7 +36,7 @@ are built, because a reader needs to know what is missing as much as what is the
 | 29 | Security | **Built** | Untrusted-input handling and archive limits; no extracted code is executed; the network engine is off by default and its key is stored outside the project in an owner-only file. |
 | 30 | Technology stack | **Built** | Rust core and CLI, Tauri desktop shell with a React and TypeScript interface, native file and save dialogs. |
 | 31 | Source structure | **Built** | Three crates (core, CLI, desktop) plus the interface under `desktop/`. |
-| 32 | API and extension contracts | **Partial** | `translate::Provider` is a stable seam, with an HTTP implementation covering four API families. The plugin boundary of §20 is not built. |
+| 32 | API and extension contracts | **Built** | `translate::Provider` is a stable seam, with an HTTP implementation covering four API families, and the plugin boundary of §20 is a second: a declarative contract, versioned by what it may name, that cannot reach past what the core already does. |
 | 33 | Performance and scalability | **Partial** | Patches are grouped per class so each is parsed once; nothing has been profiled at scale. |
 | 34 | Roadmap | n/a | |
 | 35 | Definition of done | **Partial** | The P0 row - JAR/JAD, project, analyzer, build and repack - is done and JVM-verified. |

@@ -117,6 +117,11 @@ impl ContentGraph {
 
 /// Walks an archive and builds its content graph.
 pub fn extract(archive: &Archive) -> ContentGraph {
+    extract_with(archive, &crate::plugin::Formats::default())
+}
+
+/// The same, where plugins have named files this build would not have recognised (§20).
+pub fn extract_with(archive: &Archive, formats: &crate::plugin::Formats) -> ContentGraph {
     let mut nodes = Vec::new();
 
     for entry in archive.classes() {
@@ -164,7 +169,7 @@ pub fn extract(archive: &Archive) -> ContentGraph {
         // separately - extraction by file extension, the survey by magic bytes - so a file could
         // be reported as holding three readable strings and then produce no nodes at all, with
         // nothing on screen explaining the difference.
-        match crate::writeback::plan(&entry.name, &entry.data) {
+        match crate::writeback::plan_with(&entry.name, &entry.data, formats) {
             crate::writeback::Plan::Binary(crate::writeback::BinaryFormat::Locres) => {
                 // Parse failures cannot happen here: `plan` returns `Binary` only after parsing.
                 if let Ok(table) = crate::locres::Locres::parse(&entry.data) {

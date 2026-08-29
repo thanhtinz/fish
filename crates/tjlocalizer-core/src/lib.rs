@@ -22,6 +22,7 @@ pub mod lang;
 pub mod locres;
 pub mod package;
 pub mod patch;
+pub mod plugin;
 pub mod project;
 pub mod provider;
 pub mod quality;

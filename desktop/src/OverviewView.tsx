@@ -1,6 +1,7 @@
 import { Fragment, useState } from "react";
 import { AnalystCard } from "./AnalystCard";
 import { EngineCard } from "./EngineCard";
+import { PluginsCard } from "./PluginsCard";
 import type {
   AnalystView,
   CapabilityView,
@@ -328,6 +329,8 @@ export function OverviewView(props: Props) {
             onScan={props.onScan}
             onInspect={props.onInspect}
           />
+
+          <PluginsCard path={p.path} />
 
           <div className="card">
             <h3>Loại gói</h3>
