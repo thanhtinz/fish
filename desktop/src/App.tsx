@@ -602,6 +602,7 @@ export function App() {
                   <BuildsView
                     project={project}
                     language={language}
+                    say={say}
                     builds={builds}
                     outputPath={target?.outputPath ?? null}
                     busy={busy}

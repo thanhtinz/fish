@@ -367,6 +367,40 @@ enum Command {
         scale: u32,
     },
 
+    /// What changed in the picture since the last drawing somebody accepted (§25).
+    ///
+    /// A translator changes six lines and the drawing changes in six places. If it changes in
+    /// sixty, something else moved - a font was recomposed, a glyph order edited, a rule installed
+    /// a sheet with a different baseline - and that is the class of failure no text report shows.
+    Regress {
+        project: PathBuf,
+        #[arg(long)]
+        lang: Option<String>,
+        #[arg(long, default_value_t = 4)]
+        scale: u32,
+        /// Accept the current drawing as what this language should look like from now on.
+        #[arg(long)]
+        accept: bool,
+    },
+
+    /// Runs the build in the emulator this project's owner configured (§25).
+    ///
+    /// No emulator is shipped, suggested or downloaded. This runs the command written in the
+    /// project file, on the newest build - the command is the person's, and nothing read out of
+    /// the game can influence it.
+    Play {
+        project: PathBuf,
+        #[arg(long)]
+        lang: Option<String>,
+        /// Record the program to run, and use it from now on.
+        #[arg(long)]
+        command: Option<String>,
+        /// Its arguments. `{game}` is replaced with the build's path; without it the path is
+        /// appended.
+        #[arg(long, num_args = 0..)]
+        args: Vec<String>,
+    },
+
     /// The per-game patches a project holds, and whether they fit this game (§19).
     ///
     /// A rule is data, not code: it says what it expects to find in the game and what it would
@@ -1723,6 +1757,98 @@ fn run(cli: Cli) -> Result<()> {
             }
             if claimed.len() > 20 {
                 println!("  ... and {} more", claimed.len() - 20);
+            }
+            Ok(())
+        }
+
+        Command::Regress {
+            project,
+            lang,
+            scale,
+            accept,
+        } => {
+            let project = Project::open(&project)?;
+            let language = one_language(&project, lang.as_deref())?;
+
+            if accept {
+                match project.accept_baseline(&language, scale)? {
+                    Some(path) => {
+                        println!(
+                            "accepted {} as the drawing to compare against",
+                            path.display()
+                        );
+                        return Ok(());
+                    }
+                    None => anyhow::bail!(
+                        "nothing to draw: this needs a declared glyph sheet and at least one \
+                         approved translation"
+                    ),
+                }
+            }
+
+            match project.visual_regression(&language, scale)? {
+                None => {
+                    println!(
+                        "nothing to compare against yet. Look at `tjlocalizer proof`, and when it \
+                         is right:"
+                    );
+                    println!("  tjlocalizer regress <project> --accept");
+                }
+                Some((difference, marked)) if difference.is_identical() => {
+                    println!("the drawing is identical to the one accepted.");
+                    println!("  {}", marked.display());
+                }
+                Some((difference, marked)) => {
+                    if difference.resized {
+                        println!(
+                            "the drawing changed size: {}x{} became {}x{}",
+                            difference.before.0,
+                            difference.before.1,
+                            difference.after.0,
+                            difference.after.1
+                        );
+                    }
+                    println!(
+                        "{} pixel{} changed, {:.2}% of the picture, in {} place{}:",
+                        difference.changed,
+                        if difference.changed == 1 { "" } else { "s" },
+                        difference.share() * 100.0,
+                        difference.bands.len(),
+                        if difference.bands.len() == 1 { "" } else { "s" }
+                    );
+                    for band in difference.bands.iter().take(20) {
+                        println!(
+                            "  rows {}-{}, {} pixels",
+                            band.top, band.bottom, band.changed
+                        );
+                    }
+                    if difference.bands.len() > 20 {
+                        println!("  ... and {} more", difference.bands.len() - 20);
+                    }
+                    println!("  {}", marked.display());
+                    println!("  Accept it with --accept once it is what you meant.");
+                }
+            }
+            Ok(())
+        }
+
+        Command::Play {
+            project,
+            lang,
+            command,
+            args,
+        } => {
+            let mut project = Project::open(&project)?;
+            if let Some(command) = command {
+                project.profile_mut().emulator =
+                    Some(tjlocalizer_core::regress::Emulator { command, args });
+                project.save()?;
+                println!("recorded the emulator; it will be used from now on");
+            }
+            let language = one_language(&project, lang.as_deref())?;
+            let status = project.play(&language)?;
+            if !status.success() {
+                anyhow::bail!("the emulator exited with {status}");
             }
             Ok(())
         }

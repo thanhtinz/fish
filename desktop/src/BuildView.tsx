@@ -1,3 +1,4 @@
+import { RegressionCard } from "./RegressionCard";
 import type { BuildView as Build, ProjectSummary } from "./types";
 
 interface Props {
@@ -6,6 +7,7 @@ interface Props {
   builds: Build[];
   outputPath: string | null;
   busy: string | null;
+  say: (text: string, bad?: boolean) => void;
   onBuild: () => void;
   onBuildAll: () => void;
   onRollback: (revision: number) => void;
@@ -139,6 +141,8 @@ export function BuildsView(props: Props) {
           ))
         )}
       </div>
+
+      <RegressionCard path={p.path} language={language} say={props.say} />
     </div>
   );
 }

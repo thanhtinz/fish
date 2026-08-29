@@ -864,6 +864,23 @@ impl From<tjlocalizer_core::shorten::Alternative> for AlternativeView {
     }
 }
 
+/// What changed in the drawing since the one somebody accepted (§25).
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct RegressionView {
+    /// False when the project has no accepted drawing yet, which is not the same as "unchanged".
+    pub compared: bool,
+    pub identical: bool,
+    pub resized: bool,
+    pub changed: usize,
+    /// Share of the picture that changed, 0 to 1.
+    pub share: f32,
+    /// Rows that changed, as `top-bottom`.
+    pub bands: Vec<String>,
+    /// The new drawing with the changes marked, ready to show.
+    pub picture: Option<String>,
+}
+
 /// A character the game names, and what was found out about them (§5, §15).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]

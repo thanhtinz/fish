@@ -1155,6 +1155,60 @@ pub fn proof_sheet(path: String, language: String, scale: Option<u32>) -> Reply<
         .map_err(err)
 }
 
+/// Compares the drawing against the one somebody accepted, and marks what moved (§25).
+///
+/// The failure this catches is not a wrong translation - it is everything else moving. Six lines
+/// were edited and sixty changed: a font was recomposed, a glyph order edited, a rule installed a
+/// sheet whose letters sit a pixel lower. No text report shows that.
+#[tauri::command]
+pub fn visual_regression(
+    path: String,
+    language: String,
+    scale: Option<u32>,
+) -> Reply<RegressionView> {
+    let project = open(&path)?;
+    let language = Language::new(language);
+    let scale = scale.unwrap_or(4);
+
+    let Some((difference, picture)) = project.visual_regression(&language, scale).map_err(err)?
+    else {
+        return Ok(RegressionView {
+            compared: false,
+            identical: false,
+            resized: false,
+            changed: 0,
+            share: 0.0,
+            bands: Vec::new(),
+            picture: None,
+        });
+    };
+
+    Ok(RegressionView {
+        compared: true,
+        identical: difference.is_identical(),
+        resized: difference.resized,
+        changed: difference.changed,
+        share: difference.share(),
+        bands: difference
+            .bands
+            .iter()
+            .map(|b| format!("{}-{}", b.top, b.bottom))
+            .collect(),
+        picture: std::fs::read(&picture).ok().map(|b| data_uri(&b)),
+    })
+}
+
+/// Accepts the current drawing as what this language should look like from now on.
+#[tauri::command]
+pub fn accept_baseline(path: String, language: String, scale: Option<u32>) -> Reply<bool> {
+    let project = open(&path)?;
+    let language = Language::new(language);
+    Ok(project
+        .accept_baseline(&language, scale.unwrap_or(4))
+        .map_err(err)?
+        .is_some())
+}
+
 /// Renders sample text with the drawn marks and, when one is chosen, with the typeface's.
 ///
 /// Which reads better is not a thing a count can answer, so it is put in front of a person at the

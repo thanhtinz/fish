@@ -31,9 +31,10 @@ use std::path::{Path, PathBuf};
 ///
 /// Version 3 replaced the single `localization` object with a list of targets, so one project can
 /// be shipped in several languages from one body of extracted text. Version 4 made the source a
-/// tagged union, because a game can now be a directory rather than a file. Older projects are
-/// migrated on open rather than refused.
-pub const SCHEMA_VERSION: u32 = 4;
+/// tagged union, because a game can now be a directory rather than a file. Version 5 added the
+/// emulator a person runs their builds in and how each image's words were established. Older
+/// projects are migrated on open rather than refused.
+pub const SCHEMA_VERSION: u32 = 5;
 
 /// Directories created for every project. Listed once so `create` and the documentation cannot
 /// drift apart.
@@ -207,6 +208,12 @@ pub struct ProjectProfile {
     /// that would be the worst of the three answers.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub font: Option<FontProfile>,
+    /// The emulator this project's owner runs their builds in (§25).
+    ///
+    /// Their choice, written down so it does not have to be retyped. Absent means they have not
+    /// said, and nothing here guesses: no emulator is shipped, suggested or downloaded.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub emulator: Option<crate::regress::Emulator>,
 }
 
 /// Where a game's glyph sheet is and how it is laid out.
@@ -326,6 +333,7 @@ impl Project {
             claude: None,
             text_assets: Vec::new(),
             font: None,
+            emulator: None,
         };
 
         let mut project = Project { root, profile };
@@ -425,6 +433,7 @@ impl Project {
             claude: None,
             text_assets: Vec::new(),
             font: None,
+            emulator: None,
         };
 
         let mut project = Project { root, profile };
@@ -997,6 +1006,18 @@ impl Project {
     /// where the original ended - which is where the failures this tool can see actually live.
     /// `None` when the game has no sheet to draw with, or nothing has been approved yet.
     pub fn proof_sheet(&self, language: &Language, scale: u32) -> crate::Result<Option<PathBuf>> {
+        let Some(image) = self.proof_image(language, scale)? else {
+            return Ok(None);
+        };
+        let dir = self.root.join("tests");
+        std::fs::create_dir_all(&dir)?;
+        let path = dir.join(format!("proof-{}.png", self.slug(language)));
+        std::fs::write(&path, image.encode_png()?)?;
+        Ok(Some(path))
+    }
+
+    /// The same drawing, in memory, for anything that wants to compare rather than look.
+    pub fn proof_image(&self, language: &Language, scale: u32) -> crate::Result<Option<Image>> {
         let Some(sheet) = self.shipping_sheet()? else {
             return Ok(None);
         };
@@ -1021,16 +1042,111 @@ impl Project {
             .map(|(source, target)| font::proof::Row { source, target })
             .collect();
 
-        let image = font::proof::sheet(&sheet, &metrics, &rows, scale);
-        let dir = self.root.join("tests");
-        std::fs::create_dir_all(&dir)?;
-        let slug = language
+        Ok(Some(font::proof::sheet(&sheet, &metrics, &rows, scale)))
+    }
+
+    fn slug(&self, language: &Language) -> String {
+        language
             .tag()
             .to_lowercase()
-            .replace(|c: char| !c.is_ascii_alphanumeric(), "-");
-        let path = dir.join(format!("proof-{slug}.png"));
+            .replace(|c: char| !c.is_ascii_alphanumeric(), "-")
+    }
+
+    /// Where a language's accepted drawing is kept.
+    pub fn baseline_path(&self, language: &Language) -> PathBuf {
+        self.root
+            .join("tests")
+            .join(format!("baseline-{}.png", self.slug(language)))
+    }
+
+    /// Accepts the current drawing as what this language is supposed to look like (§25).
+    ///
+    /// A person looks at the picture and says yes. That is the only way a baseline can be
+    /// established honestly: a baseline taken automatically records whatever the tool did last
+    /// time, including whatever it did wrong.
+    pub fn accept_baseline(
+        &self,
+        language: &Language,
+        scale: u32,
+    ) -> crate::Result<Option<PathBuf>> {
+        let Some(image) = self.proof_image(language, scale)? else {
+            return Ok(None);
+        };
+        let path = self.baseline_path(language);
+        if let Some(dir) = path.parent() {
+            std::fs::create_dir_all(dir)?;
+        }
         std::fs::write(&path, image.encode_png()?)?;
         Ok(Some(path))
+    }
+
+    /// Compares the current drawing against the accepted one (§25).
+    ///
+    /// `None` when there is nothing to draw or nothing to compare against, which are different
+    /// situations from "nothing changed" and must not be reported as it.
+    pub fn visual_regression(
+        &self,
+        language: &Language,
+        scale: u32,
+    ) -> crate::Result<Option<(crate::regress::Difference, PathBuf)>> {
+        let path = self.baseline_path(language);
+        if !path.exists() {
+            return Ok(None);
+        }
+        let Some(after) = self.proof_image(language, scale)? else {
+            return Ok(None);
+        };
+        let before = Image::decode_png(&std::fs::read(&path)?)?;
+        let difference = crate::regress::compare(&before, &after);
+
+        // The picture is written whether or not anything changed: a person who ran this because
+        // something looked wrong wants to look, and an empty marked image is itself an answer.
+        let marked = self
+            .root
+            .join("tests")
+            .join(format!("changed-{}.png", self.slug(language)));
+        std::fs::write(
+            &marked,
+            crate::regress::marked(&before, &after).encode_png()?,
+        )?;
+        Ok(Some((difference, marked)))
+    }
+
+    /// Runs the emulator this project's owner configured, on the newest build (§25).
+    ///
+    /// Their command, from their project file. Nothing here chooses it, and nothing read out of
+    /// the game can influence it - §29's rule is that nothing extracted is executed, and a
+    /// launcher taking its command from a manifest would break that rule while looking helpful.
+    pub fn play(&self, language: &Language) -> crate::Result<std::process::ExitStatus> {
+        let Some(emulator) = &self.profile.emulator else {
+            return Err(crate::Error::InvalidProject {
+                path: self.root.clone(),
+                reason: "this project has no emulator configured: set one with `tjlocalizer play \
+                         <project> --command <program>`, and it will be used from then on"
+                    .into(),
+            });
+        };
+        let target = self
+            .target(language)
+            .ok_or_else(|| crate::Error::InvalidProject {
+                path: self.root.clone(),
+                reason: format!("this project does not target {}", language.tag()),
+            })?;
+        let game = self.root.join("output").join(self.output_name(target));
+        if !game.exists() {
+            return Err(crate::Error::InvalidProject {
+                path: game,
+                reason: "there is no build to run yet: build this language first".into(),
+            });
+        }
+
+        std::process::Command::new(&emulator.command)
+            .args(emulator.arguments(&game))
+            .status()
+            .map_err(|e| crate::Error::InvalidProject {
+                path: self.root.clone(),
+                reason: format!("could not run {}: {e}", emulator.command),
+            })
     }
 
     /// Checks one language's approved translations against the game's font (§16, §24).
@@ -1787,6 +1903,9 @@ fn migrate(mut raw: serde_json::Value, from_version: u32) -> serde_json::Value {
             source.insert("kind".into(), serde_json::json!("archive"));
         }
     }
+
+    // Version 5 only added optional fields, so an older project needs nothing done to it: an
+    // absent emulator is a project whose owner has not said, which is the truth about it.
 
     // Stamped once, outside the per-version blocks. It used to sit inside the version 3 block,
     // so a version 3 file came out of here still labelled 3 - harmless only because `save`

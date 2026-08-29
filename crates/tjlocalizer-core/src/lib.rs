@@ -28,6 +28,7 @@ pub mod project;
 pub mod provider;
 pub mod quality;
 pub mod register;
+pub mod regress;
 pub mod resource;
 pub mod rules;
 pub mod secrets;

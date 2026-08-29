@@ -19,6 +19,7 @@ import type {
   GridView,
   ImageAssetView,
   ContextView,
+  RegressionView,
   PluginsView,
   ReadingView,
   ImportReport,
@@ -208,6 +209,12 @@ export const api = {
 
   proofSheet: (path: string, language: string, scale: number | null) =>
     call<string | null>("proof_sheet", { path, language, scale }),
+
+  visualRegression: (path: string, language: string, scale: number | null) =>
+    call<RegressionView>("visual_regression", { path, language, scale }),
+
+  acceptBaseline: (path: string, language: string, scale: number | null) =>
+    call<boolean>("accept_baseline", { path, language, scale }),
 
   imageAssets: (path: string) => call<ImageAssetView[]>("image_assets", { path }),
 

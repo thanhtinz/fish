@@ -255,6 +255,17 @@ export type Hint =
   | { kind: "fewColours"; colours: number; inkPercent: number }
   | { kind: "shapeOfALine"; width: number; height: number; bands: number };
 
+/** Bản vẽ lần này khác bản đã duyệt ở đâu. */
+export interface RegressionView {
+  compared: boolean;
+  identical: boolean;
+  resized: boolean;
+  changed: number;
+  share: number;
+  bands: string[];
+  picture: string | null;
+}
+
 /** Một nhân vật game gọi tên, và những gì suy ra được về họ. */
 export interface CharacterView {
   name: string;
