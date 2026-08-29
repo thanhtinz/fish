@@ -23,6 +23,7 @@ import type {
   InspectionView,
   LanguageView,
   NodeView,
+  PatchPlanView,
   ProjectSummary,
   RecentView,
   ReviewNoteView,
@@ -224,6 +225,12 @@ export const api = {
     call<RuleView[]>("set_rule_enabled", { path, id, enabled }),
 
   removeRule: (path: string, id: string) => call<RuleView[]>("remove_rule", { path, id }),
+
+  planPatch: (path: string, language: string, game: string) =>
+    call<PatchPlanView>("plan_patch", { path, language, game }),
+
+  applyPatch: (path: string, language: string, game: string) =>
+    call<string[]>("apply_patch", { path, language, game }),
 
   analyst: (path: string) => call<AnalystView>("analyst", { path }),
 

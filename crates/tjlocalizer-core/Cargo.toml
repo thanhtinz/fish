@@ -10,6 +10,7 @@ license.workspace = true
 [dev-dependencies]
 anyhow.workspace = true
 zip.workspace = true
+walkdir.workspace = true
 
 [dependencies]
 anyhow.workspace = true

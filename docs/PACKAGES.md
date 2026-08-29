@@ -51,6 +51,43 @@ The files that were **not** read were not hashed either. `original/tree.json` sa
 words rather than leaving a whole-game guarantee to be assumed: hashing forty gigabytes on every
 open is not something anyone would wait for.
 
+### It builds to a patch, and applying one is a separate act
+
+A game that came in as one file goes out as one file. A game that came in as a folder cannot:
+copying forty thousand files to change three of them is not a build, it is a second copy of
+somebody's game sitting in their project. So a directory build writes a **patch** — the changed
+files at their own relative paths, plus `patch.json` and `INSTALL.txt`.
+
+`patch.json` records, for every file, the hash it had **before** the change as well as after. That
+is what lets a patch refuse a game it was not built from, which it does *whole*: every file is
+checked before any is written. Half a translation is worse than none, because the game is then in
+a state that neither the patch nor the backup describes.
+
+**`build` never writes into a game directory.** Applying is a separate, explicit act —
+`tjlocalizer apply-patch <project> --to <game>`, or a button that shows the list of files first and
+asks. It runs in three phases and the order is the contract: check everything, back up everything
+into `builds/<language>/<revision>/backup/`, then write. The backup is a revision directory rather
+than a `.bak` file because that is already how this project keeps every version of everything, and
+it means an apply can be undone the same way a build can.
+
+Attribution is **not** written into a directory game. In a JAR it is two files under `META-INF/`,
+which is the archive's own bookkeeping; in a Steam install it would be a stray folder appearing in
+the middle of somebody's game, and some games check their own directory for exactly that. It goes
+in the patch — which is the thing that gets sent to another person anyway.
+
+### `tree.drift`
+
+Its own check with its own name, separate from `verify_original`, because it is a different fact
+about a different thing. `verify_original` says the project's pinned copies are intact. `tree.drift`
+says the game they were copied *from* has moved on — Steam updated it — so a patch built now will
+not apply to it. Nothing errors and nothing looks wrong; the patch simply stops fitting. That is the
+quietest way this work goes wrong, so it gets a name a person can look up.
+
+It is measured by **hash, not by modification time**. Nothing in this project has ever tracked
+mtimes, and `Archive::write` deliberately pins every timestamp to 1980 so that a build can be
+verified by hash at all. Only the files that were read are checked; the rest were never hashed, and
+`original/tree.json` says so.
+
 The engine is guessed from the file names the scan already collected — a Unity `*_Data` directory,
 `project.godot`, `Engine/Binaries/`, `steam_api64` — and reported as **evidence**, beside what was
 concluded, so a wrong answer can be argued with.

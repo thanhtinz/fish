@@ -65,6 +65,22 @@ tjlocalizer build projects/game --all
 tjlocalizer export projects/game ~/Desktop --all
 ```
 
+A PC game installed on disk is a folder, not a file, and that works too:
+
+```sh
+tjlocalizer import ~/.steam/steamapps/common/FishingGame --into projects/fishing
+#   20 006 files (12.1 MB), read 3 (164 B)
+tjlocalizer extract projects/fishing
+#   ... translate ...
+tjlocalizer build projects/fishing                    # writes a patch: only what changed
+tjlocalizer apply-patch projects/fishing --to ~/.steam/steamapps/common/FishingGame
+```
+
+The tree is walked without opening anything; only files in a format this build reads are copied in.
+`build` never writes into the game — applying is a separate command that checks every file against
+the version the patch was built from, keeps what it replaced, and refuses the whole patch rather
+than writing part of one.
+
 Or in one pass:
 
 ```sh

@@ -1254,6 +1254,118 @@ impl Project {
         Ok(rule)
     }
 
+    /// Whether the game on disk still matches what this project was built against.
+    ///
+    /// Its own check with its own name, rather than folded into `verify_original`, because it is a
+    /// different fact about a different thing: `verify_original` says the pinned copies are
+    /// intact, and this says the game they were copied *from* has moved on. Steam updating over a
+    /// game is the quietest way this work goes wrong - nothing errors, the patch simply stops
+    /// fitting - so it gets a name a person can look up.
+    ///
+    /// Only the files that were read are checked. The rest were never hashed, and `tree.json`
+    /// says so.
+    pub fn check_drift(&self) -> crate::Result<Vec<crate::validate::Finding>> {
+        let record = self.tree_record()?;
+        let game = std::path::Path::new(&record.root);
+        if !game.is_dir() {
+            return Ok(vec![crate::validate::Finding {
+                severity: crate::validate::Severity::Warning,
+                check: "tree.drift".into(),
+                detail: format!(
+                    "the game is no longer at {}, so nothing here could be compared with it; the \
+                     project still holds its own copies",
+                    record.root
+                ),
+            }]);
+        }
+
+        let mut moved = Vec::new();
+        for file in &record.files {
+            let data = std::fs::read(game.join(&file.path)).unwrap_or_default();
+            if sha256_hex(&data) != file.sha256 {
+                moved.push(file.path.clone());
+            }
+        }
+        if moved.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        // One finding for the lot, with the count and a few names. One per file would be a
+        // hundred identical lines after a game update, which is a report nobody reads.
+        let sample: Vec<&str> = moved.iter().take(3).map(|p| p.as_str()).collect();
+        Ok(vec![crate::validate::Finding {
+            severity: crate::validate::Severity::Warning,
+            check: "tree.drift".into(),
+            detail: format!(
+                "{} of the {} files this project read have changed in the game since it was \
+                 imported ({}{}); the game was probably updated, and a patch built now will not \
+                 apply to it",
+                moved.len(),
+                record.files.len(),
+                sample.join(", "),
+                if moved.len() > sample.len() {
+                    ", ..."
+                } else {
+                    ""
+                },
+            ),
+        }])
+    }
+
+    /// The patch a build produced, if this project builds patches.
+    pub fn patch_dir(&self, target: &Target) -> Option<PathBuf> {
+        if !self.profile.source.is_tree() {
+            return None;
+        }
+        let path = self.root.join("output").join(self.output_name(target));
+        path.is_dir().then_some(path)
+    }
+
+    /// Applies the current patch to a game directory, keeping what it replaced.
+    ///
+    /// The most destructive thing this tool does, so it is never a side effect of anything: the
+    /// caller has to ask for it by name, and it refuses the whole patch rather than writing part
+    /// of one.
+    pub fn apply_patch(
+        &self,
+        language: &Language,
+        game: &std::path::Path,
+    ) -> crate::Result<Vec<String>> {
+        let target = self.require_target(language)?;
+        let patch = self
+            .patch_dir(target)
+            .ok_or_else(|| crate::Error::InvalidProject {
+                path: self.root.clone(),
+                reason: "there is no patch to apply; build first".into(),
+            })?;
+        let manifest = crate::patch::read(&patch)?;
+
+        // Beside the build it came from, because that is where this project keeps every version
+        // of everything and where rollback already looks.
+        let backup = self
+            .builds_dir(target)
+            .join(format!("{:04}", manifest.revision))
+            .join("backup");
+        std::fs::create_dir_all(&backup)?;
+        crate::patch::apply(&manifest, game, &patch, &backup)
+    }
+
+    /// What applying the current patch would overwrite, without writing anything.
+    pub fn plan_patch(
+        &self,
+        language: &Language,
+        game: &std::path::Path,
+    ) -> crate::Result<crate::patch::Plan> {
+        let target = self.require_target(language)?;
+        let patch = self
+            .patch_dir(target)
+            .ok_or_else(|| crate::Error::InvalidProject {
+                path: self.root.clone(),
+                reason: "there is no patch to apply; build first".into(),
+            })?;
+        Ok(crate::patch::plan(&crate::patch::read(&patch)?, game))
+    }
+
     /// Shorter ways of saying what one node's translation says (§24).
     ///
     /// Offered after the layout check reports a label will not fit, and never applied: every
@@ -1320,25 +1432,25 @@ impl Project {
 
     /// Builds, validates, records and publishes one target (§22 steps 15-18, §23).
     pub fn build(&self, language: &Language) -> crate::Result<BuildRecord> {
-        // A directory game has no single file to write, and writing one anyway would produce an
-        // extensionless zip nobody asked for and nothing can install. It builds to a patch
-        // directory instead, which this build does not write yet - so it says so.
-        if self.profile.source.is_tree() {
-            return Err(crate::Error::InvalidProject {
-                path: self.root.clone(),
-                reason: "this game is a directory: it builds to a patch directory of changed \
-                         files, which this build cannot write yet"
-                    .into(),
-            });
-        }
         self.verify_original()?;
         let target = self.require_target(language)?;
         let original = self.original()?;
         let graph = self.graph()?;
         let translations = self.translations(language)?;
 
-        let (mut built, report) =
-            build::apply(&original, &graph, &translations, &self.profile.branding)?;
+        // Attribution is not written into a game that is a folder. In a JAR it is two files under
+        // META-INF/, which is the archive's own bookkeeping; in a Steam install it is a stray
+        // directory appearing in the middle of somebody's game, and some games check their own
+        // directory for exactly that. It travels in the patch instead.
+        let branding = if self.profile.source.is_tree() {
+            Branding {
+                enabled: false,
+                ..self.profile.branding.clone()
+            }
+        } else {
+            self.profile.branding.clone()
+        };
+        let (mut built, report) = build::apply(&original, &graph, &translations, &branding)?;
 
         // Rules run last, on the archive the text has already been patched into. They are the
         // per-game part of the work - installing a font sheet, changing a layout constant - and
@@ -1383,12 +1495,37 @@ impl Project {
             &built,
         ));
 
+        // Whether the game on disk is still the one this project was built against. Its own check
+        // rather than part of verify_original, because it is a different fact: the pinned copies
+        // are intact - that is what verify_original said - and the game they came from has moved
+        // on. Steam updating over a game is the quietest way this work goes wrong.
+        if self.profile.source.is_tree() {
+            validation.extend(self.check_drift()?);
+        }
+
         let revision = self.next_build_revision(target)?;
         let dir = self.builds_dir(target).join(format!("{revision:04}"));
         std::fs::create_dir_all(&dir)?;
 
         let name = self.output_name(target);
-        std::fs::write(dir.join(&name), &bytes)?;
+        if self.profile.source.is_tree() {
+            // Only what changed. Copying a whole game install into the project to change three
+            // strings is not a build, it is a second copy of somebody's game.
+            let mut manifest = crate::patch::Manifest {
+                project: self.profile.name.clone(),
+                language: target.language.tag().to_string(),
+                revision,
+                changes: Vec::new(),
+                localized_by: self
+                    .profile
+                    .branding
+                    .enabled
+                    .then(|| self.profile.branding.author.clone()),
+            };
+            crate::patch::write(&dir.join("patch"), &original, &built, &mut manifest)?;
+        } else {
+            std::fs::write(dir.join(&name), &bytes)?;
+        }
 
         let record = BuildRecord {
             revision,
@@ -1405,7 +1542,11 @@ impl Project {
         // Written under builds/ first and copied to output/ second, so output/ only ever holds a
         // build that finished and has a record.
         std::fs::create_dir_all(self.root.join("output"))?;
-        std::fs::write(self.root.join("output").join(&name), &bytes)?;
+        if self.profile.source.is_tree() {
+            copy_tree(&dir.join("patch"), &self.root.join("output").join(&name))?;
+        } else {
+            std::fs::write(self.root.join("output").join(&name), &bytes)?;
+        }
         Ok(record)
     }
 
@@ -1577,4 +1718,32 @@ fn read_json_or_default<T: for<'de> Deserialize<'de> + Default>(path: &Path) -> 
     } else {
         Ok(T::default())
     }
+}
+
+/// Copies a directory tree, replacing whatever was at the destination.
+///
+/// Used to publish a patch into `output/`, which holds only the most recent build - so the old one
+/// is removed first rather than merged into, or a file that stopped being changed would linger
+/// there and be applied.
+fn copy_tree(from: &Path, to: &Path) -> crate::Result<()> {
+    if to.exists() {
+        std::fs::remove_dir_all(to)?;
+    }
+    for entry in walkdir::WalkDir::new(from)
+        .into_iter()
+        .filter_map(|e| e.ok())
+    {
+        if !entry.file_type().is_file() {
+            continue;
+        }
+        let Ok(relative) = entry.path().strip_prefix(from) else {
+            continue;
+        };
+        let destination = to.join(relative);
+        if let Some(parent) = destination.parent() {
+            std::fs::create_dir_all(parent)?;
+        }
+        std::fs::copy(entry.path(), destination)?;
+    }
+    Ok(())
 }

@@ -213,6 +213,23 @@ enum Command {
         lang: Option<String>,
     },
 
+    /// Copy a built patch over a game installed on disk.
+    ///
+    /// Only for a game imported as a directory. Every file is checked against the version the
+    /// patch was built from before anything is written, and what it replaces is kept - so this
+    /// can be undone, and a patch built for a different copy of the game is refused whole.
+    ApplyPatch {
+        project: PathBuf,
+        /// The game directory to write into.
+        #[arg(long)]
+        to: PathBuf,
+        #[arg(long)]
+        lang: Option<String>,
+        /// Show what would be overwritten and write nothing.
+        #[arg(long)]
+        dry_run: bool,
+    },
+
     /// Show the dictionaries available, and what they cover.
     Dictionaries {
         /// A project, to include its own packs. Omit for the built-in ones only.
@@ -939,6 +956,47 @@ fn run(cli: Cli) -> Result<()> {
             let language = one_language(&project, lang.as_deref())?;
             let record = project.rollback(&language, revision)?;
             println!("restored {language} build {:04}", record.revision);
+            Ok(())
+        }
+
+        Command::ApplyPatch {
+            project,
+            to,
+            lang,
+            dry_run,
+        } => {
+            let project = Project::open(&project)?;
+            let language = one_language(&project, lang.as_deref())?;
+            let plan = project.plan_patch(&language, &to)?;
+
+            println!("{} in {}", to.display(), language.tag());
+            for change in &plan.ready {
+                println!("  {}", change.path);
+            }
+            for bad in &plan.mismatched {
+                println!("  {}  {}", bad.path, bad.reason);
+            }
+
+            if dry_run {
+                println!();
+                println!(
+                    "{} file{} would be overwritten; nothing was written",
+                    plan.ready.len(),
+                    if plan.ready.len() == 1 { "" } else { "s" }
+                );
+                return Ok(());
+            }
+            if !plan.is_applicable() {
+                bail!("the patch does not fit this copy of the game, so none of it was applied");
+            }
+
+            let written = project.apply_patch(&language, &to)?;
+            println!();
+            println!(
+                "wrote {} file{}; what they replaced is kept under builds/",
+                written.len(),
+                if written.len() == 1 { "" } else { "s" }
+            );
             Ok(())
         }
 

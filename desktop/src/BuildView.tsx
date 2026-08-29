@@ -10,6 +10,9 @@ interface Props {
   onBuildAll: () => void;
   onRollback: (revision: number) => void;
   onExport: () => void;
+  /// Null unless this project's game is a directory, so the patch controls are absent rather
+  /// than present and refusing.
+  onApplyPatch: (() => void) | null;
 }
 
 /** Build, validation result, and the history that makes a rollback possible. */
@@ -26,6 +29,12 @@ export function BuildsView(props: Props) {
         <div className="sub">
           Áp bản dịch đã duyệt, đóng gói lại, rồi kiểm tra. Kết quả ghi vào builds/ trước, chép
           sang output/ sau — nên output/ chỉ chứa bản build đã hoàn tất.
+          {props.onApplyPatch && (
+            <>
+              {" "}Game này là một thư mục, nên kết quả là một <b>gói vá</b>: chỉ những file đã đổi.
+              Build <b>không bao giờ</b> ghi vào thư mục game — áp vá là một việc riêng, bấm riêng.
+            </>
+          )}
         </div>
         <div className="row" style={{ flexWrap: "wrap" }}>
           <button
@@ -43,6 +52,15 @@ export function BuildsView(props: Props) {
           <button disabled={busy !== null || !props.outputPath} onClick={props.onExport}>
             Xuất file ra…
           </button>
+          {props.onApplyPatch && (
+            <button
+              disabled={busy !== null || !props.outputPath}
+              onClick={props.onApplyPatch}
+              title="Ghi các file đã đổi vào thư mục game. Bản cũ được giữ lại."
+            >
+              Áp vá vào game…
+            </button>
+          )}
           <span style={{ color: "var(--text-faint)", fontSize: 12 }}>
             {target?.approvedCount ?? 0} bản dịch sẽ được áp
           </span>

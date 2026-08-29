@@ -351,6 +351,26 @@ pub struct SkippedView {
     pub reason: String,
 }
 
+/// What applying a patch would overwrite, shown before anything is written.
+///
+/// The list is the point. Writing into somebody's game directory is the most destructive thing
+/// this tool does, and a button that does it without naming the files first is a button nobody
+/// should press.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PatchPlanView {
+    pub ready: Vec<String>,
+    pub mismatched: Vec<MismatchView>,
+    pub applicable: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MismatchView {
+    pub path: String,
+    pub reason: String,
+}
+
 /// A direction the dictionary covers, for the settings screen.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]

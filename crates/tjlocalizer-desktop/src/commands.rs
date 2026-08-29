@@ -1581,3 +1581,36 @@ pub fn review_language(
         &terms,
     )
 }
+
+/// What applying the current patch would overwrite. Writes nothing.
+#[tauri::command]
+pub fn plan_patch(path: String, language: String, game: String) -> Reply<PatchPlanView> {
+    let project = open(&path)?;
+    let plan = project
+        .plan_patch(&Language::new(&language), Path::new(&game))
+        .map_err(err)?;
+    Ok(PatchPlanView {
+        applicable: plan.is_applicable(),
+        ready: plan.ready.into_iter().map(|c| c.path).collect(),
+        mismatched: plan
+            .mismatched
+            .into_iter()
+            .map(|m| MismatchView {
+                path: m.path,
+                reason: m.reason,
+            })
+            .collect(),
+    })
+}
+
+/// Writes the patch into a game directory.
+///
+/// Separate from `plan_patch` on purpose: the interface shows what would be overwritten and asks,
+/// and this only runs after somebody said yes. What it replaces is kept under `builds/`.
+#[tauri::command]
+pub fn apply_patch(path: String, language: String, game: String) -> Reply<Vec<String>> {
+    let project = open(&path)?;
+    project
+        .apply_patch(&Language::new(&language), Path::new(&game))
+        .map_err(err)
+}

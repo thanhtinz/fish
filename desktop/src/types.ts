@@ -325,3 +325,10 @@ export interface SkippedView {
   size: number;
   reason: string;
 }
+
+/** What applying a patch would overwrite, shown before anything is written. */
+export interface PatchPlanView {
+  ready: string[];
+  mismatched: { path: string; reason: string }[];
+  applicable: boolean;
+}

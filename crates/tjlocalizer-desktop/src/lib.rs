@@ -16,6 +16,8 @@ pub fn run() {
             commands::recent_projects,
             commands::import_jar,
             commands::import_tree,
+            commands::plan_patch,
+            commands::apply_patch,
             commands::open_project,
             commands::project_summary,
             commands::analyze,

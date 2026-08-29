@@ -128,3 +128,5 @@ jobs:
       - run: ./tools/verify-font.sh
 
       - run: ./tools/verify-packages.sh
+
+      - run: ./tools/verify-tree.sh

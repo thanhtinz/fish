@@ -605,6 +605,41 @@ export function App() {
                     builds={builds}
                     outputPath={target?.outputPath ?? null}
                     busy={busy}
+                    onApplyPatch={
+                      project.package.label === "directory"
+                        ? async () => {
+                            const game = await pickFolder("Chọn thư mục game để áp vá");
+                            if (!game) return;
+                            const plan = await run("apply", () =>
+                              api.planPatch(project.path, language, game),
+                            );
+                            if (!plan) return;
+                            if (!plan.applicable) {
+                              // Named, not summarised: "the patch does not fit" without saying
+                              // which file is a message nobody can act on.
+                              const why = plan.mismatched
+                                .map((m) => `  ${m.path} — ${m.reason}`)
+                                .join("\n");
+                              say(`Gói vá không khớp bản game này:\n${why}`, true);
+                              return;
+                            }
+                            // The list before the act. Writing into somebody's game directory is
+                            // the most destructive thing this tool does.
+                            const ok = window.confirm(
+                              `Ghi đè ${plan.ready.length} file trong ${game}:\n\n` +
+                                plan.ready.map((f) => `  ${f}`).join("\n") +
+                                "\n\nBản cũ được giữ trong builds/ và phục hồi được.",
+                            );
+                            if (!ok) return;
+                            const written = await run("apply", () =>
+                              api.applyPatch(project.path, language, game),
+                            );
+                            if (written) {
+                              say(`Đã ghi ${written.length} file; bản cũ giữ trong builds/`);
+                            }
+                          }
+                        : null
+                    }
                     onBuild={async () => {
                       const b = await run("build", () => api.build(project.path, language));
                       if (b) {

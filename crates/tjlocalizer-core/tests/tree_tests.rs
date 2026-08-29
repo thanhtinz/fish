@@ -287,21 +287,271 @@ fn a_project_from_before_directories_still_opens() {
     assert!(err.contains("modified"), "{err}");
 }
 
-/// Building a directory game is not silently wrong: there is no single file to write, and an
-/// extensionless zip nobody can install would be worse than a refusal that says what is missing.
+/// A directory game builds to a directory, not to a file with no extension that nothing can
+/// install. `output_name` is derived in one place and used by rollback, export and the interface,
+/// so getting it wrong here is wrong everywhere.
 #[test]
-fn building_a_directory_game_says_what_it_cannot_do_yet() {
+fn a_directory_game_builds_to_a_directory_rather_than_a_file() {
     let dir = TempDir::new("build");
     let source = dir.0.join("game");
     game(&source);
 
     let (project, _) =
         Project::create_from_tree(dir.0.join("p"), "fishing", &source, &Limits::default()).unwrap();
-    project.extract().unwrap();
+    let target = project
+        .target(&tjlocalizer_core::lang::Language::new("vi-VN"))
+        .unwrap();
+    let name = project.output_name(target);
+    assert_eq!(name, "fishing-vi-vn");
+    assert!(
+        !name.contains('.'),
+        "a folder was named as though it were a file"
+    );
+}
 
+// -- the patch ----------------------------------------------------------------------------------
+
+fn translated(project: &Project) -> tjlocalizer_core::lang::Language {
+    let language = tjlocalizer_core::lang::Language::new("vi-VN");
+    let graph = project.extract().unwrap();
+    let want = [
+        ("Start Game", "Bắt đầu"),
+        ("You caught a fish!", "Bạn câu được một con cá!"),
+        ("Options", "Tuỳ chọn"),
+    ];
+    let mut store = tjlocalizer_core::translation::TranslationStore::default();
+    for node in &graph.nodes {
+        if let Some((_, target)) = want.iter().find(|(s, _)| *s == node.source_text) {
+            store.set(&node.id, *target);
+        }
+    }
+    project.save_translations(&language, &store).unwrap();
+    language
+}
+
+fn built(tag: &str) -> (TempDir, std::path::PathBuf, Project) {
+    let dir = TempDir::new(tag);
+    let source = dir.0.join("game");
+    game(&source);
+    let (project, _) =
+        Project::create_from_tree(dir.0.join("p"), "fishing", &source, &Limits::default()).unwrap();
+    let language = translated(&project);
+    project.build(&language).unwrap();
+    (dir, source, project)
+}
+
+/// The whole reason a directory build is different: it writes what changed, not a second copy of
+/// somebody's game. Four hundred files in, three out.
+#[test]
+fn a_directory_build_writes_only_the_files_it_changed() {
+    let (_dir, _source, project) = built("patch");
+    let patch = project
+        .patch_dir(
+            project
+                .target(&tjlocalizer_core::lang::Language::new("vi-VN"))
+                .unwrap(),
+        )
+        .expect("no patch was written");
+
+    assert!(patch.join("Content/dialogue.json").exists());
+    assert!(patch.join("Content/settings.ini").exists());
+    assert!(patch.join("patch.json").exists());
+    assert!(patch.join("INSTALL.txt").exists());
+
+    // Not a texture in sight.
+    assert!(!patch.join("Content/Textures/tex0000.png").exists());
+    assert!(!patch.join("Engine/Binaries/Win64/Game.exe").exists());
+}
+
+/// Attribution travels with the patch rather than being written into the game. A stray file in an
+/// install directory is something a game's own integrity check may notice, and the patch is what
+/// gets sent to another person anyway.
+#[test]
+fn nothing_is_added_to_the_game_that_was_not_already_in_it() {
+    let (_dir, source, project) = built("branding");
+    let patch = project
+        .patch_dir(
+            project
+                .target(&tjlocalizer_core::lang::Language::new("vi-VN"))
+                .unwrap(),
+        )
+        .unwrap();
+    let manifest = tjlocalizer_core::patch::read(&patch).unwrap();
+
+    for change in &manifest.changes {
+        assert!(
+            source.join(&change.path).exists(),
+            "{} is not a file the game already had",
+            change.path
+        );
+    }
+    assert!(
+        !patch.join("META-INF").exists(),
+        "META-INF reached a folder game"
+    );
+    // But the attribution is in the patch, where somebody receiving it will read it.
+    assert_eq!(manifest.localized_by.as_deref(), Some("Thanhtinz"));
+    let install = std::fs::read_to_string(patch.join("INSTALL.txt")).unwrap();
+    assert!(install.contains("Thanhtinz"), "{install}");
+}
+
+/// Applying replaces exactly the files the patch names and nothing else, and what it replaced can
+/// be put back.
+#[test]
+fn applying_a_patch_changes_only_the_named_files_and_keeps_what_it_replaced() {
+    let (dir, source, project) = built("apply");
+    let language = tjlocalizer_core::lang::Language::new("vi-VN");
+
+    // Onto a copy, never the imported game: a test that patches its own fixture proves less.
+    let copy = dir.0.join("copy");
+    copy_dir(&source, &copy);
+
+    let written = project.apply_patch(&language, &copy).unwrap();
+    assert_eq!(written.len(), 3, "{written:?}");
+
+    let patched = std::fs::read_to_string(copy.join("Content/settings.ini")).unwrap();
+    assert!(patched.contains("Tuỳ chọn"), "{patched}");
+
+    // Everything else came through untouched. This is the assertion a self-made tree proves
+    // completely: every file in it was put there by this test.
+    let mut differing = Vec::new();
+    for entry in walkdir::WalkDir::new(&source)
+        .into_iter()
+        .filter_map(|e| e.ok())
+    {
+        if !entry.file_type().is_file() {
+            continue;
+        }
+        let relative = entry.path().strip_prefix(&source).unwrap();
+        let theirs = std::fs::read(copy.join(relative)).unwrap();
+        if std::fs::read(entry.path()).unwrap() != theirs {
+            differing.push(relative.to_string_lossy().to_string());
+        }
+    }
+    differing.sort();
+    assert_eq!(
+        differing,
+        vec![
+            "Content/Localization/Game/en/Game.po",
+            "Content/dialogue.json",
+            "Content/settings.ini",
+        ]
+    );
+
+    // And the backup holds what was overwritten, byte for byte.
+    let backup = project
+        .root()
+        .join("builds/vi-vn/0001/backup/Content/settings.ini");
+    assert_eq!(
+        std::fs::read(&backup).unwrap(),
+        std::fs::read(source.join("Content/settings.ini")).unwrap()
+    );
+}
+
+/// A patch built from one copy of a game must not be written over another. Half a translation is
+/// worse than none: the game is then in a state neither the patch nor the backup describes.
+#[test]
+fn a_patch_is_refused_whole_when_the_game_is_not_the_one_it_was_built_from() {
+    let (dir, source, project) = built("refuse");
+    let language = tjlocalizer_core::lang::Language::new("vi-VN");
+
+    let copy = dir.0.join("copy");
+    copy_dir(&source, &copy);
+    std::fs::write(copy.join("Content/settings.ini"), b"[menu]\ntitle=Edited\n").unwrap();
+
+    let before = std::fs::read(copy.join("Content/dialogue.json")).unwrap();
     let err = project
-        .build(&tjlocalizer_core::lang::Language::new("vi-VN"))
+        .apply_patch(&language, &copy)
         .unwrap_err()
         .to_string();
-    assert!(err.contains("patch directory"), "{err}");
+    assert!(err.contains("settings.ini"), "{err}");
+    assert!(err.contains("none of it was applied"), "{err}");
+
+    // The file that *would* have applied cleanly was not written either.
+    assert_eq!(
+        std::fs::read(copy.join("Content/dialogue.json")).unwrap(),
+        before,
+        "a file was written despite the patch being refused"
+    );
+}
+
+/// Applying the same patch twice is refused, and says why in a way that is not alarming. A game
+/// that already holds the translation is not a broken game.
+#[test]
+fn a_patch_already_applied_says_so_rather_than_reporting_damage() {
+    let (dir, source, project) = built("twice");
+    let language = tjlocalizer_core::lang::Language::new("vi-VN");
+    let copy = dir.0.join("copy");
+    copy_dir(&source, &copy);
+
+    project.apply_patch(&language, &copy).unwrap();
+    let plan = project.plan_patch(&language, &copy).unwrap();
+    assert!(!plan.is_applicable());
+    assert!(
+        plan.mismatched.iter().all(|m| m.reason.contains("already")),
+        "{:?}",
+        plan.mismatched
+    );
+}
+
+/// Steam updating over a game is the quietest way this work goes wrong: nothing errors, the patch
+/// simply stops fitting. So it has a name a person can look up.
+#[test]
+fn a_game_updated_since_import_is_reported_as_drift() {
+    let (_dir, source, project) = built("drift");
+    assert!(
+        project.check_drift().unwrap().is_empty(),
+        "clean tree drifted"
+    );
+
+    std::fs::write(
+        source.join("Content/dialogue.json"),
+        br#"{"lines":[{"text":"You caught a bigger fish!"}]}"#,
+    )
+    .unwrap();
+
+    let findings = project.check_drift().unwrap();
+    assert_eq!(findings.len(), 1, "{findings:?}");
+    assert_eq!(findings[0].check, "tree.drift");
+    assert!(
+        findings[0].detail.contains("dialogue.json"),
+        "{:?}",
+        findings[0]
+    );
+    assert!(findings[0].detail.contains("updated"), "{:?}", findings[0]);
+}
+
+/// A game that has moved or been uninstalled is not an error - the project still holds its own
+/// copies - but it is worth saying, because nothing could be compared.
+#[test]
+fn a_game_that_is_no_longer_there_is_said_rather_than_ignored() {
+    let (_dir, source, project) = built("gone");
+    std::fs::remove_dir_all(&source).unwrap();
+
+    let findings = project.check_drift().unwrap();
+    assert_eq!(findings.len(), 1);
+    assert!(
+        findings[0].detail.contains("no longer"),
+        "{:?}",
+        findings[0]
+    );
+    assert!(
+        findings[0].detail.contains("its own copies"),
+        "{:?}",
+        findings[0]
+    );
+}
+
+fn copy_dir(from: &Path, to: &Path) {
+    for entry in walkdir::WalkDir::new(from)
+        .into_iter()
+        .filter_map(|e| e.ok())
+    {
+        if !entry.file_type().is_file() {
+            continue;
+        }
+        let destination = to.join(entry.path().strip_prefix(from).unwrap());
+        std::fs::create_dir_all(destination.parent().unwrap()).unwrap();
+        std::fs::copy(entry.path(), destination).unwrap();
+    }
 }
