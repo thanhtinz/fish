@@ -139,6 +139,7 @@ pub fn validate(subject: &Subject) -> ValidationReport {
         subject.translations,
         &mut report,
     );
+    check_consistency(subject.graph, subject.translations, &mut report);
     check_originals_preserved(subject.original, subject.built, &mut report);
 
     // Rules about the JAR format, asked only of JAR files. An Android package has no MIDlet entry
@@ -419,6 +420,95 @@ fn check_entry_points(built: &Archive, report: &mut ValidationReport) {
 ///
 /// Placeholders are the ones that break a running game, so they are errors; the rest are
 /// warnings, because a translator may have had a reason.
+/// One label translated two ways, and two labels translated the same way (§24).
+///
+/// Both are invisible to every other check here: each translation on its own is the right length,
+/// in the right script, with its placeholders intact. It is only across the game that they are
+/// wrong.
+///
+/// A game shows `Back` on eleven screens. Ten say `Quay lại` and one says `Trở lại`, because two
+/// people worked on it a month apart, and a player reads the odd one as a different button. The
+/// mirror of that is worse: two different things - `Attack` and `Strike` - given the same word, so
+/// a menu now has two identical entries.
+///
+/// Only labels, never dialogue or story. Two lines of speech that happen to share a source string
+/// *should* often differ, and a check that complained about them would be a check people learn to
+/// switch off. Warnings, never errors: consistency is a judgement, and there are real reasons for
+/// both of these - a word that means two things, and a screen where the shorter wording fits.
+fn check_consistency(
+    graph: &ContentGraph,
+    translations: &TranslationStore,
+    report: &mut ValidationReport,
+) {
+    use std::collections::BTreeMap;
+
+    let labelled = |context: ContextType| {
+        matches!(
+            context,
+            ContextType::Ui | ContextType::Item | ContextType::Skill | ContextType::Quest
+        )
+    };
+
+    let mut by_source: BTreeMap<&str, Vec<&str>> = BTreeMap::new();
+    let mut by_target: BTreeMap<&str, Vec<&str>> = BTreeMap::new();
+    for node in &graph.nodes {
+        if !labelled(node.context) {
+            continue;
+        }
+        let Some(target) = translations.get(&node.id) else {
+            continue;
+        };
+        let sources = by_source.entry(node.source_text.as_str()).or_default();
+        if !sources.contains(&target) {
+            sources.push(target);
+        }
+        let targets = by_target.entry(target).or_default();
+        if !targets.contains(&node.source_text.as_str()) {
+            targets.push(node.source_text.as_str());
+        }
+    }
+
+    for (source, mut targets) in by_source {
+        if targets.len() < 2 {
+            continue;
+        }
+        targets.sort();
+        report.findings.push(Finding {
+            severity: Severity::Warning,
+            check: "consistency.split".into(),
+            detail: format!(
+                "{source:?} is translated {} different ways: {}",
+                targets.len(),
+                targets
+                    .iter()
+                    .map(|t| format!("{t:?}"))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            ),
+        });
+    }
+
+    for (target, mut sources) in by_target {
+        if sources.len() < 2 {
+            continue;
+        }
+        sources.sort();
+        report.findings.push(Finding {
+            severity: Severity::Warning,
+            check: "consistency.merged".into(),
+            detail: format!(
+                "{} different labels now all read {target:?}: {}",
+                sources.len(),
+                sources
+                    .iter()
+                    .map(|s| format!("{s:?}"))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            ),
+        });
+    }
+}
+
 fn check_translations(
     graph: &ContentGraph,
     translations: &TranslationStore,

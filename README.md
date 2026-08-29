@@ -135,6 +135,7 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for how the pieces fit,
 [docs/PLUGINS.md](docs/PLUGINS.md) for adapters written as data,
 [docs/CONTEXT.md](docs/CONTEXT.md) for what a line is for and who says it,
 [docs/REGRESSION.md](docs/REGRESSION.md) for comparing drawings and running builds,
+[docs/PERFORMANCE.md](docs/PERFORMANCE.md) for what it costs to run,
 [docs/PACKAGES.md](docs/PACKAGES.md) for the package kinds and text formats,
 [docs/ASSETS.md](docs/ASSETS.md) for words painted into artwork,
 [docs/SPEC-COVERAGE.md](docs/SPEC-COVERAGE.md) for what is built and what is not, and

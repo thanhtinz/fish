@@ -11,7 +11,6 @@
 
 use crate::lang::Language;
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
 
 /// The part of a game a term belongs to.
 ///
@@ -141,11 +140,96 @@ impl Segment {
 #[serde(rename_all = "camelCase")]
 pub struct Dictionary {
     pub packs: Vec<Pack>,
+    /// Built once, on the first question asked of the dictionary, and thrown away when a pack is
+    /// added.
+    ///
+    /// It exists because of how this is actually used: not "look up one word" but "gloss forty
+    /// thousand lines", and the segmenter's inner loop was folding and grouping every entry in
+    /// every pack for every line. Six hundred entries against forty thousand lines is a wait
+    /// somebody notices; the same work done once is not.
+    #[serde(skip)]
+    index: std::sync::OnceLock<Index>,
+}
+
+/// Entries arranged for the questions that get asked of them.
+#[derive(Debug, Clone, Default)]
+struct Index {
+    /// One per direction, keyed by base language so a `vi` pack serves a `vi-VN` project.
+    directions: std::collections::HashMap<(String, String), Direction>,
+}
+
+#[derive(Debug, Clone, Default)]
+struct Direction {
+    /// Folded term to the entries that translate it, in the order they were listed - a tie goes
+    /// to the first, and that has to stay true.
+    by_term: std::collections::HashMap<String, Vec<Where>>,
+    /// Every term, longest first, with its characters already split out. Longest first because a
+    /// match on `Guild` inside `Guild Master` leaves a stray word and produces nonsense.
+    ordered: Vec<(Vec<char>, String)>,
+}
+
+/// Where an entry lives, so the index can hold positions rather than borrow the packs.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct Where {
+    pack: usize,
+    entry: usize,
 }
 
 impl Dictionary {
     pub fn add(&mut self, pack: Pack) {
         self.packs.push(pack);
+        // The index describes the packs, so it stops describing them here.
+        self.index = std::sync::OnceLock::new();
+    }
+
+    fn index(&self) -> &Index {
+        self.index.get_or_init(|| {
+            let mut index = Index::default();
+            for (p, pack) in self.packs.iter().enumerate() {
+                let key = (pack.from.base().to_string(), pack.to.base().to_string());
+                let direction = index.directions.entry(key).or_default();
+                for (e, entry) in pack.entries.iter().enumerate() {
+                    direction
+                        .by_term
+                        .entry(fold(&entry.source))
+                        .or_default()
+                        .push(Where { pack: p, entry: e });
+                }
+            }
+            for direction in index.directions.values_mut() {
+                direction.ordered = direction
+                    .by_term
+                    .keys()
+                    .map(|term| (term.chars().collect::<Vec<char>>(), term.clone()))
+                    .collect();
+                direction
+                    .ordered
+                    .sort_by_key(|(chars, term)| (std::cmp::Reverse(chars.len()), term.clone()));
+            }
+            index
+        })
+    }
+
+    fn direction(&self, from: &Language, to: &Language) -> Option<&Direction> {
+        self.index()
+            .directions
+            .get(&(from.base().to_string(), to.base().to_string()))
+    }
+
+    fn at(&self, at: Where) -> &Entry {
+        &self.packs[at.pack].entries[at.entry]
+    }
+
+    /// The entries translating one exact term, in the order they were listed.
+    fn entries_of(&self, term: &str, from: &Language, to: &Language) -> Vec<&Entry> {
+        let Some(direction) = self.direction(from, to) else {
+            return Vec::new();
+        };
+        direction
+            .by_term
+            .get(&fold(term))
+            .map(|found| found.iter().map(|at| self.at(*at)).collect())
+            .unwrap_or_default()
     }
 
     /// Directions this dictionary can work in.
@@ -164,16 +248,6 @@ impl Dictionary {
         self.packs.iter().map(|p| p.entries.len()).sum()
     }
 
-    /// Entries usable for this direction, matching on language rather than exact tag so a `vi`
-    /// pack serves a `vi-VN` project.
-    fn entries_for(&self, from: &Language, to: &Language) -> Vec<&Entry> {
-        self.packs
-            .iter()
-            .filter(|p| p.from.same_language_as(from) && p.to.same_language_as(to))
-            .flat_map(|p| p.entries.iter())
-            .collect()
-    }
-
     /// The best reading for an exact term.
     pub fn lookup(
         &self,
@@ -182,10 +256,8 @@ impl Dictionary {
         to: &Language,
         context: &str,
     ) -> Option<Reading> {
-        let folded = fold(term);
-        self.entries_for(from, to)
+        self.entries_of(term, from, to)
             .into_iter()
-            .filter(|e| fold(&e.source) == folded)
             .map(|e| (score(e, context), e))
             // A tie goes to the first entry listed rather than the last, so a pack that adds a
             // second reading for a term does not silently change what the first one meant.
@@ -212,11 +284,9 @@ impl Dictionary {
         to: &Language,
         context: &str,
     ) -> Vec<Reading> {
-        let folded = fold(term);
         let mut found: Vec<(f32, Reading)> = self
-            .entries_for(from, to)
+            .entries_of(term, from, to)
             .into_iter()
-            .filter(|e| fold(&e.source) == folded)
             .map(|e| (score(e, context), e))
             .map(|(rank, e)| {
                 (
@@ -249,21 +319,16 @@ impl Dictionary {
         to: &Language,
         context: &str,
     ) -> Vec<Segment> {
-        let entries = self.entries_for(from, to);
-        if entries.is_empty() {
+        let Some(direction) = self.direction(from, to) else {
+            return vec![Segment::Unknown {
+                text: text.to_string(),
+            }];
+        };
+        if direction.ordered.is_empty() {
             return vec![Segment::Unknown {
                 text: text.to_string(),
             }];
         }
-
-        // Group by folded source so several readings of one term are considered together, and
-        // walk longest-first.
-        let mut by_term: BTreeMap<String, Vec<&Entry>> = BTreeMap::new();
-        for entry in entries {
-            by_term.entry(fold(&entry.source)).or_default().push(entry);
-        }
-        let mut terms: Vec<&String> = by_term.keys().collect();
-        terms.sort_by_key(|t| std::cmp::Reverse(t.chars().count()));
 
         let chars: Vec<char> = text.chars().collect();
         let folded: Vec<char> = fold(text).chars().collect();
@@ -277,8 +342,7 @@ impl Dictionary {
         while i < chars.len() {
             let mut matched = false;
             if aligned {
-                for term in &terms {
-                    let term_chars: Vec<char> = term.chars().collect();
+                for (term_chars, term) in &direction.ordered {
                     if term_chars.is_empty() || i + term_chars.len() > chars.len() {
                         continue;
                     }
@@ -293,9 +357,12 @@ impl Dictionary {
                         continue;
                     }
 
-                    let best = by_term[*term]
+                    let best = direction.by_term[term]
                         .iter()
-                        .map(|e| (score(e, context), *e))
+                        .map(|at| {
+                            let entry = self.at(*at);
+                            (score(entry, context), entry)
+                        })
                         .max_by(|a, b| a.0.total_cmp(&b.0))
                         .expect("group is never empty");
 

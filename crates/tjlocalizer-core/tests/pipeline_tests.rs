@@ -207,3 +207,47 @@ fn validation_catches_a_missing_entry_point() {
         .expect("the missing MIDlet class should be reported");
     assert!(entry_point.detail.contains("SampleGame"));
 }
+
+/// One label translated two ways, and two labels translated the same way (§24).
+///
+/// Neither is visible to any other check: each translation on its own is the right length, in the
+/// right script, with its placeholders intact. It is only across the game that they are wrong.
+#[test]
+fn validation_catches_a_label_translated_two_ways() {
+    let original = original();
+    let graph = graph::extract(&original);
+
+    // The fixture's own strings, translated inconsistently: the same source text given two
+    // different words in two places is what a player reads as two different buttons.
+    let labels: Vec<_> = graph
+        .nodes
+        .iter()
+        .filter(|n| n.context == ContextType::Ui)
+        .collect();
+    assert!(labels.len() >= 2, "the fixture should have short labels");
+
+    let mut store = TranslationStore::default();
+    store.set(&labels[0].id, "Quay lại");
+    store.set(&labels[1].id, "Quay lại");
+
+    let (built, _) = apply(&original, &graph, &store, &Branding::default()).unwrap();
+    let report = validate(&Subject::new(
+        &original,
+        &built,
+        &graph,
+        &store,
+        &Language::new("en"),
+        &Language::new("vi-VN"),
+    ));
+
+    let merged = report
+        .findings
+        .iter()
+        .find(|f| f.check == "consistency.merged")
+        .expect("two labels reading the same should be reported");
+    assert_eq!(merged.severity, Severity::Warning, "it is a judgement");
+    assert!(merged.detail.contains("Quay lại"));
+
+    // A judgement, not a failure: the build still ships.
+    assert!(report.is_ok());
+}
