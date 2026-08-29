@@ -33,5 +33,6 @@ pub mod translate;
 pub mod translation;
 pub mod validate;
 pub mod vietnamese;
+pub mod writeback;
 
 pub use error::{Error, Result};

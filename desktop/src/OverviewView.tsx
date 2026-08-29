@@ -338,6 +338,9 @@ export function OverviewView(props: Props) {
                       <dt>{r.format}</dt>
                       <dd>
                         {r.entry} · {r.fields} chuỗi
+                        {!r.writable && (
+                          <span style={{ color: "var(--warn)" }}> · chỉ đọc, chưa ghi lại được</span>
+                        )}
                       </dd>
                     </Fragment>
                   ))}

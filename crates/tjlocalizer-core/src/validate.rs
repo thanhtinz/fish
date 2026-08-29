@@ -307,6 +307,33 @@ pub fn check_text_assets(
     findings
 }
 
+/// Translations that were approved and will not reach the game (§24).
+///
+/// A build that reads a file it cannot write is not wrong, but it is incomplete, and the
+/// incompleteness is invisible from anywhere else: the text is in the graph, the translation is
+/// approved, the build succeeds, and the words are simply not in the output. Somebody has to say
+/// so, once, with the count.
+///
+/// Grouped per resource, deliberately. Four hundred lines that each say the same thing about the
+/// same file is a report nobody reads, which is the same as no report.
+pub fn check_refusals(refusals: &[crate::build::Refusal]) -> Vec<Finding> {
+    refusals
+        .iter()
+        .filter(|refusal| refusal.translations > 0)
+        .map(|refusal| Finding {
+            severity: Severity::Warning,
+            check: "text.unwritable".into(),
+            detail: format!(
+                "{} approved translation{} in {} will not appear in the output: {}",
+                refusal.translations,
+                if refusal.translations == 1 { "" } else { "s" },
+                refusal.resource,
+                refusal.reason
+            ),
+        })
+        .collect()
+}
+
 /// Validates an archive on its own, with no original to compare against.
 ///
 /// This is what can be said about a JAR handed over without its project: it is well formed, every

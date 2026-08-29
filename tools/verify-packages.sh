@@ -119,6 +119,22 @@ for entry in ("classes.dex", "resources.arsc", "AndroidManifest.xml"):
 print("strings.xml, dialogue.json and game.po all patched in place")
 CHECK
 
+# The strongest assertion available without a real game: a file this build cannot write comes out
+# byte-identical. Before the refusal path existed, the build decoded every patched resource with
+# from_utf8_lossy and wrote it back - so the first reader for Android bytecode would have destroyed
+# classes.dex and reported success.
+python3 - "$work" <<'UNTOUCHED'
+import sys, zipfile, pathlib
+work = pathlib.Path(sys.argv[1])
+built = next((work / "p/output").glob("*.apk"))
+before = zipfile.ZipFile(work / "game.apk")
+after = zipfile.ZipFile(built)
+for entry in ("classes.dex", "resources.arsc", "AndroidManifest.xml"):
+    if before.read(entry) != after.read(entry):
+        raise SystemExit(f"{entry} was modified by a build that cannot write it")
+print("classes.dex, resources.arsc and AndroidManifest.xml came out byte-identical")
+UNTOUCHED
+
 # And a PC game's zip, which is where Unreal's compiled string table lives.
 "$tj" import "$work/steam.zip" --into "$work/steam" --name steam --source-language en > /dev/null
 "$tj" analyze "$work/steam" | tee "$work/steam-analyze"
@@ -170,5 +186,6 @@ if "Quit" not in texts:
 print(f"the built .locres holds {texts}")
 UNREALCHECK
 
-echo "ok: an Android package was recognised, read, translated and rebuilt, and said what it"
+echo "ok: an Android package was recognised, read, translated and rebuilt, files it cannot write"
+echo "    came out untouched, and it said what it"
 echo "    still needs from a person; a PC game's Unreal string table went through as well"

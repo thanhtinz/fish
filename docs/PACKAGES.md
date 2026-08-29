@@ -98,6 +98,38 @@ engine loads what this produces. `tools/verify-packages.sh` reads the built tabl
 independently written parser, which rules out one class of mistake and not that one. Anyone
 putting a real game through it should check the result in the game before trusting it.
 
+## Đọc được, ghi được, và chỗ ở giữa
+
+Ba trạng thái, không phải hai. `writeback::plan` quyết định cả ba, ở **một chỗ**, và extraction,
+build lẫn khảo sát gói đều hỏi nó:
+
+| Trạng thái | Nghĩa là |
+| --- | --- |
+| `Text` | Chữ, sửa tại chỗ qua `resource::write` |
+| `Binary` | Định dạng nhị phân có reader **và** writer riêng (hiện chỉ `.locres`) |
+| `ReadOnly` | Bản build này không ghi được — lý do đến thẳng người dùng |
+
+**Mặc định là từ chối.** Byte không đọc ra chữ và không khớp writer nào thì là `ReadOnly`, và một
+resource `ReadOnly` **không bao giờ bị đụng vào**.
+
+Đó không phải cẩn thận suông. Trước khi có module này, build decode mọi resource bị vá bằng
+`from_utf8_lossy` rồi ghi đè. Chưa có node nào sinh ra từ file nhị phân nên chưa hỏng gì — nhưng
+reader DEX đầu tiên sẽ biến mọi byte không hợp lệ của `classes.dex` thành U+FFFD, ghi đè, và **báo
+build thành công**. `tools/verify-packages.sh` giờ khẳng định `classes.dex`, `resources.arsc` và
+`AndroidManifest.xml` ra khỏi bản build **y hệt byte đầu vào**. Fixture tự sinh chứng minh mệnh đề
+phủ định một cách trọn vẹn: "những byte này không bị đụng vào" không cần game thật.
+
+Một bản dịch đã duyệt nhắm vào file không ghi được sẽ **không im lặng biến mất**. Build ghi lại một
+`Refusal` kèm số lượng, và kiểm tra `text.unwritable` báo một dòng cho cả file: *"412 bản dịch đã
+duyệt trong classes.dex sẽ không xuất hiện: bản build này đọc được bảng chuỗi nhưng chưa ghi lại
+được."* Một dòng, không phải 412 — 412 dòng giống nhau là báo cáo không ai đọc.
+
+Việc gom về một chỗ cũng xoá hai bất đồng đang có. `extract` từng nhận `.locres` **theo đuôi file và
+nuốt lỗi parse** trong khi khảo sát nhận **theo magic byte và báo lỗi**, nên `analyze` có thể nói
+một file có ba chuỗi đọc được còn `extract` không ra node nào. Và khảo sát từng liệt kê
+`META-INF/MANIFEST.MF` là "chữ đọc được" trong khi extraction cố tình không bao giờ đưa nó ra — hứa
+với người dịch những chuỗi họ sẽ không bao giờ thấy.
+
 ## What is named but not read
 
 Listed rather than passed over, each with what it is: `classes.dex`, `resources.arsc`, Unity

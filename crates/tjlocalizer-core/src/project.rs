@@ -1137,6 +1137,8 @@ impl Project {
             }]);
         }
 
+        validation.extend(crate::validate::check_refusals(&report.refused));
+
         // Run against the built archive, and after the rules: whether a redrawn image reached the
         // output is a fact about what will ship, not about what was intended.
         validation.extend(crate::validate::check_text_assets(

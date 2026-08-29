@@ -156,58 +156,55 @@ pub fn extract(archive: &Archive) -> ContentGraph {
     }
 
     for entry in archive.entries() {
-        // Unreal's string table is binary and never reaches the text path below, so it is read
-        // here by the one thing that understands it.
-        if entry.name.to_lowercase().ends_with(".locres") {
-            if let Ok(table) = crate::locres::Locres::parse(&entry.data) {
-                for found in table.entries() {
-                    nodes.push(make_node(
-                        TextSource::ResourceProperty {
-                            resource: entry.name.clone(),
-                            key: crate::locres::address(&found.namespace, &found.key),
-                        },
-                        found.text,
-                        None,
-                    ));
+        if entry.is_class() || is_archive_metadata(&entry.name) {
+            continue;
+        }
+
+        // The same question the build asks, asked the same way. These two used to decide
+        // separately - extraction by file extension, the survey by magic bytes - so a file could
+        // be reported as holding three readable strings and then produce no nodes at all, with
+        // nothing on screen explaining the difference.
+        match crate::writeback::plan(&entry.name, &entry.data) {
+            crate::writeback::Plan::Binary(crate::writeback::BinaryFormat::Locres) => {
+                // Parse failures cannot happen here: `plan` returns `Binary` only after parsing.
+                if let Ok(table) = crate::locres::Locres::parse(&entry.data) {
+                    for found in table.entries() {
+                        nodes.push(make_node(
+                            TextSource::ResourceProperty {
+                                resource: entry.name.clone(),
+                                key: crate::locres::address(&found.namespace, &found.key),
+                            },
+                            found.text,
+                            None,
+                        ));
+                    }
                 }
             }
-            continue;
-        }
-        if entry.is_class()
-            || is_archive_metadata(&entry.name)
-            || !encoding::looks_like_text(&entry.data)
-        {
-            continue;
-        }
-        let Some(candidate) = encoding::best(&entry.data, 0.5) else {
-            continue;
-        };
-        let decoded = encoding_rs::Encoding::for_label(candidate.label.as_bytes())
-            .unwrap_or(encoding_rs::UTF_8)
-            .decode(&entry.data)
-            .0
-            .into_owned();
 
-        // Which format decides how the text is addressed, and addressing is what has to survive:
-        // a key still finds its value after somebody edits the file, and a line number does not.
-        let format = crate::resource::detect(&entry.name, &decoded);
-        for field in crate::resource::read(format, &decoded) {
-            let source = if format.keyed() {
-                TextSource::ResourceProperty {
-                    resource: entry.name.clone(),
-                    key: field.key.clone(),
+            crate::writeback::Plan::Text { format, encoding } => {
+                let decoded = crate::writeback::decode(&entry.data, &encoding);
+                // Which format decides how the text is addressed, and addressing is what has to
+                // survive: a key still finds its value after somebody edits the file, and a line
+                // number does not.
+                for field in crate::resource::read(format, &decoded) {
+                    let source = if format.keyed() {
+                        TextSource::ResourceProperty {
+                            resource: entry.name.clone(),
+                            key: field.key.clone(),
+                        }
+                    } else {
+                        TextSource::ResourceLine {
+                            resource: entry.name.clone(),
+                            line: field.key.parse().unwrap_or(0),
+                        }
+                    };
+                    nodes.push(make_node(source, field.value, Some(encoding.clone())));
                 }
-            } else {
-                TextSource::ResourceLine {
-                    resource: entry.name.clone(),
-                    line: field.key.parse().unwrap_or(0),
-                }
-            };
-            nodes.push(make_node(
-                source,
-                field.value,
-                Some(candidate.label.clone()),
-            ));
+            }
+
+            // Nothing here can read it yet. `package::survey` is what tells a person that, with
+            // the reason; producing nodes nobody could write back would be worse than silence.
+            crate::writeback::Plan::ReadOnly { .. } => {}
         }
     }
 
@@ -224,7 +221,7 @@ pub fn extract(archive: &Archive) -> ContentGraph {
 ///
 /// This is a rule about the JAR format, not about any particular game, which is why it belongs
 /// here rather than in a profile.
-fn is_archive_metadata(name: &str) -> bool {
+pub(crate) fn is_archive_metadata(name: &str) -> bool {
     let upper = name.to_uppercase();
     upper.starts_with("META-INF/")
         || upper.ends_with(".MF")

@@ -81,6 +81,8 @@ pub struct ReadableView {
     pub entry: String,
     pub format: String,
     pub fields: usize,
+    /// Whether a build can write this file back. Readable and writable are different facts.
+    pub writable: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -121,6 +123,7 @@ impl ProjectSummary {
                         entry: r.entry,
                         format: r.format,
                         fields: r.fields,
+                        writable: r.writable,
                     })
                     .collect(),
                 opaque: found

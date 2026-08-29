@@ -92,6 +92,17 @@ pub struct ReadableResource {
     pub entry: String,
     pub format: String,
     pub fields: usize,
+    /// Whether a build can write this file back.
+    ///
+    /// Readable and writable are different facts and the three states a person needs to tell
+    /// apart are "text you can change", "text you cannot change yet", and "not text". A file in
+    /// the middle read as the first would be a translation nobody notices is missing.
+    #[serde(default = "yes")]
+    pub writable: bool,
+}
+
+fn yes() -> bool {
+    true
 }
 
 /// Something that certainly holds text, in a format this build cannot open.
@@ -148,85 +159,77 @@ pub fn detect(archive: &Archive) -> Detected {
 }
 
 /// Which entries hold text this build can read, and which hold text it cannot.
+///
+/// The decision itself belongs to `writeback::plan`, which the extractor and the build also ask -
+/// so what `analyze` reports and what `extract` produces cannot drift apart.
 fn survey(archive: &Archive) -> (Vec<ReadableResource>, Vec<OpaqueResource>) {
     let mut readable = Vec::new();
     let mut opaque = Vec::new();
 
     for entry in archive.entries() {
-        if let Some(reason) = known_opaque(&entry.name) {
-            opaque.push(OpaqueResource {
-                entry: entry.name.clone(),
-                reason: reason.to_string(),
-            });
+        // A package's own structure is not game text on any platform, and the same rule has to
+        // hold here as in extraction: listing MANIFEST.MF or AndroidManifest.xml as readable text
+        // promises a translator strings that will never be offered to them.
+        if entry.is_class() || crate::graph::is_archive_metadata(&entry.name) {
             continue;
         }
-        // Read by the one thing that understands it rather than by the text path, which would
-        // see a binary file and pass over it.
-        if crate::locres::Locres::looks_like(&entry.data) {
-            match crate::locres::Locres::parse(&entry.data) {
-                Ok(table) => readable.push(ReadableResource {
+        match crate::writeback::plan(&entry.name, &entry.data) {
+            crate::writeback::Plan::Binary(binary) => {
+                let fields = match binary {
+                    crate::writeback::BinaryFormat::Locres => {
+                        crate::locres::Locres::parse(&entry.data)
+                            .map(|t| t.entries().len())
+                            .unwrap_or(0)
+                    }
+                };
+                readable.push(ReadableResource {
                     entry: entry.name.clone(),
-                    format: "unreal-locres".into(),
-                    fields: table.entries().len(),
-                }),
-                Err(e) => opaque.push(OpaqueResource {
-                    entry: entry.name.clone(),
-                    reason: e.to_string(),
-                }),
+                    format: binary.name().to_string(),
+                    fields,
+                    writable: true,
+                });
             }
-            continue;
-        }
-        if entry.is_class() || !crate::encoding::looks_like_text(&entry.data) {
-            continue;
-        }
-        let Some(candidate) = crate::encoding::best(&entry.data, 0.5) else {
-            continue;
-        };
-        let text = encoding_rs::Encoding::for_label(candidate.label.as_bytes())
-            .unwrap_or(encoding_rs::UTF_8)
-            .decode(&entry.data)
-            .0
-            .into_owned();
-
-        let format = crate::resource::detect(&entry.name, &text);
-        let fields = crate::resource::read(format, &text).len();
-        if fields > 0 {
-            readable.push(ReadableResource {
-                entry: entry.name.clone(),
-                format: format.name().to_string(),
-                fields,
-            });
+            crate::writeback::Plan::Text { format, encoding } => {
+                let text = crate::writeback::decode(&entry.data, &encoding);
+                let fields = crate::resource::read(format, &text).len();
+                if fields > 0 {
+                    readable.push(ReadableResource {
+                        entry: entry.name.clone(),
+                        format: format.name().to_string(),
+                        fields,
+                        writable: true,
+                    });
+                }
+            }
+            crate::writeback::Plan::ReadOnly { reason } => {
+                // Only the ones that certainly hold text. Every other binary file in a game -
+                // textures, sound, meshes - would bury the ones that matter.
+                if holds_text(&entry.name) {
+                    opaque.push(OpaqueResource {
+                        entry: entry.name.clone(),
+                        reason,
+                    });
+                }
+            }
         }
     }
     readable.sort_by(|a, b| b.fields.cmp(&a.fields).then(a.entry.cmp(&b.entry)));
     (readable, opaque)
 }
 
-/// Files that certainly hold text this build cannot open yet.
+/// Whether a file this build cannot read is one that certainly holds text.
 ///
-/// Named individually rather than guessed at, and each says what it is. A translator who cannot
-/// see that a game keeps half its dialogue somewhere unreadable will conclude the game is half
-/// translated when it is not.
-fn known_opaque(name: &str) -> Option<&'static str> {
+/// Named individually rather than guessed at. A translator who cannot see that a game keeps half
+/// its dialogue somewhere unreadable will conclude the game is half translated when it is not -
+/// and a list that also named every texture and sound file would bury exactly that.
+fn holds_text(name: &str) -> bool {
     let lower = name.to_lowercase();
-    if lower.ends_with(".dex") {
-        return Some("Android bytecode: its string pool is readable in principle, not yet here");
-    }
-    if lower.ends_with("resources.arsc") {
-        return Some("Android's compiled resource table, a binary format");
-    }
-    if lower.ends_with(".xml") && !lower.contains("androidmanifest") {
-        // A packaged APK compiles its XML; a source tree or an unpacked one does not.
-        return None;
-    }
-    if lower.ends_with(".assets") || lower.ends_with(".bundle") || lower.ends_with(".unity3d") {
-        return Some("a Unity asset bundle, which needs its own reader");
-    }
-    if lower.ends_with(".pck") {
-        return Some("a Godot package, which needs its own reader");
-    }
-    if lower.ends_with(".rpa") {
-        return Some("a Ren'Py archive, which needs its own reader");
-    }
-    None
+    lower.ends_with(".dex")
+        || lower.ends_with("resources.arsc")
+        || lower.ends_with(".locres")
+        || lower.ends_with(".assets")
+        || lower.ends_with(".bundle")
+        || lower.ends_with(".unity3d")
+        || lower.ends_with(".pck")
+        || lower.ends_with(".rpa")
 }

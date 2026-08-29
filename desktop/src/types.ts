@@ -34,7 +34,7 @@ export interface PackageView {
   canRepackage: boolean;
   note: string | null;
   evidence: string[];
-  readable: { entry: string; format: string; fields: number }[];
+  readable: { entry: string; format: string; fields: number; writable: boolean }[];
   opaque: { entry: string; reason: string }[];
 }
 

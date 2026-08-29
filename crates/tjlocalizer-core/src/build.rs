@@ -35,7 +35,24 @@ pub struct BuildReport {
     pub literals_patched: usize,
     pub resources_patched: usize,
     pub skipped: Vec<String>,
+    /// Resources this build can read but not write, that had translations waiting for them.
+    ///
+    /// Structured rather than folded into `skipped`, because the interface shows these and the
+    /// count matters: a translator who approved four hundred lines needs to know they are not in
+    /// the file, and needs it as one fact rather than four hundred.
+    #[serde(default)]
+    pub refused: Vec<Refusal>,
     pub output_sha256: String,
+}
+
+/// A resource that was left alone, and what was waiting for it.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Refusal {
+    pub resource: String,
+    pub reason: String,
+    /// How many approved translations will not appear because of this.
+    pub translations: usize,
 }
 
 /// Applies every approved translation and returns the rebuilt archive.
@@ -110,45 +127,59 @@ pub fn apply(
                 .push(format!("{resource_name}: not in archive"));
             continue;
         };
-        if resource_name.to_lowercase().ends_with(".locres") {
-            let mut table = crate::locres::Locres::parse(&entry.data)?;
-            for (source, target) in &patches {
-                let TextSource::ResourceProperty { key, .. } = source else {
-                    continue;
-                };
-                if table.set_at(key, target) {
-                    report.resources_patched += 1;
-                } else {
-                    // An entry that has moved between versions of the game is not an error worth
-                    // stopping for, but it is a translation that will not appear - and silence
-                    // there reads as success.
-                    report
-                        .skipped
-                        .push(format!("{resource_name}: no entry {key}"));
-                }
+        // One question, asked in one place. Before this, the fallback below decoded every patched
+        // resource with `from_utf8_lossy` and wrote it back - which for a binary file means every
+        // invalid byte becomes U+FFFD and the file is destroyed while the build reports success.
+        match crate::writeback::plan(resource_name, &entry.data) {
+            crate::writeback::Plan::ReadOnly { reason } => {
+                report.refused.push(Refusal {
+                    resource: resource_name.to_string(),
+                    reason,
+                    translations: patches.len(),
+                });
+                continue;
             }
-            archive.replace(resource_name, table.write());
-            continue;
-        }
 
-        // Resources are rewritten as UTF-8 regardless of what they were read as: the game reads
-        // them through its own loader, and any charset that could not represent Vietnamese is the
-        // reason the text needed localizing in the first place.
-        let text = String::from_utf8_lossy(&entry.data).into_owned();
-        let format = crate::resource::detect(resource_name, &text);
+            crate::writeback::Plan::Binary(crate::writeback::BinaryFormat::Locres) => {
+                let mut table = crate::locres::Locres::parse(&entry.data)?;
+                for (source, target) in &patches {
+                    let TextSource::ResourceProperty { key, .. } = source else {
+                        continue;
+                    };
+                    if table.set_at(key, target) {
+                        report.resources_patched += 1;
+                    } else {
+                        // An entry that has moved between versions of the game is not an error
+                        // worth stopping for, but it is a translation that will not appear - and
+                        // silence there reads as success.
+                        report
+                            .skipped
+                            .push(format!("{resource_name}: no entry {key}"));
+                    }
+                }
+                archive.replace(resource_name, table.write());
+            }
 
-        let mut wanted: BTreeMap<String, String> = BTreeMap::new();
-        for (source, target) in patches {
-            let key = match source {
-                TextSource::ResourceProperty { key, .. } => key.clone(),
-                TextSource::ResourceLine { line, .. } => line.to_string(),
-                TextSource::ClassConstant { .. } => unreachable!(),
-            };
-            wanted.insert(key, (*target).to_string());
+            crate::writeback::Plan::Text { format, .. } => {
+                // Rewritten as UTF-8 regardless of what it was read as: the game reads it through
+                // its own loader, and any charset that could not represent Vietnamese is the
+                // reason the text needed localizing in the first place.
+                let text = String::from_utf8_lossy(&entry.data).into_owned();
+
+                let mut wanted: BTreeMap<String, String> = BTreeMap::new();
+                for (source, target) in patches {
+                    let key = match source {
+                        TextSource::ResourceProperty { key, .. } => key.clone(),
+                        TextSource::ResourceLine { line, .. } => line.to_string(),
+                        TextSource::ClassConstant { .. } => unreachable!(),
+                    };
+                    wanted.insert(key, (*target).to_string());
+                }
+                report.resources_patched += wanted.len();
+                let rebuilt = crate::resource::write(format, &text, &wanted);
+                archive.replace(resource_name, rebuilt.into_bytes());
+            }
         }
-        report.resources_patched += wanted.len();
-        let rebuilt = crate::resource::write(format, &text, &wanted);
-        archive.replace(resource_name, rebuilt.into_bytes());
     }
 
     if branding.enabled {

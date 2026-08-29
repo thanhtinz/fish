@@ -375,11 +375,16 @@ fn run(cli: Cli) -> Result<()> {
                 println!("text this build can read:");
                 for resource in package.readable.iter().take(20) {
                     println!(
-                        "  {:<44} {:<16} {} string{}",
+                        "  {:<44} {:<16} {} string{}{}",
                         resource.entry,
                         resource.format,
                         resource.fields,
-                        if resource.fields == 1 { "" } else { "s" }
+                        if resource.fields == 1 { "" } else { "s" },
+                        if resource.writable {
+                            ""
+                        } else {
+                            "  [read-only]"
+                        }
                     );
                 }
                 if package.readable.len() > 20 {
@@ -1535,6 +1540,19 @@ fn report_build(project: &Project, record: &BuildRecord) {
                 "constants changed"
             )
         );
+    }
+    // A refusal is not a failure and not a success: the build is correct and incomplete, and the
+    // incompleteness is invisible from anywhere else.
+    for refusal in &record.report.refused {
+        if refusal.translations > 0 {
+            println!(
+                "  left alone: {} ({} translation{} not applied) - {}",
+                refusal.resource,
+                refusal.translations,
+                if refusal.translations == 1 { "" } else { "s" },
+                refusal.reason
+            );
+        }
     }
     println!("  output/{name}");
     println!("  sha256 {}", record.report.output_sha256);
