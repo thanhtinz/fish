@@ -27,6 +27,19 @@ jobs:
           sudo apt-get install -y --no-install-recommends \
             libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+
+      # Tauri embeds the built interface into the binary, so the desktop crate does not compile
+      # until the frontend exists - and the built files are not in version control. Without this
+      # the whole workspace fails to build here, not just that crate.
+      - name: Build the desktop interface
+        run: npm ci && npm run build
+        working-directory: desktop
+
       - uses: Swatinem/rust-cache@v2
 
       - run: cargo fmt --all -- --check
