@@ -864,6 +864,28 @@ impl From<tjlocalizer_core::shorten::Alternative> for AlternativeView {
     }
 }
 
+/// A character the game names, and what was found out about them (§5, §15).
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct CharacterView {
+    pub name: String,
+    pub lines: usize,
+    pub appears_in: Vec<String>,
+    pub beside: Vec<String>,
+    /// A stance their lines lean towards, and the words that leaned that way. A proposal.
+    pub stance: Option<String>,
+    pub because: Vec<String>,
+}
+
+/// What one pass of inference worked out about a game (§10, §5, §15).
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct ContextView {
+    pub cast: Vec<CharacterView>,
+    /// How many lines were read from their surroundings rather than from their own shape.
+    pub readings: usize,
+}
+
 /// One adapter the project carries, and what it contributes to this game (§20).
 ///
 /// What *fired* is separate from what the plugin claims, because those are the two questions a

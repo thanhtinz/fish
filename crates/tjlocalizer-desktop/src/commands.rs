@@ -280,14 +280,19 @@ pub fn gloss(path: String, language: String, node_id: String) -> Reply<Option<Gl
         provider = provider.with_style(style);
     }
 
+    let voice = project.voice(&node_id).map_err(err)?;
     let request = Request {
         source_text: node.source_text.clone(),
         from: project.source_language().clone(),
         to: language,
         context: format!("{:?}", node.context).to_lowercase(),
         placeholders: node.constraints.placeholders.clone(),
-        speaker: Default::default(),
-        stance: Default::default(),
+        // Who is speaking decides the pronouns, and in Vietnamese there is no neutral choice to
+        // fall back on: a line a character says, translated as interface text, addresses the
+        // player as nobody. What the inference worked out is used where it worked something out,
+        // and the game's own voice where it did not.
+        speaker: voice.0,
+        stance: voice.1,
     };
     Ok(translate::propose(&request, &memory, &[&provider]).map(|p| GlossView::of(&p)))
 }
@@ -783,14 +788,19 @@ pub fn engine_translate(
             style: style.as_ref(),
         },
     );
+    let voice = project.voice(&node_id).map_err(err)?;
     let request = Request {
         source_text: node.source_text.clone(),
         from: project.source_language().clone(),
         to: language,
         context: format!("{:?}", node.context).to_lowercase(),
         placeholders: node.constraints.placeholders.clone(),
-        speaker: Default::default(),
-        stance: Default::default(),
+        // Who is speaking decides the pronouns, and in Vietnamese there is no neutral choice to
+        // fall back on: a line a character says, translated as interface text, addresses the
+        // player as nobody. What the inference worked out is used where it worked something out,
+        // and the game's own voice where it did not.
+        speaker: voice.0,
+        stance: voice.1,
     };
     Ok(provider.propose(&request).map(|p| GlossView::of(&p)))
 }
@@ -1313,6 +1323,46 @@ pub fn unmark_text_asset(path: String, entry: String) -> Reply<Vec<ImageAssetVie
         return Err(format!("{entry} was not marked"));
     }
     image_assets(path)
+}
+
+// ---------------------------------------------------------------------------------------------
+// What a line is for and who says it (§10, §5, §15).
+//
+// Read from the lines around it, because one string on its own often settles nothing: `Yes` is a
+// button by its length and a reply by its company. What comes back is readings with their
+// evidence and a cast with theirs - nothing here decides a register, which §14 leaves to a person.
+// ---------------------------------------------------------------------------------------------
+
+#[tauri::command]
+pub fn context(path: String) -> Reply<ContextView> {
+    let project = open(&path)?;
+    let inference = project.inference().map_err(err)?;
+    Ok(ContextView {
+        readings: inference.readings.len(),
+        cast: inference
+            .cast
+            .into_iter()
+            .map(|character| CharacterView {
+                name: character.name,
+                lines: character.lines,
+                appears_in: character.appears_in,
+                beside: character.beside,
+                stance: character
+                    .suggested_stance
+                    .as_ref()
+                    .map(|hint| match hint.stance {
+                        tjlocalizer_core::register::Stance::Deferential => "kính cẩn".to_string(),
+                        tjlocalizer_core::register::Stance::Familiar => "thân mật".to_string(),
+                        tjlocalizer_core::register::Stance::Hostile => "thù địch".to_string(),
+                        tjlocalizer_core::register::Stance::Neutral => "trung tính".to_string(),
+                    }),
+                because: character
+                    .suggested_stance
+                    .map(|hint| hint.because)
+                    .unwrap_or_default(),
+            })
+            .collect(),
+    })
 }
 
 // ---------------------------------------------------------------------------------------------

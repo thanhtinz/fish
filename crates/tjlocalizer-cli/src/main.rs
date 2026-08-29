@@ -388,6 +388,19 @@ enum Command {
         remove: Option<String>,
     },
 
+    /// What each line is for and who says it, read from the lines around it (§10, §15).
+    ///
+    /// `classify` looks at one string on its own, which for `Yes` settles nothing. This looks at
+    /// the company a string keeps: the keys beside it, the strings either side of it in the same
+    /// class, and whether the line names a speaker. Every reading carries its evidence, and none
+    /// of them overrules what the string itself said.
+    Context {
+        project: PathBuf,
+        /// Only the characters found, not the per-line readings.
+        #[arg(long)]
+        cast: bool,
+    },
+
     /// Adapters for one game or engine, written as data (§20).
     ///
     /// A plugin is a JSON file under the project's `plugins/` directory. It says what to look for
@@ -1554,6 +1567,63 @@ fn run(cli: Cli) -> Result<()> {
             Ok(())
         }
 
+        Command::Context { project, cast } => {
+            let project = Project::open(&project)?;
+            let inference = project.infer_context()?;
+
+            if !inference.cast.is_empty() {
+                println!("{} named character(s):", inference.cast.len());
+                for character in &inference.cast {
+                    println!(
+                        "  {} - {} line{} in {}",
+                        character.name,
+                        character.lines,
+                        if character.lines == 1 { "" } else { "s" },
+                        character.appears_in.join(", ")
+                    );
+                    if !character.beside.is_empty() {
+                        println!("      named beside {}", character.beside.join(", "));
+                    }
+                    if let Some(hint) = &character.suggested_stance {
+                        println!(
+                            "      sounds {:?} - {} - nothing applies this; it is for a person to judge",
+                            hint.stance,
+                            hint.because.join(", ")
+                        );
+                    }
+                }
+                println!();
+            }
+            if cast {
+                return Ok(());
+            }
+
+            if inference.readings.is_empty() {
+                println!("nothing to add: every string spoke for itself.");
+                return Ok(());
+            }
+
+            let graph = project.graph()?;
+            println!("{} reading(s):", inference.readings.len());
+            for reading in &inference.readings {
+                let text = graph
+                    .get(&reading.node)
+                    .map(|n| n.source_text.as_str())
+                    .unwrap_or("");
+                println!("  {:?}", text);
+                if let Some(context) = reading.context {
+                    println!("      reads as {}", context.key());
+                }
+                if let Some(character) = &reading.character {
+                    println!("      said by {character}");
+                }
+                for why in &reading.why {
+                    println!("      because {why}");
+                }
+            }
+            Ok(())
+        }
+
         Command::Plugins { project } => {
             let project = Project::open(&project)?;
             let plugins = project.plugins()?;
@@ -2000,6 +2070,10 @@ fn show_proposals(project: &Project, language: &Language, use_engine: bool) -> R
     let mut refused = 0usize;
     let mut shown = 0usize;
 
+    // Read once for the whole pass: who speaks a line decides its pronouns, and in Vietnamese
+    // there is no neutral choice to fall back on.
+    let inference = project.inference()?;
+
     for node in graph.translatable() {
         if approved.get(&node.id).is_some() {
             continue;
@@ -2010,8 +2084,8 @@ fn show_proposals(project: &Project, language: &Language, use_engine: bool) -> R
             to: language.clone(),
             context: format!("{:?}", node.context).to_lowercase(),
             placeholders: node.constraints.placeholders.clone(),
-            speaker: Default::default(),
-            stance: Default::default(),
+            speaker: inference.voice(&node.id).0,
+            stance: inference.voice(&node.id).1,
         };
         let Some(proposal) = translate::propose(&request, &memory, &providers) else {
             continue;

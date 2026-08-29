@@ -1,6 +1,7 @@
 import { Fragment, useState } from "react";
 import { AnalystCard } from "./AnalystCard";
 import { EngineCard } from "./EngineCard";
+import { CastCard } from "./CastCard";
 import { PluginsCard } from "./PluginsCard";
 import type {
   AnalystView,
@@ -329,6 +330,8 @@ export function OverviewView(props: Props) {
             onScan={props.onScan}
             onInspect={props.onInspect}
           />
+
+          <CastCard path={p.path} revision={p.translatableCount} />
 
           <PluginsCard path={p.path} />
 

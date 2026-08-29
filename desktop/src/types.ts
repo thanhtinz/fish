@@ -255,6 +255,22 @@ export type Hint =
   | { kind: "fewColours"; colours: number; inkPercent: number }
   | { kind: "shapeOfALine"; width: number; height: number; bands: number };
 
+/** Một nhân vật game gọi tên, và những gì suy ra được về họ. */
+export interface CharacterView {
+  name: string;
+  lines: number;
+  appearsIn: string[];
+  beside: string[];
+  stance: string | null;
+  because: string[];
+}
+
+/** Kết quả một lượt đọc ngữ cảnh. */
+export interface ContextView {
+  cast: CharacterView[];
+  readings: number;
+}
+
 /** Một thứ plugin khai báo, và nó có khớp game này không. */
 export interface PluginClaimView {
   what: string;

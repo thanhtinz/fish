@@ -133,6 +133,7 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for how the pieces fit,
 [docs/FONTS.md](docs/FONTS.md) for the glyph engine,
 [docs/RULES.md](docs/RULES.md) for the per-game patches,
 [docs/PLUGINS.md](docs/PLUGINS.md) for adapters written as data,
+[docs/CONTEXT.md](docs/CONTEXT.md) for what a line is for and who says it,
 [docs/PACKAGES.md](docs/PACKAGES.md) for the package kinds and text formats,
 [docs/ASSETS.md](docs/ASSETS.md) for words painted into artwork,
 [docs/SPEC-COVERAGE.md](docs/SPEC-COVERAGE.md) for what is built and what is not, and

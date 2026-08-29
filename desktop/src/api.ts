@@ -18,6 +18,7 @@ import type {
   GlossView,
   GridView,
   ImageAssetView,
+  ContextView,
   PluginsView,
   ReadingView,
   ImportReport,
@@ -224,6 +225,8 @@ export const api = {
     call<ImageAssetView[]>("unmark_text_asset", { path, entry }),
 
   plugins: (path: string) => call<PluginsView>("plugins", { path }),
+
+  context: (path: string) => call<ContextView>("context", { path }),
 
   rules: (path: string) => call<RuleView[]>("rules", { path }),
   writeFontInstallRule: (path: string) => call<RuleView[]>("write_font_install_rule", { path }),

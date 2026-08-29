@@ -668,7 +668,46 @@ impl Project {
     pub fn extract(&self) -> crate::Result<ContentGraph> {
         let graph = graph::extract_with(&self.original()?, &self.plugin_formats()?);
         write_json(&self.root.join("content/graph.json"), &graph)?;
+        // Read straight away rather than on demand: the readings are about this graph, and a
+        // stale set of them beside a fresh graph would attribute lines to characters who are no
+        // longer in the game.
+        write_json(
+            &self.root.join("content/context.json"),
+            &crate::context::infer(&graph),
+        )?;
         Ok(graph)
+    }
+
+    /// Reads the graph for what its lines are and who speaks them (§10, §5, §15).
+    ///
+    /// Run as part of extraction, so anything that asks for a node's voice has an answer without
+    /// a separate step somebody has to remember. It changes no node: the readings sit beside the
+    /// graph, carry their evidence, and the graph's own classifications stand where the two
+    /// disagree.
+    pub fn infer_context(&self) -> crate::Result<crate::context::Inference> {
+        let inference = crate::context::infer(&self.graph()?);
+        write_json(&self.root.join("content/context.json"), &inference)?;
+        Ok(inference)
+    }
+
+    /// The last inference, if extraction has run.
+    pub fn inference(&self) -> crate::Result<crate::context::Inference> {
+        let path = self.root.join("content/context.json");
+        if !path.exists() {
+            return Ok(crate::context::Inference::default());
+        }
+        read_json(&path)
+    }
+
+    /// The voice one node should be translated in (§14, §15).
+    ///
+    /// The game talking to the player unless something established otherwise, because that is
+    /// what interface text is and what most of a game's strings are.
+    pub fn voice(
+        &self,
+        node: &str,
+    ) -> crate::Result<(crate::register::Speaker, crate::register::Stance)> {
+        Ok(self.inference()?.voice(node))
     }
 
     /// The last scan's suggestions, kept apart from anything the package survey established.
