@@ -495,3 +495,138 @@ impl Recents {
         dir.join("recent-projects.json")
     }
 }
+
+/// The game's font, as the interface sees it.
+///
+/// `declared` is kept apart from "covers everything" on purpose. A project where nobody has said
+/// which image the font is has an unknown answer, not a good one, and an interface that shows the
+/// two the same way is how a localization ships with blank boxes where the accents should be.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FontView {
+    pub declared: bool,
+    /// The archive entry holding the sheet, empty when the game uses the device font.
+    pub entry: String,
+    pub device_font: bool,
+    pub grid: Option<GridView>,
+    /// The characters the sheet lays out. Empty means printable ASCII.
+    pub order: String,
+    pub mark_library: Option<String>,
+    pub marks_from: Option<String>,
+    /// How many of the 134 Vietnamese letters the font already draws.
+    pub covered: usize,
+    pub required: usize,
+    /// Those it cannot draw, so the interface can show them rather than a number.
+    pub missing: String,
+    /// Of the missing ones, how many can be built from letters the sheet already has.
+    pub composable: usize,
+    /// Set when the font is declared but cannot be read - a wrong entry, a missing grid.
+    pub problem: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GridView {
+    pub cell_width: u32,
+    pub cell_height: u32,
+    pub columns: u32,
+    pub rows: u32,
+}
+
+impl From<tjlocalizer_core::font::sheet::Grid> for GridView {
+    fn from(g: tjlocalizer_core::font::sheet::Grid) -> Self {
+        GridView {
+            cell_width: g.cell_width,
+            cell_height: g.cell_height,
+            columns: g.columns,
+            rows: g.rows,
+        }
+    }
+}
+
+impl From<GridView> for tjlocalizer_core::font::sheet::Grid {
+    fn from(g: GridView) -> Self {
+        tjlocalizer_core::font::sheet::Grid {
+            cell_width: g.cell_width,
+            cell_height: g.cell_height,
+            columns: g.columns,
+            rows: g.rows,
+        }
+    }
+}
+
+/// One image in the archive that could be the font, with the grids that would fit it.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SheetCandidateView {
+    pub entry: String,
+    pub width: u32,
+    pub height: u32,
+    pub ink_share: f32,
+    pub colours: usize,
+    pub grids: Vec<GridSuggestionView>,
+    /// The image itself, so a person can look at it instead of guessing from numbers.
+    pub image: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GridSuggestionView {
+    #[serde(flatten)]
+    pub grid: GridView,
+    pub fit: f32,
+    /// How many cells this grid gives, against the 95 printable ASCII a sheet usually holds.
+    pub capacity: u32,
+}
+
+/// One font in the chosen folder, measured against this game's sheet.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FontFitView {
+    pub path: String,
+    pub name: String,
+    /// Letters whose marks came from this typeface rather than being drawn.
+    pub from_typeface: usize,
+    pub composed: usize,
+    pub share: f32,
+    pub chosen: bool,
+}
+
+/// What composing produced, and what it did not.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CompositionView {
+    pub path: String,
+    pub added: String,
+    /// Letters left out, grouped by why.
+    ///
+    /// Grouped because the reasons repeat: a sheet with no headroom refuses the same way for
+    /// sixty letters, and sixty copies of one sentence is a wall of text nobody reads - which
+    /// hides the one line that says what to do about it.
+    pub skipped: Vec<SkippedGroupView>,
+    pub from_typeface: usize,
+    pub typeface: Option<String>,
+    pub image: String,
+}
+
+/// What a folder of fonts turned out to hold, and how much of it was actually measured.
+///
+/// The three counts are kept apart because they answer different questions: how many fonts are
+/// in the folder, how many could supply every Vietnamese mark, and how many were tried against
+/// this sheet. Reporting only the last would make a sampled folder look like an exhausted one.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FontScan {
+    pub found: usize,
+    pub covering: usize,
+    pub measured: usize,
+    pub fonts: Vec<FontFitView>,
+}
+
+/// One reason letters were left out, and which letters those were.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SkippedGroupView {
+    pub reason: String,
+    pub letters: String,
+}

@@ -158,3 +158,65 @@ export interface EnginePreview {
   instructions: string;
   body: string;
 }
+
+export interface GridView {
+  cellWidth: number;
+  cellHeight: number;
+  columns: number;
+  rows: number;
+}
+
+export interface GridSuggestionView extends GridView {
+  fit: number;
+  capacity: number;
+}
+
+export interface SheetCandidateView {
+  entry: string;
+  width: number;
+  height: number;
+  inkShare: number;
+  colours: number;
+  grids: GridSuggestionView[];
+  image: string;
+}
+
+export interface FontView {
+  declared: boolean;
+  entry: string;
+  deviceFont: boolean;
+  grid: GridView | null;
+  order: string;
+  markLibrary: string | null;
+  marksFrom: string | null;
+  covered: number;
+  required: number;
+  missing: string;
+  composable: number;
+  problem: string | null;
+}
+
+export interface FontFitView {
+  path: string;
+  name: string;
+  fromTypeface: number;
+  composed: number;
+  share: number;
+  chosen: boolean;
+}
+
+export interface FontScan {
+  found: number;
+  covering: number;
+  measured: number;
+  fonts: FontFitView[];
+}
+
+export interface CompositionView {
+  path: string;
+  added: string;
+  skipped: { reason: string; letters: string }[];
+  fromTypeface: number;
+  typeface: string | null;
+  image: string;
+}

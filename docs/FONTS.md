@@ -145,6 +145,29 @@ tjlocalizer font projects/game --preview
 first and the borrowed ones below. **Look at the small rows.** The enlarged ones are there to see
 the shapes; the small ones are what ships.
 
+## From the application
+
+Everything above is in the desktop application's **Font** tab as well as the CLI: finding the
+sheet, picking the grid from ranked suggestions, choosing a folder of typefaces and a font from
+it, previewing both mark styles at the shipping size, and composing. `crates/tjlocalizer-desktop/
+tests/font_commands.rs` covers the orders somebody can click these in - composing before a sheet
+is declared, choosing a typeface before a folder - because each of those has to produce a
+sentence rather than a panic.
+
+Two measures were added for the interface, since a person picking from a list needs the first
+entry to usually be right:
+
+`plausible_grids` scores every grid that divides an image evenly on three counts, because each
+one alone accepts a wrong grid. **Boundary clearness** - with the right grid, glyphs do not touch
+each other. **Occupancy** - a grid with twice the true number of rows also has clear boundaries,
+since it cuts the sheet into the letters and the space above them, but half its cells are empty.
+**Baseline agreement** - a grid one and a half times as tall keeps every cell full, and gives
+itself away by putting the letters at different depths within them. The third measure exists
+because a test caught the second one ranking a 4-row reading of a 6-row sheet first.
+
+`font_candidates` ranks the archive's images by how much each looks like a glyph sheet, on the
+best grid's score, how little ink it carries, and how few colours it uses.
+
 ## What it does not do
 
 **It does not install the font.** Making the game *use* the new glyphs means changing how it looks

@@ -3,6 +3,7 @@ import { api, isDesktop, pickFile, pickFolder, pickJar, pickSavePath } from "./a
 import { OverviewView } from "./OverviewView";
 import { TextView } from "./TextView";
 import { BuildsView } from "./BuildView";
+import { FontView } from "./FontView";
 import type {
   BuildView,
   CapabilityView,
@@ -15,7 +16,7 @@ import type {
   StyleView,
 } from "./types";
 
-type Tab = "overview" | "text" | "build";
+type Tab = "overview" | "text" | "font" | "build";
 
 export function App() {
   const [recents, setRecents] = useState<RecentView[]>([]);
@@ -335,6 +336,12 @@ export function App() {
                   Văn bản {project.nodeCount > 0 && `(${project.nodeCount})`}
                 </button>
                 <button
+                  className={tab === "font" ? "tab on" : "tab"}
+                  onClick={() => setTab("font")}
+                >
+                  Font
+                </button>
+                <button
                   className={tab === "build" ? "tab on" : "tab"}
                   onClick={() => setTab("build")}
                 >
@@ -463,6 +470,8 @@ export function App() {
                     onImport={doImportCsv}
                   />
                 )}
+
+                {tab === "font" && <FontView path={project.path} say={say} />}
 
                 {tab === "build" && (
                   <BuildsView

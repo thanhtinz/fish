@@ -7,15 +7,20 @@
 import type {
   BuildView,
   CapabilityView,
+  CompositionView,
   DictionaryView,
   EnginePreview,
   EngineView,
+  FontScan,
+  FontView,
   GlossView,
+  GridView,
   ImportReport,
   LanguageView,
   NodeView,
   ProjectSummary,
   RecentView,
+  SheetCandidateView,
   StyleView,
 } from "./types";
 
@@ -153,4 +158,24 @@ export const api = {
 
   engineTranslate: (path: string, language: string, nodeId: string) =>
     call<GlossView | null>("engine_translate", { path, language, nodeId }),
+
+  fontStatus: (path: string) => call<FontView>("font_status", { path }),
+  fontCandidates: (path: string) => call<SheetCandidateView[]>("font_candidates", { path }),
+
+  setFontSheet: (path: string, entry: string, grid: GridView, order: string | null) =>
+    call<FontView>("set_font_sheet", { path, entry, grid, order }),
+
+  setDeviceFont: (path: string) => call<FontView>("set_device_font", { path }),
+  clearFont: (path: string) => call<FontView>("clear_font", { path }),
+
+  scanFontLibrary: (path: string, directory: string, limit: number | null) =>
+    call<FontScan>("scan_font_library", { path, directory, limit }),
+
+  setMarksFont: (path: string, font: string | null) =>
+    call<FontView>("set_marks_font", { path, font }),
+
+  composeFont: (path: string) => call<CompositionView>("compose_font", { path }),
+
+  fontPreview: (path: string, text: string | null, scale: number | null) =>
+    call<string>("font_preview", { path, text, scale }),
 };

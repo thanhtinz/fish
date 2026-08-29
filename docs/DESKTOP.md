@@ -52,7 +52,7 @@ Opened in a plain browser, the interface renders a short note saying it needs th
 and nothing else. There is deliberately no stand-in data: a screenshot of the interface must never
 be mistakable for a screenshot of it working.
 
-## The three screens
+## The four screens
 
 **Tổng quan** - the pipeline in the order §22 runs it, with each step's state visible rather than
 inferred; the target languages and their progress; the register picker, which shows what each
@@ -68,6 +68,36 @@ the original, where it lives, the placeholders that must survive, the current ca
 origin, and the quality warnings, recomputed on every read so a stale green row is impossible.
 Non-translatable strings are hidden by default rather than dropped, so "where did that string go?"
 has an answer.
+
+**Font** - the game's own font, which is the difference between a correct translation and a
+correct translation that displays. Most J2ME games draw text from an image holding the letters
+they were written for, and a game from China, Japan or Korea holds ASCII and nothing else, so
+Vietnamese renders as blanks until somebody deals with it.
+
+The tab does four things, and offers rather than decides at every one of them:
+
+- **Which image is the font.** Every PNG in the archive is ranked by how much it looks like a
+  glyph sheet - few colours, little ink, letters sitting inside a grid - and shown with a
+  thumbnail, because what separates a glyph sheet from a sprite atlas is often obvious only to
+  somebody who has seen the game run.
+- **Which grid it uses.** The grids that divide the image evenly are scored on three counts and
+  offered in order. The tool never picks: a grid off by a pixel shifts every glyph and reads as a
+  rendering bug rather than as a wrong setting.
+- **Where the marks come from.** Drawn from pixels by default, or borrowed from a folder of
+  typefaces on the user's own disk. Nothing is copied into the project - the path is remembered
+  and the font is read from where its owner keeps it - so a project can still be sent to a
+  translator. Fonts are measured against this game's sheet rather than read off the file, because
+  at twelve pixels no property of a font says how many of its marks will survive.
+- **What it looks like.** The sample text renders with both, at the size that ships, because
+  which reads better is not a thing a count can answer.
+
+Composing writes the extended sheet into the project's `fonts/`. It does **not** install it:
+making a game use new glyphs means changing how it looks characters up, which is per-game. The
+tab says so where the button is, not in a footnote.
+
+Coverage is reported in three states, not two: covered, missing, and *nobody has said*. A project
+whose font has never been declared has an unknown answer rather than a good one, and showing the
+two the same way is how a localization ships with empty boxes where the accents should be.
 
 **Đóng gói** - build one language or all of them, the validation report, the build history with
 rollback, and **Xuất file ra…**, which opens a native save dialog. Where the finished file goes is

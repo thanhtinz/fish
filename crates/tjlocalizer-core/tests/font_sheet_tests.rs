@@ -341,3 +341,78 @@ fn no_two_composed_letters_are_drawn_identically() {
         }
     }
 }
+
+/// A sheet's own grid should be the first thing offered for it.
+///
+/// The point of ranking is that the top suggestion is usually right; if it were not, a person
+/// scanning the list would be no better off than typing numbers into an empty box.
+#[test]
+fn the_real_grid_ranks_first() {
+    let sheet = ascii_sheet(3);
+    let guesses = tjlocalizer_core::font::sheet::plausible_grids(&sheet.image);
+
+    assert!(!guesses.is_empty(), "no grid was offered for a real sheet");
+    assert_eq!(
+        guesses[0].grid, sheet.grid,
+        "the sheet's own grid was not the first suggestion"
+    );
+    assert!(
+        guesses[0].fit > 0.9,
+        "the right grid scored badly: {}",
+        guesses[0].fit
+    );
+}
+
+/// Every suggestion has to divide the image evenly and hold enough cells to be a character set.
+/// A grid that does not is not a near miss - it is a guaranteed misreading of every glyph.
+#[test]
+fn suggestions_divide_the_image_and_could_hold_a_character_set() {
+    let sheet = ascii_sheet(3);
+    for guess in tjlocalizer_core::font::sheet::plausible_grids(&sheet.image) {
+        let grid = guess.grid;
+        assert_eq!(grid.cell_width * grid.columns, sheet.image.width);
+        assert_eq!(grid.cell_height * grid.rows, sheet.image.height);
+        assert!(
+            grid.capacity() >= 64,
+            "{grid:?} could not hold printable ASCII"
+        );
+        assert!((0.0..=1.0).contains(&guess.fit));
+    }
+}
+
+/// Artwork should not be mistaken for a glyph sheet.
+///
+/// Not by being rejected - `inspect` reports rather than judges - but by scoring low enough on
+/// every measure that it sorts below a real sheet.
+#[test]
+fn artwork_looks_nothing_like_a_glyph_sheet() {
+    let sheet = ascii_sheet(3);
+    let sheet_png = sheet.image.encode_png().unwrap();
+
+    // Dense, many-coloured, no clear lines anywhere: a background, not a font.
+    let mut art = Image::new(192, 132);
+    for y in 0..132u32 {
+        for x in 0..192u32 {
+            let r = ((x * 7 + y * 3) % 256) as u8;
+            let g = ((x * 3 + y * 11) % 256) as u8;
+            let b = ((x * 13 + y * 5) % 256) as u8;
+            art.set(x, y, [r, g, b, 255]);
+        }
+    }
+    let art_png = art.encode_png().unwrap();
+
+    let a = tjlocalizer_core::font::sheet::inspect("font.png", &sheet_png).unwrap();
+    let b = tjlocalizer_core::font::sheet::inspect("sky.png", &art_png).unwrap();
+
+    assert_eq!(a.entry, "font.png");
+    assert!(
+        a.ink_share < b.ink_share,
+        "the sheet was not the emptier image"
+    );
+    assert!(a.colours < b.colours, "the sheet was not the plainer image");
+    let art_fit = b.grids.first().map(|g| g.fit).unwrap_or(0.0);
+    assert!(
+        a.grids[0].fit > art_fit,
+        "artwork fitted a grid as well as a real sheet did ({art_fit})"
+    );
+}

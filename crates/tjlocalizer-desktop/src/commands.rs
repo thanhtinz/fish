@@ -13,8 +13,10 @@ use crate::state::*;
 use std::path::{Path, PathBuf};
 use tauri::Manager;
 use tjlocalizer_core::build::Branding;
+use tjlocalizer_core::font::library;
+use tjlocalizer_core::font::outline::MarkSource;
 use tjlocalizer_core::lang::{known_languages, Language};
-use tjlocalizer_core::project::Project;
+use tjlocalizer_core::project::{FontProfile, Project};
 use tjlocalizer_core::provider::{Briefing, HttpProvider, ProviderConfig, ProviderKind};
 use tjlocalizer_core::register;
 use tjlocalizer_core::secrets::Keys;
@@ -733,4 +735,368 @@ fn default_style(language: &Language) -> String {
         .first()
         .map(|p| p.id.clone())
         .unwrap_or_else(|| format!("{}-plain", language.base()))
+}
+
+// ---------------------------------------------------------------------------------------------
+// The game's font.
+//
+// A J2ME game usually draws from a strip of pixels rather than a system font, and that strip
+// holds the letters the game was written for - which for a game from China or Japan means ASCII
+// and nothing else. Vietnamese needs 134 letters beyond ASCII, so without doing something about
+// the font a finished translation renders as blanks. These commands are how a person does that
+// something from the application instead of the command line.
+// ---------------------------------------------------------------------------------------------
+
+/// A PNG the interface can show, as a data URI.
+///
+/// Tauri will not load an arbitrary path from the filesystem, and the images here live in the
+/// project directory and inside the user's archive. Inlining them avoids granting the webview a
+/// read of the disk in order to show a picture of a font.
+fn data_uri(png: &[u8]) -> String {
+    const ALPHABET: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    let mut out = String::from("data:image/png;base64,");
+    for chunk in png.chunks(3) {
+        let b = [
+            chunk[0],
+            *chunk.get(1).unwrap_or(&0),
+            *chunk.get(2).unwrap_or(&0),
+        ];
+        let n = (b[0] as u32) << 16 | (b[1] as u32) << 8 | b[2] as u32;
+        for i in 0..4 {
+            if i <= chunk.len() {
+                out.push(ALPHABET[(n >> (18 - i * 6) & 0x3F) as usize] as char);
+            } else {
+                out.push('=');
+            }
+        }
+    }
+    out
+}
+
+fn font_view(project: &Project) -> FontView {
+    let Some(profile) = project.profile().font.clone() else {
+        return FontView {
+            required: tjlocalizer_core::font::vietnamese_required().len(),
+            ..Default::default()
+        };
+    };
+
+    let mut view = FontView {
+        declared: true,
+        entry: profile.entry.clone(),
+        device_font: profile.device_font,
+        grid: profile.grid.map(GridView::from),
+        order: profile.order.clone(),
+        mark_library: profile.mark_library.map(|p| p.display().to_string()),
+        marks_from: profile.marks_from.map(|p| p.display().to_string()),
+        required: tjlocalizer_core::font::vietnamese_required().len(),
+        ..Default::default()
+    };
+
+    // A declared font that cannot be read is reported as a problem rather than as zero coverage.
+    // Zero coverage is a fact about a font; this is a fact about the project settings, and the
+    // two need different fixes.
+    match project.font_coverage() {
+        Ok(Some(coverage)) => {
+            let missing = coverage.missing_for_vietnamese();
+            view.covered = view.required - missing.len();
+            view.composable = coverage.composable().len();
+            view.missing = missing.into_iter().collect();
+        }
+        Ok(None) => view.declared = false,
+        Err(e) => view.problem = Some(err(e)),
+    }
+    view
+}
+
+#[tauri::command]
+pub fn font_status(path: String) -> Reply<FontView> {
+    Ok(font_view(&open(&path)?))
+}
+
+/// The images in the game that could be its font, best first, each with the grids that fit it.
+#[tauri::command]
+pub fn font_candidates(path: String) -> Reply<Vec<SheetCandidateView>> {
+    let project = open(&path)?;
+    let archive = project.original().map_err(err)?;
+    let candidates = project.font_candidates().map_err(err)?;
+
+    Ok(candidates
+        .into_iter()
+        .map(|c| SheetCandidateView {
+            image: archive
+                .get(&c.entry)
+                .map(|e| data_uri(&e.data))
+                .unwrap_or_default(),
+            grids: c
+                .grids
+                .iter()
+                .map(|g| GridSuggestionView {
+                    grid: GridView::from(g.grid),
+                    fit: g.fit,
+                    capacity: g.grid.capacity(),
+                })
+                .collect(),
+            entry: c.entry,
+            width: c.width,
+            height: c.height,
+            ink_share: c.ink_share,
+            colours: c.colours,
+        })
+        .collect())
+}
+
+/// Says which entry holds the font and how it is laid out.
+///
+/// The grid is given, not guessed: the interface offers the ranked suggestions and a person picks
+/// one, because a grid off by a pixel shifts every glyph and reads as a rendering bug rather than
+/// as a wrong setting.
+#[tauri::command]
+pub fn set_font_sheet(
+    path: String,
+    entry: String,
+    grid: GridView,
+    order: Option<String>,
+) -> Reply<FontView> {
+    let mut project = open(&path)?;
+    let previous = project.profile().font.clone();
+    project.profile_mut().font = Some(FontProfile {
+        entry,
+        grid: Some(grid.into()),
+        order: order.unwrap_or_default(),
+        device_font: false,
+        // A folder of fonts is the person's, not the sheet's; changing which image is the font
+        // does not un-choose it.
+        mark_library: previous.as_ref().and_then(|p| p.mark_library.clone()),
+        marks_from: previous.and_then(|p| p.marks_from),
+    });
+    project.save().map_err(err)?;
+    Ok(font_view(&project))
+}
+
+/// Records that the game draws with the handset's own font.
+///
+/// Then there is no sheet to extend and nothing for this tab to compose - which is worth saying
+/// plainly, because it is the one case where the answer is "your font is already fine".
+#[tauri::command]
+pub fn set_device_font(path: String) -> Reply<FontView> {
+    let mut project = open(&path)?;
+    project.profile_mut().font = Some(FontProfile {
+        entry: String::new(),
+        grid: None,
+        order: String::new(),
+        device_font: true,
+        mark_library: None,
+        marks_from: None,
+    });
+    project.save().map_err(err)?;
+    Ok(font_view(&project))
+}
+
+/// Forgets what the project was told about the font.
+#[tauri::command]
+pub fn clear_font(path: String) -> Reply<FontView> {
+    let mut project = open(&path)?;
+    project.profile_mut().font = None;
+    project.save().map_err(err)?;
+    Ok(font_view(&project))
+}
+
+/// Measures the fonts in a folder against this game's sheet, best first.
+///
+/// Measured rather than read off the file: at twelve pixels a well-drawn typeface may contribute
+/// a third of its marks and a plainer one two thirds, and nothing about the file says which. That
+/// costs a rasterisation of 134 letters per font, so a folder is sampled up to `limit` and the
+/// interface says how many of the covering fonts were actually tried.
+#[tauri::command]
+pub fn scan_font_library(path: String, directory: String, limit: Option<usize>) -> Reply<FontScan> {
+    let mut project = open(&path)?;
+    let sheet = project
+        .font_sheet()
+        .map_err(err)?
+        .ok_or("say which image holds the font first")?;
+
+    let found = library::scan(Path::new(&directory)).map_err(err)?;
+    let covering: Vec<library::Candidate> = found
+        .iter()
+        .filter(|c| c.covers_vietnamese)
+        .cloned()
+        .collect();
+    let limit = limit.unwrap_or(40).max(1);
+    let measured = covering.iter().take(limit).cloned().collect::<Vec<_>>();
+    let fits = library::rank(&sheet, &measured).map_err(err)?;
+
+    // Remembering the folder is the point of choosing one; the font itself is chosen separately,
+    // because a person may want to look at several before deciding.
+    let chosen = project
+        .profile()
+        .font
+        .as_ref()
+        .and_then(|f| f.marks_from.clone());
+    if let Some(profile) = project.profile_mut().font.as_mut() {
+        profile.mark_library = Some(PathBuf::from(&directory));
+    }
+    project.save().map_err(err)?;
+
+    Ok(FontScan {
+        found: found.len(),
+        covering: covering.len(),
+        measured: measured.len(),
+        fonts: fits
+            .into_iter()
+            .map(|f| FontFitView {
+                chosen: chosen.as_deref() == Some(f.path.as_path()),
+                path: f.path.display().to_string(),
+                name: f.name.clone(),
+                share: f.share(),
+                from_typeface: f.from_typeface,
+                composed: f.composed,
+            })
+            .collect(),
+    })
+}
+
+/// Chooses the typeface the diacritics are borrowed from, or goes back to the drawn ones.
+///
+/// Nothing is copied. The path is remembered and the font is read from where its owner keeps it,
+/// so a project can be sent to a translator without carrying somebody's typefaces along.
+#[tauri::command]
+pub fn set_marks_font(path: String, font: Option<String>) -> Reply<FontView> {
+    let mut project = open(&path)?;
+    let font = font.filter(|f| !f.trim().is_empty()).map(PathBuf::from);
+    if let Some(chosen) = &font {
+        // Read it now rather than at compose time: a font that cannot be read should be refused
+        // where the person chose it, not three screens later.
+        MarkSource::from_path(chosen).map_err(err)?;
+    }
+    project
+        .profile_mut()
+        .font
+        .as_mut()
+        .ok_or("say which image holds the font first")?
+        .marks_from = font;
+    project.save().map_err(err)?;
+    Ok(font_view(&project))
+}
+
+/// Builds the extended sheet and writes it into the project's `fonts/` directory.
+///
+/// It does not install it. Making the game *use* the new glyphs means changing how it looks them
+/// up, which is per-game, and saying otherwise would be the difference between a font that works
+/// and one that looks like it should.
+#[tauri::command]
+pub fn compose_font(path: String) -> Reply<CompositionView> {
+    let project = open(&path)?;
+    let marks = project
+        .profile()
+        .font
+        .as_ref()
+        .and_then(|f| f.marks_from.clone())
+        .map(|p| MarkSource::from_path(&p))
+        .transpose()
+        .map_err(err)?;
+
+    let (written, report) = project
+        .compose_font(marks.as_ref())
+        .map_err(err)?
+        .ok_or("say which image holds the font first")?;
+
+    Ok(CompositionView {
+        image: std::fs::read(&written)
+            .map(|b| data_uri(&b))
+            .unwrap_or_default(),
+        path: written.display().to_string(),
+        added: report.added.iter().collect(),
+        skipped: {
+            // Kept in the order the reasons first appeared rather than sorted: the first one is
+            // the one that stopped the most letters, and that is the one worth reading.
+            let mut groups: Vec<SkippedGroupView> = Vec::new();
+            for skip in &report.skipped {
+                match groups.iter_mut().find(|g| g.reason == skip.reason) {
+                    Some(group) => group.letters.push(skip.composed),
+                    None => groups.push(SkippedGroupView {
+                        reason: skip.reason.clone(),
+                        letters: skip.composed.to_string(),
+                    }),
+                }
+            }
+            groups
+        },
+        from_typeface: report.from_typeface,
+        typeface: report.typeface,
+    })
+}
+
+/// Renders sample text with the drawn marks and, when one is chosen, with the typeface's.
+///
+/// Which reads better is not a thing a count can answer, so it is put in front of a person at the
+/// size that ships.
+#[tauri::command]
+pub fn font_preview(path: String, text: Option<String>, scale: Option<u32>) -> Reply<String> {
+    let project = open(&path)?;
+    let text = text.unwrap_or_else(|| {
+        "Cá đã cắn câu\nBạn nhận được 5 vàng\nĐiểm kinh nghiệm\nThoát trò chơi".to_string()
+    });
+    let lines: Vec<&str> = text.lines().filter(|l| !l.trim().is_empty()).collect();
+    let written = project
+        .preview_font(&lines, scale.unwrap_or(4).clamp(1, 8))
+        .map_err(err)?
+        .ok_or("say which image holds the font first")?;
+    std::fs::read(&written).map(|b| data_uri(&b)).map_err(err)
+}
+
+#[cfg(test)]
+mod tests {
+    /// The base64 here is written out by hand, and hand-written base64 gets the tail wrong: one
+    /// or two leftover bytes need a different number of characters and padding signs. A wrong
+    /// tail shows as a picture that will not load, with nothing on screen to say why.
+    #[test]
+    fn images_encode_the_way_a_browser_expects() {
+        let cases: [(&[u8], &str); 5] = [
+            (b"", ""),
+            (b"f", "Zg=="),
+            (b"fo", "Zm8="),
+            (b"foo", "Zm9v"),
+            (b"foobar", "Zm9vYmFy"),
+        ];
+        for (input, expected) in cases {
+            assert_eq!(
+                super::data_uri(input),
+                format!("data:image/png;base64,{expected}"),
+                "encoding {input:?}"
+            );
+        }
+    }
+
+    /// Every byte value, round-tripped through a decoder written independently of the encoder.
+    #[test]
+    fn every_byte_survives_the_round_trip() {
+        let bytes: Vec<u8> = (0..=255u8).collect();
+        for length in [1, 2, 3, 254, 255, 256] {
+            let source = &bytes[..length];
+            let encoded = super::data_uri(source);
+            let encoded = encoded.strip_prefix("data:image/png;base64,").unwrap();
+
+            let mut bits = 0u32;
+            let mut held = 0u32;
+            let mut decoded = Vec::new();
+            for c in encoded.chars().filter(|c| *c != '=') {
+                let value = match c {
+                    'A'..='Z' => c as u32 - 'A' as u32,
+                    'a'..='z' => c as u32 - 'a' as u32 + 26,
+                    '0'..='9' => c as u32 - '0' as u32 + 52,
+                    '+' => 62,
+                    '/' => 63,
+                    other => panic!("{other:?} is not a base64 character"),
+                };
+                bits = bits << 6 | value;
+                held += 6;
+                if held >= 8 {
+                    held -= 8;
+                    decoded.push((bits >> held & 0xFF) as u8);
+                }
+            }
+            assert_eq!(decoded, source, "at length {length}");
+        }
+    }
 }

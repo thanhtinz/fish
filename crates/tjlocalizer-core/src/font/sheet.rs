@@ -750,3 +750,214 @@ pub fn preview(sheets: &[(&str, &Sheet)], lines: &[&str], scale: u32) -> Image {
     }
     out
 }
+
+/// A grid that might be the one a sheet uses, with how well it fits.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GridGuess {
+    pub grid: Grid,
+    /// 0.0 to 1.0. How well this grid explains the image, on three counts: the lines between
+    /// cells are clear, the cells hold something, and the letters inside them sit on a common
+    /// baseline. All three are needed, because each alone accepts a wrong grid. Twice the true
+    /// number of rows keeps the boundaries clear - it cuts a sheet into the letters and the space
+    /// above them - and leaves half the cells blank. A grid one and a half times as tall keeps
+    /// every cell full and puts the letters at different heights within them.
+    pub fit: f32,
+}
+
+/// Grids that would divide an image evenly and could plausibly hold a character set.
+///
+/// Suggestions, never a choice. A grid inferred from one sheet is a guess about that sheet, and a
+/// wrong one shifts every glyph by a pixel in a way that reads as a rendering bug - so the tool
+/// offers the possibilities in order and a person picks. Offering a ranked list is a great deal
+/// more useful than an empty box, and a great deal safer than picking silently.
+pub fn plausible_grids(image: &Image) -> Vec<GridGuess> {
+    let mut guesses = Vec::new();
+
+    for columns in 4..=32u32 {
+        if image.width % columns != 0 {
+            continue;
+        }
+        let cell_width = image.width / columns;
+        if !(4..=64).contains(&cell_width) {
+            continue;
+        }
+        for rows in 2..=32u32 {
+            if image.height % rows != 0 {
+                continue;
+            }
+            let cell_height = image.height / rows;
+            if !(4..=64).contains(&cell_height) {
+                continue;
+            }
+            // A character set needs somewhere to put its characters. Below sixty-four cells this
+            // is a sprite strip, not a font.
+            if columns * rows < 64 {
+                continue;
+            }
+            let grid = Grid {
+                cell_width,
+                cell_height,
+                columns,
+                rows,
+            };
+            guesses.push(GridGuess {
+                fit: boundary_clearness(image, &grid) * 0.45
+                    + occupancy(image, &grid) * 0.3
+                    + baseline_agreement(image, &grid) * 0.25,
+                grid,
+            });
+        }
+    }
+
+    guesses.sort_by(|a, b| {
+        b.fit
+            .total_cmp(&a.fit)
+            // A tie goes to the grid with more cells: two grids explaining the image equally
+            // well, one of which holds more characters, means the smaller one is a fold of the
+            // larger and would leave characters unreachable.
+            .then((b.grid.columns * b.grid.rows).cmp(&(a.grid.columns * a.grid.rows)))
+    });
+    guesses.truncate(12);
+    guesses
+}
+
+/// The share of pixels on the cell boundaries that are empty.
+///
+/// With the right grid, glyphs sit inside their cells and the lines between them are clear. With
+/// the wrong one, glyphs straddle the boundaries and this drops.
+fn boundary_clearness(image: &Image, grid: &Grid) -> f32 {
+    let mut checked = 0usize;
+    let mut clear = 0usize;
+
+    let ink = |x: u32, y: u32| image.get(x, y)[3] >= 24;
+
+    for column in 1..grid.columns {
+        let x = column * grid.cell_width - 1;
+        for y in 0..image.height {
+            checked += 1;
+            if !ink(x, y) {
+                clear += 1;
+            }
+        }
+    }
+    for row in 1..grid.rows {
+        let y = row * grid.cell_height - 1;
+        for x in 0..image.width {
+            checked += 1;
+            if !ink(x, y) {
+                clear += 1;
+            }
+        }
+    }
+
+    if checked == 0 {
+        return 0.0;
+    }
+    clear as f32 / checked as f32
+}
+
+/// The share of cells holding any ink at all.
+///
+/// A font sheet has a letter in nearly every cell. A grid with twice the true number of rows
+/// leaves half of them empty, which is the difference boundary clearness alone cannot see.
+fn occupancy(image: &Image, grid: &Grid) -> f32 {
+    let mut used = 0u32;
+    for index in 0..grid.capacity() {
+        let (ox, oy) = grid.cell_origin(index);
+        let inked = (0..grid.cell_height).any(|y| {
+            (0..grid.cell_width).any(|x| {
+                let (px, py) = (ox + x, oy + y);
+                px < image.width && py < image.height && image.get(px, py)[3] >= 24
+            })
+        });
+        if inked {
+            used += 1;
+        }
+    }
+    if grid.capacity() == 0 {
+        return 0.0;
+    }
+    used as f32 / grid.capacity() as f32
+}
+
+/// The share of cells whose ink ends at the commonest distance from the bottom of the cell.
+///
+/// Letters in a font sit on a baseline, so with the right grid nearly every cell's ink stops at
+/// the same height. With a grid that is not a multiple of the true one, cells hold letters at
+/// different depths and this collapses - which is the wrong guess that clear boundaries and full
+/// cells both accept. Descenders keep this below one on a real sheet, which is why it is weighed
+/// alongside the others rather than trusted alone.
+fn baseline_agreement(image: &Image, grid: &Grid) -> f32 {
+    let mut bottoms: std::collections::HashMap<u32, u32> = Default::default();
+    let mut inked_cells = 0u32;
+
+    for index in 0..grid.capacity() {
+        let (ox, oy) = grid.cell_origin(index);
+        let mut bottom = None;
+        for y in 0..grid.cell_height {
+            for x in 0..grid.cell_width {
+                let (px, py) = (ox + x, oy + y);
+                if px < image.width && py < image.height && image.get(px, py)[3] >= 24 {
+                    bottom = Some(y);
+                    break;
+                }
+            }
+        }
+        if let Some(bottom) = bottom {
+            inked_cells += 1;
+            *bottoms.entry(bottom).or_default() += 1;
+        }
+    }
+
+    if inked_cells == 0 {
+        return 0.0;
+    }
+    let commonest = bottoms.values().copied().max().unwrap_or(0);
+    commonest as f32 / inked_cells as f32
+}
+
+/// What an image in the archive looks like, for offering it as a font sheet.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SheetCandidate {
+    pub entry: String,
+    pub width: u32,
+    pub height: u32,
+    /// Share of pixels carrying ink. A glyph sheet is mostly empty; artwork is not.
+    pub ink_share: f32,
+    /// How many distinct colours. A glyph sheet has very few; a photograph has thousands.
+    pub colours: usize,
+    pub grids: Vec<GridGuess>,
+}
+
+/// Looks at one image and reports whether it could be a glyph sheet.
+pub fn inspect(entry: &str, bytes: &[u8]) -> Result<SheetCandidate> {
+    let image = Image::decode_png(bytes)?;
+
+    let mut inked = 0usize;
+    let mut colours = std::collections::HashSet::new();
+    for y in 0..image.height {
+        for x in 0..image.width {
+            let pixel = image.get(x, y);
+            if pixel[3] >= 24 {
+                inked += 1;
+                // Capped: counting every colour of a photograph costs more than the answer is
+                // worth, and past a few hundred the answer is already "not a glyph sheet".
+                if colours.len() < 512 {
+                    colours.insert(pixel);
+                }
+            }
+        }
+    }
+    let total = (image.width * image.height).max(1) as f32;
+
+    Ok(SheetCandidate {
+        entry: entry.to_string(),
+        width: image.width,
+        height: image.height,
+        ink_share: inked as f32 / total,
+        colours: colours.len(),
+        grids: plausible_grids(&image),
+    })
+}

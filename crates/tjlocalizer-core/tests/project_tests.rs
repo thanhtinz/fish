@@ -261,3 +261,60 @@ fn rolling_back_to_a_build_that_never_happened_is_an_error() {
     let err = project.rollback(&vi(), 7).unwrap_err();
     assert!(err.to_string().contains("no build 7"), "got: {err}");
 }
+
+/// A project should be able to tell a person which images in their game might be the font.
+///
+/// Finding the glyph sheet by hand means opening a JAR and looking at every PNG, which is the
+/// part of this work people get wrong. The tool ranks; it does not choose.
+#[test]
+fn the_font_sheet_is_offered_ahead_of_the_artwork() {
+    use tjlocalizer_core::font::sheet::{Grid, Image};
+    use tjlocalizer_core::jar::Archive;
+
+    let cell = 12u32;
+    let columns = 16u32;
+    let characters: Vec<char> = (0x20u8..=0x7E).map(|b| b as char).collect();
+    let rows = (characters.len() as u32).div_ceil(columns);
+    let grid = Grid {
+        cell_width: cell,
+        cell_height: cell,
+        columns,
+        rows,
+    };
+    let mut font = Image::new(columns * cell, rows * cell);
+    for (i, c) in characters.iter().enumerate() {
+        if *c == ' ' {
+            continue;
+        }
+        let (ox, oy) = grid.cell_origin(i as u32);
+        for y in 0..5u32 {
+            for x in 0..6u32 {
+                font.set(ox + 3 + x, oy + 3 + y, [230, 230, 230, 255]);
+            }
+        }
+    }
+
+    let mut art = Image::new(192, 132);
+    for y in 0..132u32 {
+        for x in 0..192u32 {
+            let v = |m: u32, n: u32| ((x * m + y * n) % 256) as u8;
+            art.set(x, y, [v(7, 3), v(3, 11), v(13, 5), 255]);
+        }
+    }
+
+    let mut archive = Archive::read(&fixture()).unwrap();
+    archive.insert("sky.png", art.encode_png().unwrap());
+    archive.insert("font.png", font.encode_png().unwrap());
+
+    let dir = TempDir::new("font-candidates");
+    let project = Project::create(&dir.0, "sample-game", &archive.write().unwrap()).unwrap();
+
+    let candidates = project.font_candidates().unwrap();
+    let names: Vec<&str> = candidates.iter().map(|c| c.entry.as_str()).collect();
+    assert_eq!(
+        names,
+        vec!["font.png", "sky.png"],
+        "the glyph sheet should be offered first"
+    );
+    assert_eq!(candidates[0].grids[0].grid, grid);
+}

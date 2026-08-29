@@ -639,6 +639,39 @@ impl Project {
         Ok(Some((path, report)))
     }
 
+    /// Every image in the archive that could be a glyph sheet, best first.
+    ///
+    /// Ranked rather than chosen. What separates a glyph sheet from a sprite atlas is often only
+    /// obvious to someone who has seen the game run.
+    pub fn font_candidates(&self) -> crate::Result<Vec<font::sheet::SheetCandidate>> {
+        let archive = self.original()?;
+        let mut found = Vec::new();
+
+        for entry in archive.entries() {
+            if entry.extension() != "png" {
+                continue;
+            }
+            // An image that fails to decode is not a candidate; it is also not an error worth
+            // stopping for, because the archive is somebody else's and may hold anything.
+            if let Ok(candidate) = font::sheet::inspect(&entry.name, &entry.data) {
+                found.push(candidate);
+            }
+        }
+
+        found.sort_by(|a, b| {
+            let score = |c: &font::sheet::SheetCandidate| {
+                let best_fit = c.grids.first().map(|g| g.fit).unwrap_or(0.0);
+                // Few colours and little ink is what a glyph sheet looks like; a grid the glyphs
+                // sit inside is what confirms it.
+                let sparse = (1.0 - c.ink_share).clamp(0.0, 1.0);
+                let plain = 1.0 - (c.colours as f32 / 512.0).clamp(0.0, 1.0);
+                best_fit * 0.6 + sparse * 0.2 + plain * 0.2
+            };
+            score(b).total_cmp(&score(a))
+        });
+        Ok(found)
+    }
+
     /// Renders sample text with the drawn marks and with the chosen typeface, for comparison.
     ///
     /// Which reads better is not something a count can answer. A typeface supplying more marks is
