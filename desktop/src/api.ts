@@ -5,6 +5,7 @@
 // so rather than rendering something a screenshot could mistake for the real thing.
 
 import type {
+  AlternativeView,
   BuildView,
   CapabilityView,
   CompositionView,
@@ -179,6 +180,9 @@ export const api = {
 
   fontPreview: (path: string, text: string | null, scale: number | null) =>
     call<string>("font_preview", { path, text, scale }),
+
+  shorter: (path: string, language: string, nodeId: string) =>
+    call<AlternativeView[]>("shorter", { path, language, nodeId }),
 
   renderText: (path: string, text: string, scale: number | null) =>
     call<string | null>("render_text", { path, text, scale }),

@@ -23,6 +23,7 @@ pub mod quality;
 pub mod register;
 pub mod rules;
 pub mod secrets;
+pub mod shorten;
 pub mod suggest;
 pub mod translate;
 pub mod translation;

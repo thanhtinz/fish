@@ -231,3 +231,9 @@ export interface RuleView {
   effects: string[];
   unmet: string[];
 }
+
+export interface AlternativeView {
+  text: string;
+  width: number | null;
+  why: string;
+}

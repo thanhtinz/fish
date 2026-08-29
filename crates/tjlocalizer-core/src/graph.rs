@@ -49,6 +49,28 @@ pub enum ContextType {
 }
 
 impl ContextType {
+    /// The name this context goes by outside the type: in dictionary domain matching, in the
+    /// interface, in a CSV a translator gets sent.
+    ///
+    /// Here rather than at each caller because the dictionary scores entries by this string, and
+    /// a second copy that spelled one of them differently would silently stop matching a whole
+    /// domain.
+    pub fn key(self) -> &'static str {
+        match self {
+            ContextType::Ui => "ui",
+            ContextType::Dialogue => "dialogue",
+            ContextType::Quest => "quest",
+            ContextType::Item => "item",
+            ContextType::Skill => "skill",
+            ContextType::System => "system",
+            ContextType::Tutorial => "tutorial",
+            ContextType::Story => "story",
+            ContextType::Format => "format",
+            ContextType::Technical => "technical",
+            ContextType::Unknown => "unknown",
+        }
+    }
+
     /// Whether a translator should be offered this node at all.
     pub fn is_translatable(self) -> bool {
         !matches!(self, ContextType::Technical)

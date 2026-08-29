@@ -57,6 +57,7 @@ pub fn run() {
             commands::compose_font,
             commands::font_preview,
             commands::render_text,
+            commands::shorter,
             commands::proof_sheet,
             commands::rules,
             commands::write_font_install_rule,

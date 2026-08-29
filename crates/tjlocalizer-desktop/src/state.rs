@@ -393,19 +393,9 @@ impl NodeView {
 }
 
 fn context_label(context: ContextType) -> &'static str {
-    match context {
-        ContextType::Ui => "ui",
-        ContextType::Dialogue => "dialogue",
-        ContextType::Quest => "quest",
-        ContextType::Item => "item",
-        ContextType::Skill => "skill",
-        ContextType::System => "system",
-        ContextType::Tutorial => "tutorial",
-        ContextType::Story => "story",
-        ContextType::Format => "format",
-        ContextType::Technical => "technical",
-        ContextType::Unknown => "unknown",
-    }
+    // The core's own name for it. A second spelling here would drift from the one the dictionary
+    // scores entries against, and a whole domain would quietly stop matching.
+    context.key()
 }
 
 /// A build, flattened for display.
@@ -689,6 +679,25 @@ impl From<tjlocalizer_core::rules::RulePlan> for RuleView {
             enabled: plan.enabled,
             effects: plan.effects,
             unmet: plan.unmet,
+        }
+    }
+}
+
+/// A shorter way of saying the same thing, and why it is being offered.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AlternativeView {
+    pub text: String,
+    pub width: Option<u32>,
+    pub why: String,
+}
+
+impl From<tjlocalizer_core::shorten::Alternative> for AlternativeView {
+    fn from(a: tjlocalizer_core::shorten::Alternative) -> Self {
+        AlternativeView {
+            text: a.text,
+            width: a.width,
+            why: a.why,
         }
     }
 }

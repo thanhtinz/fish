@@ -213,3 +213,50 @@ fn a_gloss_reports_the_register_it_was_made_under() {
     .unwrap();
     assert_eq!(proposal.register.as_deref(), Some("natural-dialogue"));
 }
+
+/// Priority has to decide between two readings of the same term in the context both suit.
+///
+/// It used to be unable to: a Ui entry in a "ui" context already scores the maximum, the score
+/// was clamped after priority was added, and so both readings tied and whichever happened to be
+/// listed last won. A curator raising a priority saw nothing change - which is worse than having
+/// no priority at all, because it looks like it worked.
+#[test]
+fn priority_decides_between_two_readings_of_one_term() {
+    use tjlocalizer_core::dictionary::{Dictionary, Domain, Entry, Pack};
+    use tjlocalizer_core::lang::Language;
+
+    let (from, to) = (Language::new("en"), Language::new("vi-VN"));
+    let entry = |target: &str, priority: i32| Entry {
+        source: "Settings".into(),
+        target: target.into(),
+        domain: Domain::Ui,
+        priority,
+        note: String::new(),
+    };
+
+    for order in [
+        vec![("cài đặt", 10), ("thiết lập", 0)],
+        vec![("thiết lập", 0), ("cài đặt", 10)],
+    ] {
+        let mut dictionary = Dictionary::default();
+        dictionary.add(Pack {
+            from: from.clone(),
+            to: to.clone(),
+            source_note: "test".into(),
+            entries: order.iter().map(|(t, p)| entry(t, *p)).collect(),
+        });
+
+        let reading = dictionary.lookup("Settings", &from, &to, "ui").unwrap();
+        assert_eq!(
+            reading.target, "cài đặt",
+            "the listing order decided instead of the priority"
+        );
+        // The confidence a person reads stays inside its range, whatever the priority.
+        assert!((0.0..=1.0).contains(&reading.fit), "{}", reading.fit);
+
+        // And both readings are still offered, best first.
+        let readings = dictionary.readings("Settings", &from, &to, "ui");
+        assert_eq!(readings.len(), 2);
+        assert_eq!(readings[0].target, "cài đặt");
+    }
+}

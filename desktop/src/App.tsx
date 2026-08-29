@@ -89,6 +89,14 @@ export function App() {
     [projectPath],
   );
 
+  const shorterFor = useCallback(
+    (nodeId: string) =>
+      projectPath && language
+        ? api.shorter(projectPath, language, nodeId).catch(() => [])
+        : Promise.resolve([]),
+    [projectPath, language],
+  );
+
   const loadProject = useCallback(
     async (path: string) => {
       const summary = await run("open", () => api.openProject(path));
@@ -477,6 +485,7 @@ export function App() {
                       await refresh();
                     }}
                     onRender={renderWithGameFont}
+                    onShorter={shorterFor}
                     onExport={doExportCsv}
                     onImport={doImportCsv}
                   />

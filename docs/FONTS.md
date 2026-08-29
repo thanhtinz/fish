@@ -232,6 +232,31 @@ drawing on a fixed pitch, and where the widths differ it must be advancing by th
 text would be full of holes. Drawing a proportional font at fixed pitch would produce a picture
 no player will ever see.
 
+## Making it fit
+
+A check that reports a label is too wide, and a picture that shows it, still leave the work to
+somebody else. The work is finding a shorter way to say the same thing that is still Vietnamese
+and still means what the game meant.
+
+`shorten` offers what the project already holds. Two sources, both traceable:
+
+- **Another reading in the dictionary.** A term with two readings is carrying a choice, and a
+  button sometimes needs the shorter one. Only readings the translation actually used are
+  substituted, and only at word boundaries - "bắt" sits inside "bắt đầu", and a plain replace
+  would cut a word in half and offer the result as an improvement.
+- **A word the interface register says to drop.** Vietnamese interface text takes no pronoun: a
+  button says *Thoát*, not *Bạn thoát*. The `terse-ui` profile already carries that as data, so
+  the offer comes from there rather than from an opinion.
+
+Every alternative is measured before it is offered, and only what is genuinely narrower survives.
+Fewer characters is not narrower - that is the whole reason the widths exist - so an alternative
+with fewer letters and more pixels is dropped rather than presented as a saving. Where the game
+has no declared sheet the offers fall back to counting characters, which is the worse question,
+and the widths are reported as absent rather than invented.
+
+Nothing is applied. The Text tab lists them under a row whose translation measured wider than its
+original, each with its reason and its width, and a person picks.
+
 ## Installing it
 
 Composing writes artwork. Putting it in the game is a rule (§19), because which entry the game

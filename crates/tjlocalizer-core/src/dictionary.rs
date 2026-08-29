@@ -187,14 +187,54 @@ impl Dictionary {
             .into_iter()
             .filter(|e| fold(&e.source) == folded)
             .map(|e| (score(e, context), e))
-            .max_by(|a, b| a.0.total_cmp(&b.0))
-            .map(|(fit, e)| Reading {
+            // A tie goes to the first entry listed rather than the last, so a pack that adds a
+            // second reading for a term does not silently change what the first one meant.
+            .reduce(|best, next| if next.0 > best.0 { next } else { best })
+            .map(|(_, e)| Reading {
                 source: e.source.clone(),
                 target: e.target.clone(),
                 domain: e.domain,
-                fit,
+                fit: fit_of(e, context),
                 note: e.note.clone(),
             })
+    }
+
+    /// Every reading for a term, best first.
+    ///
+    /// `lookup` answers "what should this be"; this answers "what else could it be", which is a
+    /// different question and the one asked by anybody trying to make a label fit. A dictionary
+    /// carrying two words for one term is carrying a choice, and the shorter one is sometimes the
+    /// one a button needs.
+    pub fn readings(
+        &self,
+        term: &str,
+        from: &Language,
+        to: &Language,
+        context: &str,
+    ) -> Vec<Reading> {
+        let folded = fold(term);
+        let mut found: Vec<(f32, Reading)> = self
+            .entries_for(from, to)
+            .into_iter()
+            .filter(|e| fold(&e.source) == folded)
+            .map(|e| (score(e, context), e))
+            .map(|(rank, e)| {
+                (
+                    rank,
+                    Reading {
+                        source: e.source.clone(),
+                        target: e.target.clone(),
+                        domain: e.domain,
+                        fit: fit_of(e, context),
+                        note: e.note.clone(),
+                    },
+                )
+            })
+            .collect();
+        found.sort_by(|a, b| b.0.total_cmp(&a.0));
+        let mut found: Vec<Reading> = found.into_iter().map(|(_, reading)| reading).collect();
+        found.dedup_by(|a, b| a.target == b.target);
+        found
     }
 
     /// Splits the text into terms, literals and unresolved stretches.
@@ -327,8 +367,19 @@ fn at_word_boundary(chars: &[char], start: usize, len: usize) -> bool {
 }
 
 /// How well an entry suits the context: its domain's affinity, nudged by its priority.
+///
+/// Not clamped. It used to be, and that quietly disabled `priority` exactly where a curator most
+/// needs it: a Ui entry in a "ui" context already scores 1.0, so adding its priority and clamping
+/// gave every reading of the term the same number, and which one won came down to the order they
+/// happened to be listed in. `fit` is clamped where it is reported, because there it is a
+/// confidence a person reads; ranking uses the real number.
 fn score(entry: &Entry, context: &str) -> f32 {
-    (entry.domain.affinity(context) + entry.priority as f32 * 0.05).clamp(0.0, 1.0)
+    entry.domain.affinity(context) + entry.priority as f32 * 0.05
+}
+
+/// The score as a confidence to show somebody: the same ranking, bounded.
+fn fit_of(entry: &Entry, context: &str) -> f32 {
+    score(entry, context).clamp(0.0, 1.0)
 }
 
 /// Case folding for matching. Deliberately character-preserving: the segmenter maps folded

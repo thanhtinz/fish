@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import type { GlossView, NodeView } from "./types";
+import type { AlternativeView, GlossView, NodeView } from "./types";
 
 interface Props {
   nodes: NodeView[];
@@ -8,6 +8,8 @@ interface Props {
   onEngine: ((nodeId: string) => Promise<GlossView | null>) | null;
   /// Draws one string with the game's own glyphs. Null when the game has no declared sheet.
   onRender: (text: string) => Promise<string | null>;
+  /// Shorter renderings of a row's translation, for when it will not fit.
+  onShorter: (nodeId: string) => Promise<AlternativeView[]>;
   onExport: () => void;
   onImport: () => void;
 }
@@ -27,6 +29,7 @@ export function TextView({
   onGloss,
   onEngine,
   onRender,
+  onShorter,
   onExport,
   onImport,
 }: Props) {
@@ -44,6 +47,7 @@ export function TextView({
     source: null,
     target: null,
   });
+  const [shorter, setShorter] = useState<AlternativeView[]>([]);
 
   const contexts = useMemo(
     () => Array.from(new Set(nodes.map((n) => n.context))).sort(),
@@ -110,6 +114,29 @@ export function TextView({
       cancelled = true;
     };
   }, [current?.id, current?.target, onRender]);
+
+  // Only asked for where it could matter: a row nobody has translated has nothing to shorten,
+  // and one that already fits does not need a list of ways to make it smaller.
+  const overflowing =
+    current?.sourceWidth !== undefined &&
+    current?.targetWidth !== undefined &&
+    current.targetWidth > current.sourceWidth;
+
+  useEffect(() => {
+    let cancelled = false;
+    setShorter([]);
+    if (!current || !current.target || !overflowing) return;
+    onShorter(current.id)
+      .then((found) => {
+        if (!cancelled) setShorter(found);
+      })
+      .catch(() => {
+        if (!cancelled) setShorter([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [current?.id, current?.target, overflowing, onShorter]);
 
   function select(node: NodeView) {
     setSelected(node.id);
@@ -281,6 +308,43 @@ export function TextView({
                 <div style={{ color: "var(--text-faint)", fontSize: 11.5, marginTop: 5 }}>
                   Đo bằng chính chữ của game. Số ký tự không nói lên điều này: chữ hoa rộng gấp mấy
                   lần chữ i, còn dấu tiếng Việt thì gần như không tốn thêm bề ngang.
+                </div>
+              </div>
+            )}
+
+            {shorter.length > 0 && (
+              <div className="block">
+                <h4>Cách nói ngắn hơn</h4>
+                <div style={{ display: "grid", gap: 7 }}>
+                  {shorter.slice(0, 5).map((a) => (
+                    <div key={a.text} className="cand-box">
+                      <div className="row" style={{ gap: 8 }}>
+                        <span style={{ flex: 1, minWidth: 0 }}>{a.text}</span>
+                        {a.width !== null && (
+                          <span
+                            style={{
+                              fontFamily: "var(--mono)",
+                              fontSize: 11.5,
+                              color:
+                                current.sourceWidth !== undefined && a.width <= current.sourceWidth
+                                  ? "var(--ok)"
+                                  : "var(--text-faint)",
+                            }}
+                          >
+                            {a.width}px
+                          </span>
+                        )}
+                        <button onClick={() => setDraft(a.text)}>Dùng</button>
+                      </div>
+                      <div style={{ color: "var(--text-faint)", fontSize: 11.5, marginTop: 4 }}>
+                        {a.why}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div style={{ color: "var(--text-faint)", fontSize: 11.5, marginTop: 7 }}>
+                  Lấy từ chính từ điển và văn phong của dự án, không phải chữ do máy nghĩ ra. Số
+                  xanh là vừa trong bề ngang của bản gốc.
                 </div>
               </div>
             )}

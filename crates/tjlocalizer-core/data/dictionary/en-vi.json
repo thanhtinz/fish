@@ -4,75 +4,14 @@
   "sourceNote": "Game terminology, English to Vietnamese.",
   "entries": [
     {
-      "source": "HP",
-      "target": "sinh lực",
-      "domain": "stat"
+      "source": "Abandon",
+      "target": "từ bỏ",
+      "domain": "quest"
     },
     {
-      "source": "MP",
-      "target": "nội lực",
-      "domain": "stat",
-      "note": "'pháp lực' outside wuxia"
-    },
-    {
-      "source": "EXP",
-      "target": "kinh nghiệm",
-      "domain": "stat"
-    },
-    {
-      "source": "Level",
-      "target": "cấp độ",
-      "domain": "stat"
-    },
-    {
-      "source": "Lv",
-      "target": "cấp",
-      "domain": "stat"
-    },
-    {
-      "source": "Attack",
-      "target": "tấn công",
-      "domain": "combat"
-    },
-    {
-      "source": "Defense",
-      "target": "phòng thủ",
-      "domain": "combat"
-    },
-    {
-      "source": "Defence",
-      "target": "phòng thủ",
-      "domain": "combat"
-    },
-    {
-      "source": "Speed",
-      "target": "tốc độ",
-      "domain": "stat"
-    },
-    {
-      "source": "Agility",
-      "target": "nhanh nhẹn",
-      "domain": "stat"
-    },
-    {
-      "source": "Strength",
-      "target": "sức mạnh",
-      "domain": "stat"
-    },
-    {
-      "source": "Intelligence",
-      "target": "trí lực",
-      "domain": "stat"
-    },
-    {
-      "source": "Luck",
-      "target": "may mắn",
-      "domain": "stat"
-    },
-    {
-      "source": "Critical",
-      "target": "bạo kích",
-      "domain": "combat"
+      "source": "Accept",
+      "target": "nhận",
+      "domain": "quest"
     },
     {
       "source": "Accuracy",
@@ -80,46 +19,24 @@
       "domain": "combat"
     },
     {
-      "source": "Evasion",
-      "target": "né tránh",
-      "domain": "combat"
+      "source": "Achievement",
+      "target": "thành tựu",
+      "domain": "ui"
     },
     {
-      "source": "Damage",
-      "target": "sát thương",
-      "domain": "combat"
+      "source": "Active",
+      "target": "chủ động",
+      "domain": "skill"
     },
     {
-      "source": "Heal",
-      "target": "hồi phục",
-      "domain": "combat"
+      "source": "Agility",
+      "target": "nhanh nhẹn",
+      "domain": "stat"
     },
     {
-      "source": "Stun",
-      "target": "choáng",
-      "domain": "combat"
-    },
-    {
-      "source": "Poison",
-      "target": "trúng độc",
-      "domain": "combat"
-    },
-    {
-      "source": "Equipment",
-      "target": "trang bị",
-      "domain": "item",
-      "priority": 2,
-      "note": "not 'thiết bị'"
-    },
-    {
-      "source": "Equip",
-      "target": "trang bị",
-      "domain": "item"
-    },
-    {
-      "source": "Weapon",
-      "target": "vũ khí",
-      "domain": "item"
+      "source": "Apprentice",
+      "target": "đồ đệ",
+      "domain": "social"
     },
     {
       "source": "Armor",
@@ -132,33 +49,18 @@
       "domain": "item"
     },
     {
-      "source": "Helmet",
-      "target": "mũ giáp",
-      "domain": "item"
+      "source": "Attack",
+      "target": "tấn công",
+      "domain": "combat"
     },
     {
-      "source": "Ring",
-      "target": "nhẫn",
-      "domain": "item"
+      "source": "Auction",
+      "target": "đấu giá",
+      "domain": "social"
     },
     {
-      "source": "Necklace",
-      "target": "dây chuyền",
-      "domain": "item"
-    },
-    {
-      "source": "Potion",
-      "target": "thuốc",
-      "domain": "item"
-    },
-    {
-      "source": "Material",
-      "target": "nguyên liệu",
-      "domain": "item"
-    },
-    {
-      "source": "Inventory",
-      "target": "hành trang",
+      "source": "Back",
+      "target": "quay lại",
       "domain": "ui"
     },
     {
@@ -167,24 +69,34 @@
       "domain": "ui"
     },
     {
-      "source": "Storage",
-      "target": "kho",
+      "source": "Battle",
+      "target": "chiến đấu",
+      "domain": "combat"
+    },
+    {
+      "source": "Boss",
+      "target": "trùm",
+      "domain": "combat"
+    },
+    {
+      "source": "Buy",
+      "target": "mua",
       "domain": "ui"
     },
     {
-      "source": "Warehouse",
-      "target": "kho",
+      "source": "Cancel",
+      "target": "huỷ",
       "domain": "ui"
     },
     {
-      "source": "Item",
-      "target": "vật phẩm",
-      "domain": "item"
+      "source": "Character",
+      "target": "nhân vật",
+      "domain": "ui"
     },
     {
-      "source": "Items",
-      "target": "vật phẩm",
-      "domain": "item"
+      "source": "Chat",
+      "target": "trò chuyện",
+      "domain": "social"
     },
     {
       "source": "Chest",
@@ -192,13 +104,101 @@
       "domain": "item"
     },
     {
-      "source": "Fragment",
-      "target": "mảnh",
-      "domain": "item"
+      "source": "Claim",
+      "target": "nhận thưởng",
+      "domain": "quest"
     },
     {
-      "source": "Upgrade",
-      "target": "nâng cấp",
+      "source": "Clan",
+      "target": "bang hội",
+      "domain": "social"
+    },
+    {
+      "source": "Close",
+      "target": "đóng",
+      "domain": "ui"
+    },
+    {
+      "source": "Coin",
+      "target": "xu",
+      "domain": "stat"
+    },
+    {
+      "source": "Complete",
+      "target": "hoàn thành",
+      "domain": "quest"
+    },
+    {
+      "source": "Confirm",
+      "target": "xác nhận",
+      "domain": "ui"
+    },
+    {
+      "source": "Connect",
+      "target": "kết nối",
+      "domain": "system"
+    },
+    {
+      "source": "Continue",
+      "target": "chơi tiếp",
+      "domain": "ui",
+      "priority": 5
+    },
+    {
+      "source": "Continue",
+      "target": "tiếp",
+      "domain": "ui",
+      "priority": 0,
+      "note": "shorter label, for a narrow button"
+    },
+    {
+      "source": "Cooldown",
+      "target": "hồi chiêu",
+      "domain": "skill"
+    },
+    {
+      "source": "Critical",
+      "target": "bạo kích",
+      "domain": "combat"
+    },
+    {
+      "source": "Daily",
+      "target": "hằng ngày",
+      "domain": "quest"
+    },
+    {
+      "source": "Damage",
+      "target": "sát thương",
+      "domain": "combat"
+    },
+    {
+      "source": "Defeat",
+      "target": "thất bại",
+      "domain": "combat"
+    },
+    {
+      "source": "Defence",
+      "target": "phòng thủ",
+      "domain": "combat"
+    },
+    {
+      "source": "Defense",
+      "target": "phòng thủ",
+      "domain": "combat"
+    },
+    {
+      "source": "Diamond",
+      "target": "kim cương",
+      "domain": "stat"
+    },
+    {
+      "source": "Drop",
+      "target": "vứt bỏ",
+      "domain": "ui"
+    },
+    {
+      "source": "Durability",
+      "target": "độ bền",
       "domain": "item"
     },
     {
@@ -207,131 +207,51 @@
       "domain": "item"
     },
     {
-      "source": "Gem",
-      "target": "bảo thạch",
+      "source": "Equip",
+      "target": "trang bị",
       "domain": "item"
     },
     {
-      "source": "Durability",
-      "target": "độ bền",
-      "domain": "item"
-    },
-    {
-      "source": "Skill",
-      "target": "kỹ năng",
-      "domain": "skill"
-    },
-    {
-      "source": "Skills",
-      "target": "kỹ năng",
-      "domain": "skill"
-    },
-    {
-      "source": "Spell",
-      "target": "phép",
-      "domain": "skill"
-    },
-    {
-      "source": "Passive",
-      "target": "bị động",
-      "domain": "skill"
-    },
-    {
-      "source": "Active",
-      "target": "chủ động",
-      "domain": "skill"
-    },
-    {
-      "source": "Cooldown",
-      "target": "hồi chiêu",
-      "domain": "skill"
-    },
-    {
-      "source": "Learn",
-      "target": "học",
-      "domain": "skill"
-    },
-    {
-      "source": "Quest",
-      "target": "nhiệm vụ",
-      "domain": "quest"
-    },
-    {
-      "source": "Quests",
-      "target": "nhiệm vụ",
-      "domain": "quest"
-    },
-    {
-      "source": "Mission",
-      "target": "nhiệm vụ",
-      "domain": "quest"
-    },
-    {
-      "source": "Main Quest",
-      "target": "nhiệm vụ chính",
-      "domain": "quest"
-    },
-    {
-      "source": "Side Quest",
-      "target": "nhiệm vụ phụ",
-      "domain": "quest"
-    },
-    {
-      "source": "Daily",
-      "target": "hằng ngày",
-      "domain": "quest"
-    },
-    {
-      "source": "Complete",
-      "target": "hoàn thành",
-      "domain": "quest"
-    },
-    {
-      "source": "Accept",
-      "target": "nhận",
-      "domain": "quest"
-    },
-    {
-      "source": "Abandon",
-      "target": "từ bỏ",
-      "domain": "quest"
-    },
-    {
-      "source": "Reward",
-      "target": "phần thưởng",
-      "domain": "quest"
-    },
-    {
-      "source": "Rewards",
-      "target": "phần thưởng",
-      "domain": "quest"
-    },
-    {
-      "source": "Objective",
-      "target": "mục tiêu",
-      "domain": "quest"
-    },
-    {
-      "source": "Progress",
-      "target": "tiến độ",
-      "domain": "quest"
-    },
-    {
-      "source": "Claim",
-      "target": "nhận thưởng",
-      "domain": "quest"
-    },
-    {
-      "source": "Guild",
-      "target": "bang hội",
-      "domain": "social",
+      "source": "Equipment",
+      "target": "trang bị",
+      "domain": "item",
       "priority": 2,
-      "note": "not 'hiệp hội'"
+      "note": "not 'thiết bị'"
     },
     {
-      "source": "Clan",
-      "target": "bang hội",
-      "domain": "social"
+      "source": "Error",
+      "target": "lỗi",
+      "domain": "system"
+    },
+    {
+      "source": "Evasion",
+      "target": "né tránh",
+      "domain": "combat"
+    },
+    {
+      "source": "Event",
+      "target": "sự kiện",
+      "domain": "ui"
+    },
+    {
+      "source": "Exit",
+      "target": "thoát",
+      "domain": "ui"
+    },
+    {
+      "source": "EXP",
+      "target": "kinh nghiệm",
+      "domain": "stat"
+    },
+    {
+      "source": "Flee",
+      "target": "bỏ chạy",
+      "domain": "combat"
+    },
+    {
+      "source": "Fragment",
+      "target": "mảnh",
+      "domain": "item"
     },
     {
       "source": "Friend",
@@ -344,258 +264,13 @@
       "domain": "social"
     },
     {
-      "source": "Chat",
-      "target": "trò chuyện",
-      "domain": "social"
-    },
-    {
-      "source": "World",
-      "target": "thế giới",
-      "domain": "social"
-    },
-    {
-      "source": "Whisper",
-      "target": "nhắn riêng",
-      "domain": "social"
-    },
-    {
-      "source": "Party",
-      "target": "tổ đội",
-      "domain": "social"
-    },
-    {
-      "source": "Team",
-      "target": "tổ đội",
-      "domain": "social"
-    },
-    {
-      "source": "Invite",
-      "target": "mời",
-      "domain": "social"
-    },
-    {
-      "source": "Trade",
-      "target": "giao dịch",
-      "domain": "social"
-    },
-    {
-      "source": "Auction",
-      "target": "đấu giá",
-      "domain": "social"
-    },
-    {
-      "source": "Ranking",
-      "target": "bảng xếp hạng",
-      "domain": "social"
-    },
-    {
-      "source": "Leaderboard",
-      "target": "bảng xếp hạng",
-      "domain": "social"
-    },
-    {
-      "source": "Master",
-      "target": "sư phụ",
-      "domain": "social"
-    },
-    {
-      "source": "Apprentice",
-      "target": "đồ đệ",
-      "domain": "social"
-    },
-    {
-      "source": "OK",
-      "target": "đồng ý",
-      "domain": "ui"
-    },
-    {
-      "source": "Cancel",
-      "target": "huỷ",
-      "domain": "ui"
-    },
-    {
-      "source": "Back",
-      "target": "quay lại",
-      "domain": "ui"
-    },
-    {
-      "source": "Exit",
-      "target": "thoát",
-      "domain": "ui"
-    },
-    {
-      "source": "Quit",
-      "target": "thoát",
-      "domain": "ui"
-    },
-    {
-      "source": "Settings",
-      "target": "cài đặt",
-      "domain": "ui"
-    },
-    {
-      "source": "Options",
-      "target": "tuỳ chọn",
-      "domain": "ui"
-    },
-    {
-      "source": "Help",
-      "target": "trợ giúp",
-      "domain": "ui"
-    },
-    {
-      "source": "Close",
-      "target": "đóng",
-      "domain": "ui"
-    },
-    {
-      "source": "Open",
-      "target": "mở",
-      "domain": "ui"
-    },
-    {
-      "source": "Buy",
-      "target": "mua",
-      "domain": "ui"
-    },
-    {
-      "source": "Sell",
-      "target": "bán",
-      "domain": "ui"
-    },
-    {
-      "source": "Use",
-      "target": "dùng",
-      "domain": "ui"
-    },
-    {
-      "source": "Drop",
-      "target": "vứt bỏ",
-      "domain": "ui"
-    },
-    {
-      "source": "Confirm",
-      "target": "xác nhận",
-      "domain": "ui"
-    },
-    {
-      "source": "Menu",
-      "target": "menu",
-      "domain": "ui"
-    },
-    {
-      "source": "Shop",
-      "target": "cửa hàng",
-      "domain": "ui"
-    },
-    {
-      "source": "Store",
-      "target": "cửa hàng",
-      "domain": "ui"
-    },
-    {
-      "source": "Start Game",
-      "target": "bắt đầu trò chơi",
-      "domain": "ui"
-    },
-    {
-      "source": "New Game",
-      "target": "trò chơi mới",
-      "domain": "ui"
-    },
-    {
-      "source": "Continue",
-      "target": "chơi tiếp",
-      "domain": "ui"
-    },
-    {
-      "source": "Save",
-      "target": "lưu",
-      "domain": "ui"
-    },
-    {
-      "source": "Load",
-      "target": "tải",
-      "domain": "ui"
-    },
-    {
-      "source": "Sound",
-      "target": "âm thanh",
-      "domain": "ui"
-    },
-    {
-      "source": "Music",
-      "target": "nhạc nền",
-      "domain": "ui"
-    },
-    {
-      "source": "Yes",
-      "target": "có",
-      "domain": "ui"
-    },
-    {
-      "source": "No",
-      "target": "không",
-      "domain": "ui"
-    },
-    {
-      "source": "Next",
-      "target": "tiếp theo",
-      "domain": "ui"
-    },
-    {
-      "source": "Previous",
-      "target": "quay lại",
-      "domain": "ui"
-    },
-    {
-      "source": "Character",
-      "target": "nhân vật",
-      "domain": "ui"
-    },
-    {
-      "source": "Login",
-      "target": "đăng nhập",
-      "domain": "ui"
-    },
-    {
-      "source": "Register",
-      "target": "đăng ký",
-      "domain": "ui"
-    },
-    {
-      "source": "Recharge",
-      "target": "nạp thẻ",
-      "domain": "ui"
+      "source": "Gem",
+      "target": "bảo thạch",
+      "domain": "item"
     },
     {
       "source": "Gift",
       "target": "gói quà",
-      "domain": "ui"
-    },
-    {
-      "source": "Event",
-      "target": "sự kiện",
-      "domain": "ui"
-    },
-    {
-      "source": "Notice",
-      "target": "thông báo",
-      "domain": "ui"
-    },
-    {
-      "source": "Mail",
-      "target": "thư",
-      "domain": "ui"
-    },
-    {
-      "source": "Map",
-      "target": "bản đồ",
-      "domain": "ui"
-    },
-    {
-      "source": "Teleport",
-      "target": "dịch chuyển",
       "domain": "ui"
     },
     {
@@ -604,79 +279,92 @@
       "domain": "stat"
     },
     {
-      "source": "Silver",
-      "target": "bạc",
+      "source": "Guild",
+      "target": "bang hội",
+      "domain": "social",
+      "priority": 2,
+      "note": "not 'hiệp hội'"
+    },
+    {
+      "source": "Heal",
+      "target": "hồi phục",
+      "domain": "combat"
+    },
+    {
+      "source": "Helmet",
+      "target": "mũ giáp",
+      "domain": "item"
+    },
+    {
+      "source": "Help",
+      "target": "trợ giúp",
+      "domain": "ui"
+    },
+    {
+      "source": "HP",
+      "target": "sinh lực",
       "domain": "stat"
     },
     {
-      "source": "Diamond",
-      "target": "kim cương",
+      "source": "Intelligence",
+      "target": "trí lực",
       "domain": "stat"
     },
     {
-      "source": "Coin",
-      "target": "xu",
+      "source": "Inventory",
+      "target": "hành trang",
+      "domain": "ui",
+      "priority": 5
+    },
+    {
+      "source": "Inventory",
+      "target": "túi đồ",
+      "domain": "ui",
+      "priority": 0,
+      "note": "shorter than \"hành trang\", equally standard"
+    },
+    {
+      "source": "Invite",
+      "target": "mời",
+      "domain": "social"
+    },
+    {
+      "source": "Item",
+      "target": "vật phẩm",
+      "domain": "item"
+    },
+    {
+      "source": "Items",
+      "target": "vật phẩm",
+      "domain": "item"
+    },
+    {
+      "source": "Leaderboard",
+      "target": "bảng xếp hạng",
+      "domain": "social",
+      "priority": 5
+    },
+    {
+      "source": "Leaderboard",
+      "target": "xếp hạng",
+      "domain": "social",
+      "priority": 0,
+      "note": "shorter label, drops \"bảng\""
+    },
+    {
+      "source": "Learn",
+      "target": "học",
+      "domain": "skill"
+    },
+    {
+      "source": "Level",
+      "target": "cấp độ",
       "domain": "stat"
     },
     {
-      "source": "Battle",
-      "target": "chiến đấu",
-      "domain": "combat"
-    },
-    {
-      "source": "Victory",
-      "target": "chiến thắng",
-      "domain": "combat"
-    },
-    {
-      "source": "Defeat",
-      "target": "thất bại",
-      "domain": "combat"
-    },
-    {
-      "source": "Revive",
-      "target": "hồi sinh",
-      "domain": "combat"
-    },
-    {
-      "source": "Flee",
-      "target": "bỏ chạy",
-      "domain": "combat"
-    },
-    {
-      "source": "Monster",
-      "target": "quái vật",
-      "domain": "combat"
-    },
-    {
-      "source": "Boss",
-      "target": "trùm",
-      "domain": "combat"
-    },
-    {
-      "source": "Turn",
-      "target": "lượt",
-      "domain": "combat"
-    },
-    {
-      "source": "Network",
-      "target": "mạng",
-      "domain": "system"
-    },
-    {
-      "source": "Connect",
-      "target": "kết nối",
-      "domain": "system"
-    },
-    {
-      "source": "Server",
-      "target": "máy chủ",
-      "domain": "system"
-    },
-    {
-      "source": "Error",
-      "target": "lỗi",
-      "domain": "system"
+      "source": "Load",
+      "target": "tải",
+      "domain": "ui"
     },
     {
       "source": "Loading",
@@ -684,9 +372,330 @@
       "domain": "system"
     },
     {
+      "source": "Login",
+      "target": "đăng nhập",
+      "domain": "ui"
+    },
+    {
+      "source": "Luck",
+      "target": "may mắn",
+      "domain": "stat"
+    },
+    {
+      "source": "Lv",
+      "target": "cấp",
+      "domain": "stat"
+    },
+    {
+      "source": "Mail",
+      "target": "thư",
+      "domain": "ui"
+    },
+    {
+      "source": "Main Quest",
+      "target": "nhiệm vụ chính",
+      "domain": "quest"
+    },
+    {
+      "source": "Map",
+      "target": "bản đồ",
+      "domain": "ui"
+    },
+    {
+      "source": "Master",
+      "target": "sư phụ",
+      "domain": "social"
+    },
+    {
+      "source": "Material",
+      "target": "nguyên liệu",
+      "domain": "item"
+    },
+    {
+      "source": "Menu",
+      "target": "menu",
+      "domain": "ui"
+    },
+    {
+      "source": "Mission",
+      "target": "nhiệm vụ",
+      "domain": "quest"
+    },
+    {
+      "source": "Monster",
+      "target": "quái vật",
+      "domain": "combat"
+    },
+    {
+      "source": "MP",
+      "target": "nội lực",
+      "domain": "stat",
+      "note": "'pháp lực' outside wuxia"
+    },
+    {
+      "source": "Music",
+      "target": "nhạc nền",
+      "domain": "ui"
+    },
+    {
+      "source": "Necklace",
+      "target": "dây chuyền",
+      "domain": "item"
+    },
+    {
+      "source": "Network",
+      "target": "mạng",
+      "domain": "system"
+    },
+    {
+      "source": "New Game",
+      "target": "trò chơi mới",
+      "domain": "ui"
+    },
+    {
+      "source": "Next",
+      "target": "tiếp theo",
+      "domain": "ui"
+    },
+    {
+      "source": "No",
+      "target": "không",
+      "domain": "ui"
+    },
+    {
+      "source": "Notice",
+      "target": "thông báo",
+      "domain": "ui"
+    },
+    {
+      "source": "Objective",
+      "target": "mục tiêu",
+      "domain": "quest"
+    },
+    {
+      "source": "OK",
+      "target": "đồng ý",
+      "domain": "ui"
+    },
+    {
+      "source": "Open",
+      "target": "mở",
+      "domain": "ui"
+    },
+    {
+      "source": "Options",
+      "target": "tuỳ chọn",
+      "domain": "ui"
+    },
+    {
+      "source": "Party",
+      "target": "tổ đội",
+      "domain": "social"
+    },
+    {
+      "source": "Passive",
+      "target": "bị động",
+      "domain": "skill"
+    },
+    {
       "source": "Please wait",
       "target": "xin chờ",
       "domain": "system"
+    },
+    {
+      "source": "Poison",
+      "target": "trúng độc",
+      "domain": "combat"
+    },
+    {
+      "source": "Potion",
+      "target": "thuốc",
+      "domain": "item"
+    },
+    {
+      "source": "Previous",
+      "target": "quay lại",
+      "domain": "ui"
+    },
+    {
+      "source": "Progress",
+      "target": "tiến độ",
+      "domain": "quest"
+    },
+    {
+      "source": "Quest",
+      "target": "nhiệm vụ",
+      "domain": "quest"
+    },
+    {
+      "source": "Quests",
+      "target": "nhiệm vụ",
+      "domain": "quest"
+    },
+    {
+      "source": "Quit",
+      "target": "thoát",
+      "domain": "ui"
+    },
+    {
+      "source": "Rank",
+      "target": "thứ hạng",
+      "domain": "ui"
+    },
+    {
+      "source": "Ranking",
+      "target": "bảng xếp hạng",
+      "domain": "social"
+    },
+    {
+      "source": "Recharge",
+      "target": "nạp thẻ",
+      "domain": "ui"
+    },
+    {
+      "source": "Register",
+      "target": "đăng ký",
+      "domain": "ui"
+    },
+    {
+      "source": "Revive",
+      "target": "hồi sinh",
+      "domain": "combat"
+    },
+    {
+      "source": "Reward",
+      "target": "phần thưởng",
+      "domain": "quest"
+    },
+    {
+      "source": "Rewards",
+      "target": "phần thưởng",
+      "domain": "quest"
+    },
+    {
+      "source": "Ring",
+      "target": "nhẫn",
+      "domain": "item"
+    },
+    {
+      "source": "Save",
+      "target": "lưu",
+      "domain": "ui"
+    },
+    {
+      "source": "Sell",
+      "target": "bán",
+      "domain": "ui"
+    },
+    {
+      "source": "Server",
+      "target": "máy chủ",
+      "domain": "system"
+    },
+    {
+      "source": "Settings",
+      "target": "cài đặt",
+      "domain": "ui"
+    },
+    {
+      "source": "Shop",
+      "target": "cửa hàng",
+      "domain": "ui"
+    },
+    {
+      "source": "Side Quest",
+      "target": "nhiệm vụ phụ",
+      "domain": "quest"
+    },
+    {
+      "source": "Silver",
+      "target": "bạc",
+      "domain": "stat"
+    },
+    {
+      "source": "Skill",
+      "target": "kỹ năng",
+      "domain": "skill"
+    },
+    {
+      "source": "Skills",
+      "target": "kỹ năng",
+      "domain": "skill"
+    },
+    {
+      "source": "Sound",
+      "target": "âm thanh",
+      "domain": "ui"
+    },
+    {
+      "source": "Speed",
+      "target": "tốc độ",
+      "domain": "stat"
+    },
+    {
+      "source": "Spell",
+      "target": "phép",
+      "domain": "skill"
+    },
+    {
+      "source": "Start Game",
+      "target": "bắt đầu trò chơi",
+      "domain": "ui",
+      "priority": 5
+    },
+    {
+      "source": "Start Game",
+      "target": "bắt đầu",
+      "domain": "ui",
+      "priority": 0,
+      "note": "shorter label, drops \"trò chơi\""
+    },
+    {
+      "source": "Start Game",
+      "target": "chơi",
+      "domain": "ui",
+      "priority": 0,
+      "note": "shortest, for a narrow button"
+    },
+    {
+      "source": "Storage",
+      "target": "kho",
+      "domain": "ui"
+    },
+    {
+      "source": "Store",
+      "target": "cửa hàng",
+      "domain": "ui"
+    },
+    {
+      "source": "Strength",
+      "target": "sức mạnh",
+      "domain": "stat"
+    },
+    {
+      "source": "Stun",
+      "target": "choáng",
+      "domain": "combat"
+    },
+    {
+      "source": "Team",
+      "target": "tổ đội",
+      "domain": "social"
+    },
+    {
+      "source": "Teleport",
+      "target": "dịch chuyển",
+      "domain": "ui"
+    },
+    {
+      "source": "Trade",
+      "target": "giao dịch",
+      "domain": "social"
+    },
+    {
+      "source": "Turn",
+      "target": "lượt",
+      "domain": "combat"
     },
     {
       "source": "Tutorial",
@@ -694,13 +703,43 @@
       "domain": "ui"
     },
     {
-      "source": "Achievement",
-      "target": "thành tựu",
+      "source": "Upgrade",
+      "target": "nâng cấp",
+      "domain": "item"
+    },
+    {
+      "source": "Use",
+      "target": "dùng",
       "domain": "ui"
     },
     {
-      "source": "Rank",
-      "target": "thứ hạng",
+      "source": "Victory",
+      "target": "chiến thắng",
+      "domain": "combat"
+    },
+    {
+      "source": "Warehouse",
+      "target": "kho",
+      "domain": "ui"
+    },
+    {
+      "source": "Weapon",
+      "target": "vũ khí",
+      "domain": "item"
+    },
+    {
+      "source": "Whisper",
+      "target": "nhắn riêng",
+      "domain": "social"
+    },
+    {
+      "source": "World",
+      "target": "thế giới",
+      "domain": "social"
+    },
+    {
+      "source": "Yes",
+      "target": "có",
       "domain": "ui"
     }
   ]

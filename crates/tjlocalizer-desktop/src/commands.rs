@@ -1032,6 +1032,22 @@ pub fn compose_font(path: String) -> Reply<CompositionView> {
     })
 }
 
+/// Shorter ways of saying what this row says, narrowest first (§24).
+///
+/// Offered, never applied. Each one names where it came from - another reading in the project's
+/// dictionary, a pronoun its interface register says to drop - because a suggestion a translator
+/// cannot check is one they have to work out again from scratch.
+#[tauri::command]
+pub fn shorter(path: String, language: String, node_id: String) -> Reply<Vec<AlternativeView>> {
+    let project = open(&path)?;
+    Ok(project
+        .shorter_alternatives(&Language::new(language), &node_id)
+        .map_err(err)?
+        .into_iter()
+        .map(AlternativeView::from)
+        .collect())
+}
+
 /// Draws one string exactly as the game will draw it.
 ///
 /// The numbers beside a row say a translation is wider; this says what it looks like. Which

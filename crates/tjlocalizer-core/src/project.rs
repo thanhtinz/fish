@@ -967,6 +967,38 @@ impl Project {
         Ok(rule)
     }
 
+    /// Shorter ways of saying what one node's translation says (§24).
+    ///
+    /// Offered after the layout check reports a label will not fit, and never applied: every
+    /// alternative comes from something this project already holds - another reading in its
+    /// dictionary, a word its own interface register says to drop - and a person picks.
+    pub fn shorter_alternatives(
+        &self,
+        language: &Language,
+        node_id: &str,
+    ) -> crate::Result<Vec<crate::shorten::Alternative>> {
+        let graph = self.graph()?;
+        let Some(node) = graph.nodes.iter().find(|n| n.id == node_id) else {
+            return Ok(Vec::new());
+        };
+        let translations = self.translations(language)?;
+        let Some(current) = translations.get(node_id) else {
+            return Ok(Vec::new());
+        };
+        let dictionary = self.dictionary()?;
+        let metrics = self.font_metrics()?;
+
+        Ok(crate::shorten::alternatives(
+            &node.source_text,
+            current,
+            &dictionary,
+            self.source_language(),
+            language,
+            node.context.key(),
+            metrics.as_ref(),
+        ))
+    }
+
     /// Generates translation candidates for one target (§22, step 9).
     pub fn suggest(
         &self,

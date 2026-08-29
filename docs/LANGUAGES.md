@@ -63,12 +63,12 @@ checks nothing, and says so rather than pretending.
 
 ## What ships
 
-628 entries across eight directions:
+633 entries across eight directions:
 
 | Direction | Entries |
 | --- | --- |
 | zh → vi-VN | 159 |
-| en → vi-VN | 139 |
+| en → vi-VN | 144 |
 | ja → vi-VN | 60 |
 | ko → vi-VN | 60 |
 | ru → vi-VN | 54 |
@@ -78,6 +78,16 @@ checks nothing, and says so rather than pretending.
 
 Embedded in the binary, so the tool works without a data directory beside it. A project's own packs
 go in its `dictionary/` folder and are loaded on top.
+
+Four English terms carry more than one reading: the established one, and a shorter label for a
+narrow button - "Start Game" as *bắt đầu trò chơi*, *bắt đầu* or *chơi*. The full rendering has the
+higher priority and stays the one the tool proposes; the short ones exist for `shorten`, which
+offers them only when the layout check has measured the label as too wide (see `docs/FONTS.md`).
+
+Priority decides between readings of one term, which it could not do until recently: a `ui` entry
+in a `ui` context already scores the maximum, the score was clamped after priority was added, and
+so readings tied and the listing order won. A curator raising a priority saw nothing change, which
+is worse than having no priority at all.
 
 Entries carry a **domain** - `ui`, `combat`, `item`, `skill`, `quest`, `social`, `stat`, `system`,
 `story` - matched against the content node's context, so a term can read differently in a menu and

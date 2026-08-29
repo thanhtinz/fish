@@ -16,7 +16,7 @@ are built, because a reader needs to know what is missing as much as what is the
 | 9 | Encoding and charset | **Built** | `encoding` (confidence-scored detection) plus modified UTF-8 in `classfile`. |
 | 10 | Context intelligence | **Partial** | Classification by shape, and dictionary domains matched against it. No cross-node inference. |
 | 11 | Vietnamese language engine | **Built** | Register profiles with pronoun sets, register-break detection, missing-diacritic and unconverted-Telex/VNI checks, plus the language-general quality checks. |
-| 12 | Dictionary | **Built** | 628 game-domain entries across eight directions, embedded; projects may add their own packs. See `docs/LANGUAGES.md`. |
+| 12 | Dictionary | **Built** | 633 game-domain entries across eight directions, embedded; projects may add their own packs. See `docs/LANGUAGES.md`. |
 | 13 | Glossary and translation memory | **Built** | `vietnamese`: locked terms, exact and fuzzy memory, `suggest` for candidates. |
 | 14 | Natural dialogue engine | **Partial** | Register profiles decide the voice, are sent to an external engine as instructions, and are checked against every reply. Sentence-level generation is the external engine's, and its output is never auto-approved - see `docs/LANGUAGES.md`. |
 | 15 | Character and relationship model | **Partial** | `Speaker` and `Stance` select the voice; nothing yet infers them per line. |
@@ -28,7 +28,7 @@ are built, because a reader needs to know what is missing as much as what is the
 | 21 | Project system | **Built** | `project`: immutable original, versioned profile, recorded builds, rollback. |
 | 22 | Localization workflow | **Partial** | Steps 1-11 and 14-17 are built, plus font generation and rules. Asset OCR is not. |
 | 23 | Build and repackaging | **Built** | Deterministic output, manifest preservation, SHA-256, build record. |
-| 24 | Validation and QA | **Partial** | Structural, class, resource, encoding, entry point, placeholder, attribution, per-language length and script, terminology, register, **glyph** and **layout width** checks - the last measured in the game's own pixels from its glyph sheet, for interface text on proportional fonts. Asset checks are not built. |
+| 24 | Validation and QA | **Partial** | Structural, class, resource, encoding, entry point, placeholder, attribution, per-language length and script, terminology, register, **glyph** and **layout width** checks - the last measured in the game's own pixels from its glyph sheet, for interface text on proportional fonts. Where the layout check fires, `shorten` offers narrower wordings from the project's own dictionary and interface register, measured and never applied. Asset checks are not built. |
 | 25 | Emulator and visual regression | **Partial** | No emulator: nothing here runs the game. `tjlocalizer proof` draws every approved translation with the game's own glyphs, at its own size, with a marker where the original ended, and the Text tab draws the selected row the same way. That catches what a report cannot - a mark landing on the letter below it, a stack that smudges at twelve pixels - and catches nothing about menus, backgrounds or timing. `tjlocalizer test` is still static. |
 | 26 | Branding and attribution | **Built** | See `docs/LEGAL.md`. |
 | 27 | CLI and automation | **Built** | Every subcommand in the specification, plus `builds` and `rollback`. The same pipeline is driveable from the desktop application. |
