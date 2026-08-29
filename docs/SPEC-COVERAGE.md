@@ -31,11 +31,11 @@ are built, because a reader needs to know what is missing as much as what is the
 | 24 | Validation and QA | **Partial** | Structural, class, resource, encoding, entry point, placeholder and attribution checks. Glyph, layout, asset and terminology checks are not built. |
 | 25 | Emulator and visual regression | **Not built** | `tjlocalizer test` performs static checks only and says so. |
 | 26 | Branding and attribution | **Built** | See `docs/LEGAL.md`. |
-| 27 | CLI and automation | **Built** | Every subcommand in the specification, plus `builds` and `rollback`. |
+| 27 | CLI and automation | **Built** | Every subcommand in the specification, plus `builds` and `rollback`. The same pipeline is driveable from the desktop application. |
 | 28 | Data model | **Partial** | project.json matches §28.1. The entities for dialogue, fonts, assets, rules and patches are not built. |
 | 29 | Security | **Built** | Untrusted-input handling and archive limits; no extracted code is executed. |
-| 30 | Technology stack | **Partial** | Rust core and CLI. The Tauri and React desktop shell is not built. |
-| 31 | Source structure | **Partial** | Two crates rather than the proposed layout, which assumed the desktop shell. |
+| 30 | Technology stack | **Built** | Rust core and CLI, Tauri desktop shell with a React and TypeScript interface. |
+| 31 | Source structure | **Built** | Three crates (core, CLI, desktop) plus the interface under `desktop/`. |
 | 32 | API and extension contracts | **Not built** | Depends on §20. |
 | 33 | Performance and scalability | **Partial** | Patches are grouped per class so each is parsed once; nothing has been profiled at scale. |
 | 34 | Roadmap | n/a | |
@@ -45,4 +45,6 @@ are built, because a reader needs to know what is missing as much as what is the
 
 The pipeline is exercised end to end by the test suite against a `javac`-produced fixture, and
 `tools/verify-roundtrip.sh` goes further: it patches a class with Vietnamese text longer than the
-original and runs it on a real JVM, which loads and verifies it. That is the standard used above.
+original and runs it on a real JVM, which loads and verifies it. `tools/verify-desktop.sh` boots
+the real desktop binary against a virtual display and checks that it opens and renders. That is
+the standard used above.

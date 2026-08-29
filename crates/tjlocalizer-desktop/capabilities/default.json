@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "What the interface is allowed to do: pick a file or a folder, and nothing else. The commands it calls are the ones this crate declares.",
+  "windows": ["main"],
+  "permissions": ["core:default", "dialog:allow-open"]
+}

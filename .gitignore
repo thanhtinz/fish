@@ -14,3 +14,10 @@ dist/
 .DS_Store
 .idea/
 .vscode/
+
+# Desktop UI build output
+/desktop/dist/
+/desktop/node_modules/
+
+# Tauri generated sources
+/crates/tjlocalizer-desktop/gen/

@@ -1,0 +1,39 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "TJLocalizer",
+  "version": "0.1.0",
+  "identifier": "com.thanhtinz.tjlocalizer",
+  "build": {
+    "frontendDist": "../../desktop/dist",
+    "devUrl": "http://localhost:5173",
+    "beforeDevCommand": "npm --prefix ../../desktop run dev",
+    "beforeBuildCommand": "npm --prefix ../../desktop run build"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "TJLocalizer",
+        "width": 1320,
+        "height": 860,
+        "minWidth": 960,
+        "minHeight": 620
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: asset: http://asset.localhost"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["deb", "appimage", "nsis", "dmg"],
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.png"
+    ],
+    "copyright": "Localization tooling © 2026 Thanhtinz",
+    "shortDescription": "Java/J2ME game localization",
+    "longDescription": "Localizes Java and J2ME game archives into Vietnamese. Nothing in the core is specific to any one game."
+  }
+}

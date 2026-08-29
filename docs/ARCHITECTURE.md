@@ -118,3 +118,16 @@ losing the build that replaced it.
 
 Output is written under `builds/` first and copied to `output/` second, so `output/` only ever
 holds a build that finished and has a record.
+
+### `tjlocalizer-desktop` and `desktop/` — the application
+
+A Tauri shell: a Rust backend calling the core directly, and a React and TypeScript interface.
+No localization logic is on the TypeScript side. The rule that makes this concrete is
+auto-approval - whether a candidate may be taken without a human is decided by `suggest::apply_safe`
+in Rust, where the tests are, and the interface only renders the answer.
+
+The view models in `state.rs` exist because the core's types are shaped for correctness rather
+than for a table: a `TextNode` knows nothing about its translation and vice versa, while a row of
+the interface needs both. Joining them in Rust keeps that joining testable.
+
+See [DESKTOP.md](DESKTOP.md).

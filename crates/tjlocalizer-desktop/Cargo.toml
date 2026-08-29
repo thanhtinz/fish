@@ -1,0 +1,38 @@
+[package]
+name = "tjlocalizer-desktop"
+description = "Desktop application for the Thanhtinz JAR Localizer."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[lib]
+name = "tjlocalizer_desktop_lib"
+path = "src/lib.rs"
+
+[[bin]]
+name = "tjlocalizer-desktop"
+path = "src/main.rs"
+
+[features]
+# Tauri decides between "load the built files embedded in the binary" and "load them from the dev
+# server" by this feature, not by the build profile. The upstream scaffold leaves it off and lets
+# the Tauri CLI add it; this project builds with plain cargo, so a `cargo build` that produced a
+# binary needing a dev server running would be a trap. It is on by default and turned off for the
+# hot-reload loop instead:
+#
+#     npm --prefix desktop run dev            # in one terminal
+#     cargo run -p tjlocalizer-desktop --no-default-features
+default = ["custom-protocol"]
+custom-protocol = ["tauri/custom-protocol"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tjlocalizer-core = { path = "../tjlocalizer-core" }
+tauri = { version = "2", features = [] }
+tauri-plugin-dialog = "2"
+serde.workspace = true
+serde_json.workspace = true

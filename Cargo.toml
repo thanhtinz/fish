@@ -1,6 +1,10 @@
 [workspace]
 resolver = "2"
-members = ["crates/tjlocalizer-core", "crates/tjlocalizer-cli"]
+members = [
+    "crates/tjlocalizer-core",
+    "crates/tjlocalizer-cli",
+    "crates/tjlocalizer-desktop",
+]
 
 [workspace.package]
 version = "0.1.0"

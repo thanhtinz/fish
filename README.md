@@ -28,6 +28,21 @@ the reason is written down at the code.
 
 ## Quick start
 
+### The desktop application
+
+```sh
+# system dependencies (Debian/Ubuntu)
+sudo apt-get install libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev
+
+npm --prefix desktop install && npm --prefix desktop run build
+cargo run --release -p tjlocalizer-desktop
+```
+
+Import a JAR, work through the pipeline, translate, build. See
+[docs/DESKTOP.md](docs/DESKTOP.md).
+
+### The command line
+
 ```sh
 cargo build --release
 ./tools/make-fixtures.sh              # needs a JDK; builds the test fixtures
@@ -65,12 +80,15 @@ so rather than reporting success.
 
 ## Layout
 
-| Crate | What it holds |
+| Directory | What it holds |
 | --- | --- |
-| `crates/tjlocalizer-core` | Everything: class files, archives, detection, extraction, translation, build, validation |
+| `crates/tjlocalizer-core` | Everything that decides anything: class files, archives, detection, extraction, translation, build, validation |
 | `crates/tjlocalizer-cli` | `tjlocalizer`, one subcommand per workflow step |
+| `crates/tjlocalizer-desktop` | The desktop application's Rust side: commands and view models |
+| `desktop` | The desktop interface, React and TypeScript |
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for how the pieces fit,
+[docs/DESKTOP.md](docs/DESKTOP.md) for the application,
 [docs/SPEC-COVERAGE.md](docs/SPEC-COVERAGE.md) for what is built and what is not, and
 [docs/LEGAL.md](docs/LEGAL.md) for the attribution boundary.
 
@@ -78,7 +96,8 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for how the pieces fit,
 
 The pipeline works end to end and is verified against a real JVM: the test suite localizes a
 `javac`-produced class with Vietnamese text longer than the original, and the JVM loads, verifies
-and runs the result. Several large parts of the specification are not built yet -
+and runs the result. The desktop application is checked the same way - a script boots the real
+binary and confirms it opens and renders, because compiling proves neither. Several large parts of the specification are not built yet -
 `docs/SPEC-COVERAGE.md` lists them plainly rather than leaving them to be discovered.
 
 Localization by Thanhtinz. © 2026 Thanhtinz.
