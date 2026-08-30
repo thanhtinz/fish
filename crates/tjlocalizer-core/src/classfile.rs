@@ -77,16 +77,39 @@ pub struct CodeSite {
     pub text: Option<String>,
 }
 
-struct Method {
-    name: String,
-    descriptor: String,
-    code: Option<Code>,
+/// One method reference in the pool: who is called, what it is called, and with what.
+///
+/// Resolved rather than left opaque because it is the only way to ask what a class *does*
+/// without running it. A class that calls `Graphics.drawRegion` is blitting pieces of an image,
+/// which is what drawing from a glyph sheet looks like; one that calls `Graphics.drawString` is
+/// letting the handset draw the letters. That difference decides which of the two ways of getting
+/// Vietnamese into a game is even possible.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MethodRef {
+    pub owner: String,
+    pub name: String,
+    pub descriptor: String,
 }
 
-struct Code {
+/// One method of a class, and where its code lives in the class body.
+#[derive(Debug, Clone)]
+pub struct MethodInfo {
+    pub name: String,
+    pub descriptor: String,
+    /// True for a static method, which shifts every parameter down a local slot.
+    pub is_static: bool,
+    pub(crate) code: Option<Code>,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct Code {
     /// Where the bytecode starts within the class body.
     at: usize,
     len: usize,
+    /// Where the whole Code attribute's `attribute_length` field starts, and how long the
+    /// attribute's own data is - the span a replacement body has to fit into.
+    attribute_length_at: usize,
+    attribute_len: usize,
 }
 
 /// A parsed class file.
@@ -328,7 +351,7 @@ impl ClassFile {
     /// them cannot be expressed in the pool at all. A site is one of those eleven.
     pub fn string_sites(&self) -> Result<Vec<CodeSite>> {
         let mut sites = Vec::new();
-        for method in self.methods()? {
+        for method in self.walk_methods()? {
             let Some(code) = method.code else {
                 continue;
             };
@@ -433,8 +456,183 @@ impl ClassFile {
         Ok(())
     }
 
+    /// Every method reference this class holds: what it calls, on what, with what descriptor.
+    pub fn method_refs(&self) -> Vec<MethodRef> {
+        let mut refs = Vec::new();
+        for constant in &self.constants {
+            // 10 is a plain method, 11 an interface method. Both are calls.
+            let Constant::Other {
+                tag: 10 | 11,
+                payload,
+            } = constant
+            else {
+                continue;
+            };
+            let Ok(bytes) = <[u8; 4]>::try_from(payload.as_slice()) else {
+                continue;
+            };
+            let class_index = u16::from_be_bytes([bytes[0], bytes[1]]);
+            let name_and_type = u16::from_be_bytes([bytes[2], bytes[3]]);
+            let (Some(owner), Some((name, descriptor))) = (
+                self.class_name(class_index),
+                self.name_and_type(name_and_type),
+            ) else {
+                continue;
+            };
+            refs.push(MethodRef {
+                owner,
+                name,
+                descriptor,
+            });
+        }
+        refs
+    }
+
+    /// The name a `CONSTANT_Class` holds.
+    fn class_name(&self, index: u16) -> Option<String> {
+        let Constant::Other { tag: 7, payload } = self.constants.get(index as usize)? else {
+            return None;
+        };
+        let bytes = <[u8; 2]>::try_from(payload.as_slice()).ok()?;
+        self.utf8_at(u16::from_be_bytes(bytes))
+    }
+
+    /// The name and descriptor a `CONSTANT_NameAndType` holds.
+    fn name_and_type(&self, index: u16) -> Option<(String, String)> {
+        let Constant::Other { tag: 12, payload } = self.constants.get(index as usize)? else {
+            return None;
+        };
+        let bytes = <[u8; 4]>::try_from(payload.as_slice()).ok()?;
+        let name = self.utf8_at(u16::from_be_bytes([bytes[0], bytes[1]]))?;
+        let descriptor = self.utf8_at(u16::from_be_bytes([bytes[2], bytes[3]]))?;
+        Some((name, descriptor))
+    }
+
+    /// Adds a Utf8 constant, or returns the index of one that already holds this text.
+    ///
+    /// Reused rather than duplicated because a pool with two identical Utf8 entries is legal and
+    /// ugly, and because `ldc` can only reach the first 255 entries: every constant not added is
+    /// one more site that can still be repointed.
+    fn intern_utf8(&mut self, text: &str) -> u16 {
+        let raw = encode_modified_utf8(text);
+        for (i, constant) in self.constants.iter().enumerate() {
+            if let Constant::Utf8 { raw: existing, .. } = constant {
+                if *existing == raw {
+                    return i as u16;
+                }
+            }
+        }
+        let decoded = decode_modified_utf8(&raw).ok();
+        self.constants.push(Constant::Utf8 { raw, decoded });
+        (self.constants.len() - 1) as u16
+    }
+
+    fn intern_other(&mut self, tag: u8, payload: Vec<u8>) -> u16 {
+        for (i, constant) in self.constants.iter().enumerate() {
+            if let Constant::Other {
+                tag: existing_tag,
+                payload: existing,
+            } = constant
+            {
+                if *existing_tag == tag && *existing == payload {
+                    return i as u16;
+                }
+            }
+        }
+        self.constants.push(Constant::Other { tag, payload });
+        (self.constants.len() - 1) as u16
+    }
+
+    /// Adds a method reference, with the class and name-and-type entries it needs.
+    ///
+    /// `interface` picks the tag: calling an interface method through a plain `Methodref` is
+    /// rejected by the verifier, and the two are otherwise identical.
+    pub fn add_method_ref(&mut self, called: &MethodRef, interface: bool) -> u16 {
+        let owner_name = self.intern_utf8(&called.owner);
+        let owner = self.intern_other(7, owner_name.to_be_bytes().to_vec());
+        let name = self.intern_utf8(&called.name);
+        let descriptor = self.intern_utf8(&called.descriptor);
+
+        let mut name_and_type = name.to_be_bytes().to_vec();
+        name_and_type.extend_from_slice(&descriptor.to_be_bytes());
+        let name_and_type = self.intern_other(12, name_and_type);
+
+        let mut payload = owner.to_be_bytes().to_vec();
+        payload.extend_from_slice(&name_and_type.to_be_bytes());
+        self.intern_other(if interface { 11 } else { 10 }, payload)
+    }
+
+    /// Every method this class declares.
+    pub fn methods(&self) -> Result<Vec<MethodInfo>> {
+        self.walk_methods()
+    }
+
+    /// Replaces one method's body outright.
+    ///
+    /// The one thing in this crate that writes bytecode, and it is fenced accordingly. The caller
+    /// supplies a complete, branchless instruction sequence with its stack and local counts; the
+    /// old exception table and the old attributes - `StackMapTable`, `LineNumberTable`,
+    /// `LocalVariableTable` - are dropped rather than adjusted, because they describe code that
+    /// no longer exists and a frame describing the wrong instruction is worse than no frame.
+    ///
+    /// Dropping the stack map is safe *only* for a body with no branches: the verifier needs a
+    /// frame at every jump target, and a method that never jumps has none. That is checked here
+    /// rather than trusted, because the failure is a class the JVM refuses to load.
+    pub fn set_method_body(
+        &mut self,
+        name: &str,
+        descriptor: &str,
+        code: &[u8],
+        max_stack: u16,
+        max_locals: u16,
+    ) -> Result<()> {
+        if code.is_empty() {
+            return Err(Error::MalformedClassBody {
+                reason: "a method body cannot be empty".into(),
+            });
+        }
+        if let Some(at) = branch_at(code)? {
+            return Err(Error::MalformedClassBody {
+                reason: format!(
+                    "the replacement body branches at offset {at}, and a branch needs a stack map                      frame this cannot write"
+                ),
+            });
+        }
+
+        let method = self
+            .walk_methods()?
+            .into_iter()
+            .find(|m| m.name == name && m.descriptor == descriptor)
+            .ok_or_else(|| Error::MalformedClassBody {
+                reason: format!("this class has no {name}{descriptor}"),
+            })?;
+        let Some(existing) = method.code else {
+            return Err(Error::MalformedClassBody {
+                reason: format!("{name}{descriptor} has no body to replace"),
+            });
+        };
+
+        let mut info = Vec::with_capacity(code.len() + 12);
+        info.extend_from_slice(&max_stack.to_be_bytes());
+        info.extend_from_slice(&max_locals.to_be_bytes());
+        info.extend_from_slice(&(code.len() as u32).to_be_bytes());
+        info.extend_from_slice(code);
+        info.extend_from_slice(&0u16.to_be_bytes()); // no exception table
+        info.extend_from_slice(&0u16.to_be_bytes()); // and no attributes
+
+        let mut rebuilt = Vec::with_capacity(self.tail.len() + info.len());
+        rebuilt.extend_from_slice(&self.tail[..existing.attribute_length_at]);
+        rebuilt.extend_from_slice(&(info.len() as u32).to_be_bytes());
+        rebuilt.extend_from_slice(&info);
+        rebuilt.extend_from_slice(
+            &self.tail[existing.attribute_length_at + 4 + existing.attribute_len..],
+        );
+        self.tail = rebuilt;
+        Ok(())
+    }
+
     /// Walks the class body far enough to find each method and its code.
-    fn methods(&self) -> Result<Vec<Method>> {
+    fn walk_methods(&self) -> Result<Vec<MethodInfo>> {
         let mut r = Reader {
             bytes: &self.tail,
             pos: 0,
@@ -461,7 +659,7 @@ impl ClassFile {
         let count = r.u2().map_err(|_| bad("no method count"))?;
         let mut methods = Vec::new();
         for _ in 0..count {
-            r.u2().map_err(|_| bad("method truncated"))?;
+            let access = r.u2().map_err(|_| bad("method truncated"))?;
             let name_index = r.u2().map_err(|_| bad("method truncated"))?;
             let descriptor_index = r.u2().map_err(|_| bad("method truncated"))?;
 
@@ -469,6 +667,7 @@ impl ClassFile {
             let mut code = None;
             for _ in 0..attributes {
                 let attribute_name = r.u2().map_err(|_| bad("attribute truncated"))?;
+                let attribute_length_at = r.pos;
                 let length = r.u4().map_err(|_| bad("attribute truncated"))? as usize;
                 let at = r.pos;
                 r.take(length).map_err(|_| bad("attribute truncated"))?;
@@ -492,12 +691,18 @@ impl ClassFile {
                 code = Some(Code {
                     at: at + 8,
                     len: code_length,
+                    attribute_length_at,
+                    attribute_len: length,
                 });
             }
 
-            methods.push(Method {
+            methods.push(MethodInfo {
                 name: self.utf8_at(name_index).unwrap_or_default(),
                 descriptor: self.utf8_at(descriptor_index).unwrap_or_default(),
+                // ACC_STATIC. A static method has no `this`, so every parameter sits one local
+                // slot lower - and a shim that got that wrong would read its arguments from the
+                // wrong places.
+                is_static: access & 0x0008 != 0,
                 code,
             });
         }
@@ -739,4 +944,28 @@ fn operand_bytes(opcode: u8) -> usize {
         0xC8 | 0xC9 => 4,
         _ => 0,
     }
+}
+
+/// The offset of the first branch in a body, if it has one.
+///
+/// A method that never jumps needs no `StackMapTable`, which is what makes a written body safe to
+/// install without computing frames. Every jump - conditional, unconditional, switch, `jsr` - is
+/// looked for rather than assumed absent.
+fn branch_at(code: &[u8]) -> Result<Option<usize>> {
+    let mut pc = 0usize;
+    while pc < code.len() {
+        let opcode = code[pc];
+        let branches = matches!(
+            opcode,
+            // ifeq..if_acmpne, goto, jsr, ifnull, ifnonnull, goto_w, jsr_w
+            0x99..=0xA8 | 0xC6 | 0xC7 | 0xC8 | 0xC9
+                // tableswitch and lookupswitch
+                | 0xAA | 0xAB
+        );
+        if branches {
+            return Ok(Some(pc));
+        }
+        pc += instruction_length(code, pc)?;
+    }
+    Ok(None)
 }

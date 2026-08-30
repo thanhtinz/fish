@@ -11,9 +11,12 @@ out="$root/crates/tjlocalizer-core/tests/data"
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
 
-javac --release 8 -d "$work" "$here/fixtures/SampleGame.java" 2>/dev/null
+javac --release 8 -d "$work" "$here/fixtures/SampleGame.java" "$here/fixtures/BitmapFont.java" 2>/dev/null
 mkdir -p "$out"
 cp "$work/SampleGame.class" "$out/SampleGame.class"
+# A stand-in for the font class a game ships, so that rewriting one to use the device font can be
+# put through a real verifier - no desktop JVM has javax.microedition.lcdui.
+cp "$work/BitmapFont.class" "$out/BitmapFont.class"
 
 # A minimal JAR carrying the same class plus a MIDlet-shaped manifest, for archive-level tests.
 mkdir -p "$work/jar/META-INF"
@@ -41,4 +44,4 @@ TZ=UTC find "$work/jar" -exec touch -t 198001010000 {} +
 ( cd "$work/jar" && TZ=UTC zip -q -X "$out/sample-game.jar" \
     META-INF/MANIFEST.MF SampleGame.class levels.properties )
 
-echo "wrote $out/SampleGame.class and $out/sample-game.jar"
+echo "wrote $out/SampleGame.class, $out/BitmapFont.class and $out/sample-game.jar"

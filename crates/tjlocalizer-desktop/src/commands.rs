@@ -1155,6 +1155,42 @@ pub fn proof_sheet(path: String, language: String, scale: Option<u32>) -> Reply<
         .map_err(err)
 }
 
+/// How this game draws its text, and what could be handed to the handset's own font (§16).
+///
+/// The other route to Vietnamese, and for a game whose sheet is CJK-only the only one: instead of
+/// composing 134 letters into the sheet and teaching the game it grew, stop using the sheet.
+#[tauri::command]
+pub fn system_font(path: String) -> Reply<SystemFontView> {
+    let project = open(&path)?;
+    let strategy = project.font_strategy().map_err(err)?;
+    Ok(SystemFontView {
+        bitmap: strategy.bitmap,
+        device: strategy.device,
+        evidence: strategy.evidence,
+        switched: project.switched_to_device_font().map_err(err)?,
+        candidates: project
+            .system_font_candidates()
+            .map_err(err)?
+            .into_iter()
+            .map(|found| SystemFontCandidateView {
+                class: found.class,
+                method: found.method,
+                descriptor: found.descriptor,
+                job: found.job.key().to_string(),
+                evidence: found.evidence,
+            })
+            .collect(),
+    })
+}
+
+/// Writes the rules that make that switch, all switched off (§16, §19).
+#[tauri::command]
+pub fn write_system_font_rules(path: String) -> Reply<Vec<RuleView>> {
+    let project = open(&path)?;
+    project.write_system_font_rules().map_err(err)?;
+    rules(path)
+}
+
 /// Where the game looks like it writes down the shape of its own glyph sheet (§16).
 ///
 /// The half of a font swap that is per-game. It still cannot be known from here - it can be

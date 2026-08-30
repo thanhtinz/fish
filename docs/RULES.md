@@ -36,7 +36,7 @@ refuses when it does not hold, so a rule carried over from another version of a 
 the game is not what it was written for rather than patching the wrong thing. `entrySha256` is the
 strictest and the right one for a file swap: it says *this is the image I measured*.
 
-`then` is what it would change. Four actions, deliberately:
+`then` is what it would change. Five actions, deliberately:
 
 | Action | What it does |
 | --- | --- |
@@ -44,6 +44,7 @@ strictest and the right one for a file swap: it says *this is the image I measur
 | `setIntConstant` | Changes every `CONSTANT_Integer` of one value, in one named class. |
 | `setStringConstant` | Changes a string literal, in one named class. |
 | `setStringAtSite` | Changes what one named *method* loads, leaving the string itself alone. |
+| `useDeviceFont` | Replaces one font method's body with a call to the handset's own font. |
 
 Every constant action is scoped to a class **and** to an exact previous value. "Change the 16 to
 22" applied across a whole game changes sixteens that had nothing to do with the font.
@@ -70,9 +71,30 @@ would in GameScreen.class.drawBattleEnd, load "Trở về" instead of "Back" at 
        (10 other uses of "Back" left alone)
 ```
 
+### `useDeviceFont`, and the one exception it is
+
+```json
+{
+  "kind": "useDeviceFont",
+  "class": "GFont.class", "method": "drawString",
+  "descriptor": "(Ljavax/microedition/lcdui/Graphics;Ljava/lang/String;III)V"
+}
+```
+
+The second route to Vietnamese in a game that draws from a glyph sheet, and for a CJK-only sheet
+the only one: the method stops blitting and calls `Graphics.drawString` instead. See
+`docs/FONTS.md`. It is written by `tjlocalizer font <project> --write-system-font-rules`, which
+pins the class by hash, and like everything else here it arrives switched off.
+
 ## What a rule cannot do
 
-It cannot add bytecode. Every action here is something this crate already does and has verified on
+It cannot add bytecode - with one exception, fenced on every side: `useDeviceFont` *replaces* a
+recognised method's body with a branchless call to the platform's own font, which needs no stack
+map frames and leaves the method's name and descriptor alone, so every call site in the game keeps
+working. It is proved by a real JVM's verifier rather than by a test (`docs/FONTS.md`), and it is
+the only action that writes an instruction at all.
+
+Otherwise: it cannot add bytecode. Every action here is something this crate already does and has verified on
 a real JVM - rewriting the constant pool, replacing an entry, repointing one load instruction - so
 no rule can make a class fail verification. `setStringAtSite` changes an operand and never a
 length, so every jump, exception range and stack map frame in the method stays exactly as the

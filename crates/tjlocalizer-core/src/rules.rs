@@ -54,6 +54,20 @@ pub enum Action {
     /// Scoped to a class and to an exact previous value, because "change the 16 to 22" applied
     /// across a whole game changes sixteens that had nothing to do with the font.
     SetIntConstant { class: String, from: i32, to: i32 },
+    /// Switches one of a game's font methods to the handset's own font (§16).
+    ///
+    /// The second way of getting Vietnamese into a game that draws from a glyph sheet, and for a
+    /// game whose sheet is CJK-only the only way: the body of the method that blits glyphs is
+    /// replaced with a call to `Graphics.drawString`, and every call site in the game keeps
+    /// working because nothing about the method's signature moved.
+    ///
+    /// It costs the game's own lettering, which is a visible change and sometimes an
+    /// unacceptable one - so like every rule it is off until somebody decides.
+    UseDeviceFont {
+        class: String,
+        method: String,
+        descriptor: String,
+    },
     /// Changes what one method loads, without changing the string itself.
     ///
     /// The case the constant pool cannot express. A game shows `Back` on eleven screens from one
@@ -88,7 +102,8 @@ impl Action {
             Action::ReplaceEntry { .. } => None,
             Action::SetIntConstant { class, .. }
             | Action::SetStringConstant { class, .. }
-            | Action::SetStringAtSite { class, .. } => Some(class),
+            | Action::SetStringAtSite { class, .. }
+            | Action::UseDeviceFont { class, .. } => Some(class),
         }
     }
 }
@@ -282,6 +297,30 @@ pub fn apply(rules: &[Rule], archive: &mut Archive, root: &Path) -> Result<Appli
                             }
                         }
                     }
+                    Action::UseDeviceFont {
+                        class: c,
+                        method,
+                        descriptor,
+                    } if *c == class => {
+                        let candidate = crate::font::device::Candidate {
+                            class: class.clone(),
+                            method: method.clone(),
+                            descriptor: descriptor.clone(),
+                            job: match crate::font::device::job_of(method, descriptor) {
+                                Some(job) => job,
+                                // A method whose shape this build does not recognise is one whose
+                                // body it cannot write. Skipped rather than guessed at.
+                                None => continue,
+                            },
+                            evidence: Vec::new(),
+                        };
+                        crate::font::device::rewrite(
+                            &mut file,
+                            &candidate,
+                            &crate::font::device::Toolkit::midp(),
+                        )?;
+                        changed += 1;
+                    }
                     _ => {}
                 }
             }
@@ -378,6 +417,29 @@ fn describe(action: &Action, archive: &Archive, root: &Path) -> Result<Vec<Strin
                     vec![]
                 } else {
                     vec![format!("in {class}, change {count} × {from} to {to}")]
+                }
+            }
+        },
+        Action::UseDeviceFont {
+            class,
+            method,
+            descriptor,
+        } => match read_class(archive, class)? {
+            None => vec![],
+            Some(file) => {
+                let has = file
+                    .methods()?
+                    .into_iter()
+                    .any(|m| m.name == *method && m.descriptor == *descriptor);
+                match (has, crate::font::device::job_of(method, descriptor)) {
+                    (true, Some(job)) => vec![format!(
+                        "in {class}, rewrite {method}{descriptor} to let the handset's own font \
+                         do the {} - the game stops drawing that text from its glyph sheet",
+                        job.key()
+                    )],
+                    // A method this build cannot write a body for produces no effect line, and a
+                    // plan with no effects is not ready: the difference between a patch and a wish.
+                    _ => vec![],
                 }
             }
         },

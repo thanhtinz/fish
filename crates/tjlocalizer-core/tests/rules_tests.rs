@@ -585,6 +585,7 @@ fn the_generated_rule_proposes_what_the_game_looks_like_it_records() {
             Action::SetIntConstant { .. } => "int",
             Action::SetStringConstant { .. } => "string",
             Action::SetStringAtSite { .. } => "site",
+            Action::UseDeviceFont { .. } => "device-font",
         })
         .collect();
     kinds.sort();

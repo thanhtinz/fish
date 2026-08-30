@@ -20,6 +20,7 @@ import type {
   ImageAssetView,
   ContextView,
   FontLookupView,
+  SystemFontView,
   RegressionView,
   PluginsView,
   ReadingView,
@@ -210,6 +211,11 @@ export const api = {
 
   proofSheet: (path: string, language: string, scale: number | null) =>
     call<string | null>("proof_sheet", { path, language, scale }),
+
+  systemFont: (path: string) => call<SystemFontView>("system_font", { path }),
+
+  writeSystemFontRules: (path: string) =>
+    call<RuleView[]>("write_system_font_rules", { path }),
 
   fontLookupCandidates: (path: string) =>
     call<FontLookupView[]>("font_lookup_candidates", { path }),

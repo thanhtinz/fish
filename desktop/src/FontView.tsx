@@ -3,6 +3,7 @@ import { api, pickFolder } from "./api";
 import type {
   CompositionView,
   FontLookupView,
+  SystemFontView,
   FontScan,
   FontView as Font,
   RuleView,
@@ -36,6 +37,7 @@ export function FontView({ path, say }: Props) {
   const [order, setOrder] = useState("");
   const [rules, setRules] = useState<RuleView[]>([]);
   const [lookups, setLookups] = useState<FontLookupView[]>([]);
+  const [systemFont, setSystemFont] = useState<SystemFontView | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -55,8 +57,9 @@ export function FontView({ path, say }: Props) {
     void load();
   }, [load]);
 
-  // Where the game looks like it writes down its sheet's shape. Loaded on its own because it is
-  // evidence about the game rather than about anything the person just did.
+  // Where the game looks like it writes down its sheet's shape, and how it draws its text at all.
+  // Loaded on their own because both are evidence about the game rather than about anything the
+  // person just did.
   useEffect(() => {
     let alive = true;
     api
@@ -67,7 +70,18 @@ export function FontView({ path, say }: Props) {
       .catch(() => {
         if (alive) setLookups([]);
       });
-  }, [path]);
+    api
+      .systemFont(path)
+      .then((found) => {
+        if (alive) setSystemFont(found);
+      })
+      .catch(() => {
+        if (alive) setSystemFont(null);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [path, rules.length]);
 
   async function run<T>(tag: string, work: () => Promise<T>): Promise<T | null> {
     setBusy(tag);
@@ -483,6 +497,74 @@ export function FontView({ path, say }: Props) {
               </>
             )}
           </div>
+
+          {systemFont && (systemFont.bitmap || systemFont.switched) && (
+            <div className="card">
+              <h3>Hoặc: giao chữ cho font của máy</h3>
+              <div className="sub">
+                Có <b>hai đường</b> để game hiện được tiếng Việt. Một là bổ sung 134 chữ vào bảng
+                font của game rồi dạy game đọc bảng cao hơn — chữ giữ đúng nét của game, nhưng mọi
+                bước đều là việc riêng của từng game. Hai là <b>bỏ bảng font đi</b>: viết lại thân
+                phương thức vẽ chữ để gọi thẳng <code>Graphics.drawString</code>, máy tự vẽ chữ.
+                Không phải ghép chữ, không phải cài bảng, không phải dạy thứ tự ký tự.
+                {" "}Đổi lại: nét chữ riêng của game mất, thay bằng nét của máy — ở cỡ 12px đó là
+                thay đổi nhìn thấy được. Với game có bảng font chỉ toàn chữ Hán/Nhật/Hàn thì đây là
+                đường <i>duy nhất</i>.
+              </div>
+
+              {systemFont.switched && (
+                <div className="row" style={{ gap: 8, marginBottom: 10 }}>
+                  <span className="pill ok">đã chuyển</span>
+                  <span style={{ color: "var(--text-faint)", fontSize: 12 }}>
+                    một luật đang bật đang giao chữ cho font máy
+                  </span>
+                </div>
+              )}
+
+              {systemFont.evidence.map((note) => (
+                <div key={note} style={{ color: "var(--text-faint)", fontSize: 11.5, marginTop: 2 }}>
+                  · {note}
+                </div>
+              ))}
+
+              {systemFont.candidates.length > 0 && (
+                <div style={{ marginTop: 10 }}>
+                  <div style={{ color: "var(--text-dim)", fontSize: 12, marginBottom: 4 }}>
+                    Những phương thức có thể giao cho font máy:
+                  </div>
+                  {systemFont.candidates.map((found) => (
+                    <div
+                      key={`${found.class}-${found.method}-${found.descriptor}`}
+                      style={{ color: "var(--text-faint)", fontSize: 11.5, marginTop: 2 }}
+                    >
+                      · <span style={{ fontFamily: "var(--mono)" }}>{found.class}</span>{" "}
+                      {found.method} ({found.job})
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {systemFont.candidates.length > 0 && (
+                <div className="wrap" style={{ marginTop: 12 }}>
+                  <button
+                    disabled={busy !== null}
+                    onClick={async () => {
+                      const updated = await run("system-font", () =>
+                        api.writeSystemFontRules(path),
+                      );
+                      if (updated) {
+                        setRules(updated);
+                        say("Đã viết luật chuyển sang font máy — đang tắt, bật ở dưới");
+                      }
+                    }}
+                  >
+                    {busy === "system-font" ? <span className="spin" /> : null} Viết luật dùng font
+                    máy
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
 
           <div className="card">
             <h3>Gắn vào game</h3>

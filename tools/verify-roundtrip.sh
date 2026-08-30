@@ -28,3 +28,14 @@ cargo run -q -p tjlocalizer-core --example site_demo -- \
 
 echo "--- JVM output from the class whose code was patched:"
 java -Dstdout.encoding=UTF-8 -Xverify:all -cp "$work/sites" SampleGame
+
+# The third kind: a game's font class rewritten to stop drawing from its glyph sheet and let the
+# platform draw the letters instead. This one writes a method body, so the verifier's opinion is
+# the whole point - a wrong local slot or stack depth is a class the JVM refuses to load.
+mkdir -p "$work/font"
+cargo run -q -p tjlocalizer-core --example device_font_demo -- \
+    "$root/crates/tjlocalizer-core/tests/data/BitmapFont.class" \
+    "$work/font/BitmapFont.class"
+
+echo "--- JVM output from the font class switched to the platform's own:"
+java -Dstdout.encoding=UTF-8 -Xverify:all -cp "$work/font" BitmapFont

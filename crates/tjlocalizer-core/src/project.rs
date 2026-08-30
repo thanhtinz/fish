@@ -891,6 +891,17 @@ impl Project {
     /// everything", and the caller has to keep them apart: a game drawing from a sheet nobody
     /// declared will show blanks, and reporting that as fine is how a localization ships broken.
     pub fn font_coverage(&self) -> crate::Result<Option<Coverage>> {
+        // A ready rule that switches the game's font class to the handset's own answers this
+        // before the profile does: after it runs the game is not drawing from a sheet at all, so
+        // the sheet's coverage is an answer about something that will no longer happen.
+        if self.switched_to_device_font()? {
+            let mut covered: Vec<char> = (0x20u8..=0x7E).map(|b| b as char).collect();
+            covered.extend(font::vietnamese_required());
+            return Ok(Some(Coverage::new(
+                covered,
+                "the handset's own font, by rule",
+            )));
+        }
         let Some(profile) = &self.profile.font else {
             return Ok(None);
         };
@@ -911,6 +922,33 @@ impl Project {
         }
         let sheet = self.font_sheet()?;
         Ok(sheet.map(|s| Coverage::new(s.order.clone(), profile.entry.clone())))
+    }
+
+    /// Whether a rule that is on, and fits, hands this game's text to the handset's font (§16).
+    ///
+    /// Only a rule that is switched on *and* whose conditions hold counts, exactly as for an
+    /// installed sheet: one written against a version of the class the game no longer has changes
+    /// nothing, and reporting otherwise would pass a build that ships blanks.
+    pub fn switched_to_device_font(&self) -> crate::Result<bool> {
+        let rules = self.rules()?;
+        if rules.is_empty() {
+            return Ok(false);
+        }
+        let archive = self.original()?;
+        for rule in rules.iter().filter(|r| r.enabled) {
+            if !rule
+                .then
+                .iter()
+                .any(|a| matches!(a, crate::rules::Action::UseDeviceFont { .. }))
+            {
+                continue;
+            }
+            let plan = crate::rules::plan(std::slice::from_ref(rule), &archive, &self.root)?;
+            if plan.first().is_some_and(|p| p.ready()) {
+                return Ok(true);
+            }
+        }
+        Ok(false)
     }
 
     /// The characters the game will draw once the rules have run, when a rule installs a sheet.
@@ -1015,6 +1053,12 @@ impl Project {
     }
 
     fn shipping_sheet(&self) -> crate::Result<Option<font::sheet::Sheet>> {
+        // Nothing to measure or draw with once the game has been switched to the handset's font:
+        // its sheet is still in the archive and is no longer what the player sees. Measuring it
+        // would answer a question about the build that was not made.
+        if self.switched_to_device_font()? {
+            return Ok(None);
+        }
         let Some(sheet) = self.font_sheet()? else {
             return Ok(None);
         };
@@ -1445,6 +1489,95 @@ impl Project {
     /// It refuses to pretend otherwise. A rule that replaced the image and stopped would leave a
     /// game drawing its old letters from a taller sheet, which is a display bug rather than a
     /// missing feature, and much harder to see.
+    /// How this game draws its text, from what its classes call (§16).
+    ///
+    /// The question that decides which of the two routes to Vietnamese is open. A game already
+    /// calling `Graphics.drawString` needs no font work at all; one blitting pieces of an image
+    /// needs either a composed sheet or the switch below.
+    pub fn font_strategy(&self) -> crate::Result<crate::font::device::Strategy> {
+        crate::font::device::strategy(&self.original()?)
+    }
+
+    /// The methods that could be switched to the handset's own font (§16).
+    pub fn system_font_candidates(&self) -> crate::Result<Vec<crate::font::device::Candidate>> {
+        crate::font::device::candidates(&self.original()?)
+    }
+
+    /// Writes the rules that switch this game to the handset's own font, all switched off.
+    ///
+    /// One rule per class rather than one per method, because switching a font class's drawing
+    /// method and leaving its width method measuring the old sheet gives a game that draws
+    /// correct text in the wrong places - the two belong to one decision.
+    ///
+    /// Nothing is applied. Every rule states which methods it would rewrite and stays off, because
+    /// this trades the game's own lettering for the handset's and that is not a judgement this
+    /// tool is in a position to make.
+    pub fn write_system_font_rules(&self) -> crate::Result<Vec<crate::rules::Rule>> {
+        use crate::rules::{Action, Condition, Rule};
+
+        let candidates = self.system_font_candidates()?;
+        if candidates.is_empty() {
+            return Err(crate::Error::InvalidProject {
+                path: self.root.clone(),
+                reason: "nothing in this game looks like a font class drawing from a sheet: no \
+                         class both touches a Graphics and has a method shaped like drawing text"
+                    .into(),
+            });
+        }
+
+        let mut classes: Vec<String> = candidates.iter().map(|c| c.class.clone()).collect();
+        classes.sort();
+        classes.dedup();
+
+        let mut written = Vec::new();
+        for class in classes {
+            let mine: Vec<&crate::font::device::Candidate> =
+                candidates.iter().filter(|c| c.class == class).collect();
+            let slug = class
+                .trim_end_matches(".class")
+                .replace(|c: char| !c.is_ascii_alphanumeric(), "-")
+                .to_lowercase();
+
+            let mut rule = Rule::new(
+                format!("system-font-{slug}"),
+                format!(
+                    "Let the handset draw the text instead of {class}: {}. The game stops using \
+                     its glyph sheet for this text, so Vietnamese needs no letters composed - and \
+                     the game's own lettering is replaced by the handset's, which is a visible \
+                     change. Found from what the class calls, not verified against a running game.",
+                    mine.iter()
+                        .map(|c| format!("{}{}", c.method, c.descriptor))
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                ),
+            );
+            // The class has to be the one this was read from. A game updated underneath the
+            // project would otherwise have a body written into whatever method now has that name.
+            rule.when = vec![Condition::EntrySha256 {
+                entry: class.clone(),
+                sha256: sha256_hex(
+                    &self
+                        .original()?
+                        .get(&class)
+                        .expect("the candidate came from this archive")
+                        .data,
+                ),
+            }];
+            rule.then = mine
+                .iter()
+                .map(|c| Action::UseDeviceFont {
+                    class: class.clone(),
+                    method: c.method.clone(),
+                    descriptor: c.descriptor.clone(),
+                })
+                .collect();
+
+            self.put_rule(rule.clone())?;
+            written.push(rule);
+        }
+        Ok(written)
+    }
+
     /// Where in the game's code the shape of its glyph sheet appears to be written down (§16).
     ///
     /// The half of a font swap this tool could not do: replacing the image is the same in every

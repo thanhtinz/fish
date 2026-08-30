@@ -864,6 +864,32 @@ impl From<tjlocalizer_core::shorten::Alternative> for AlternativeView {
     }
 }
 
+/// How a game draws its text, and what could be handed to the handset's font (§16).
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct SystemFontView {
+    /// It blits pieces of an image: a glyph sheet.
+    pub bitmap: bool,
+    /// It already calls the platform's own text drawing.
+    pub device: bool,
+    pub evidence: Vec<String>,
+    pub candidates: Vec<SystemFontCandidateView>,
+    /// True once a rule that is on, and fits, hands the text to the handset's font.
+    pub switched: bool,
+}
+
+/// One method that could stop drawing from the sheet.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct SystemFontCandidateView {
+    pub class: String,
+    pub method: String,
+    pub descriptor: String,
+    /// `draw`, `string-width`, `char-width` or `height`.
+    pub job: String,
+    pub evidence: Vec<String>,
+}
+
 /// Something in a game's code that looks like part of its font lookup (§16).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]

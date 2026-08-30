@@ -255,6 +255,24 @@ export type Hint =
   | { kind: "fewColours"; colours: number; inkPercent: number }
   | { kind: "shapeOfALine"; width: number; height: number; bands: number };
 
+/** Một phương thức có thể chuyển sang dùng font máy. */
+export interface SystemFontCandidateView {
+  class: string;
+  method: string;
+  descriptor: string;
+  job: string;
+  evidence: string[];
+}
+
+/** Game vẽ chữ kiểu gì, và có thể giao cho font máy những gì. */
+export interface SystemFontView {
+  bitmap: boolean;
+  device: boolean;
+  evidence: string[];
+  candidates: SystemFontCandidateView[];
+  switched: boolean;
+}
+
 /** Chỗ trong code game trông giống nơi ghi lại hình dạng bảng font. */
 export interface FontLookupView {
   class: string;

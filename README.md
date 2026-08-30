@@ -81,6 +81,20 @@ The tree is walked without opening anything; only files in a format this build r
 the version the patch was built from, keeps what it replaced, and refuses the whole patch rather
 than writing part of one.
 
+Most J2ME games draw their text from a glyph sheet, so a correct translation still renders as
+blanks. There are two ways out and the tool supports both — compose the missing letters into the
+game's own sheet, or stop using the sheet and let the handset draw:
+
+```sh
+tjlocalizer font projects/game --system-font                  # how does it draw? what could switch?
+tjlocalizer font projects/game --write-system-font-rules      # written, switched off
+tjlocalizer rules projects/game --enable system-font-gfont
+```
+
+Switching costs the game's own lettering and buys everything else: no letters to compose, no sheet
+to install, no character order to teach. For a game whose sheet is CJK-only it is the only route
+there is. See [docs/FONTS.md](docs/FONTS.md).
+
 Reading the words painted into artwork with the game's own letters, being told what a game is, and
 looking at what a build changed:
 

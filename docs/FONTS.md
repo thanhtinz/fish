@@ -257,6 +257,72 @@ and the widths are reported as absent rather than invented.
 Nothing is applied. The Text tab lists them under a row whose translation measured wider than its
 original, each with its reason and its width, and a person picks.
 
+## Two routes, and which one to take
+
+A game that draws from a glyph sheet can be given Vietnamese in two ways, and this tool supports
+both because neither is right for every game.
+
+| | Extend the sheet | Switch to the handset's font |
+| --- | --- | --- |
+| What happens | 134 letters are composed from the game's own glyphs and the sheet is installed | The body of the game's drawing method is replaced with a call to `Graphics.drawString` |
+| The letters | The game's own, at the game's own weight | The handset's, which at twelve pixels is a visible change |
+| What it needs | A composed sheet, a rule to install it, and the game taught that the sheet grew | One rule, switched on |
+| When it fails | A sheet with no Latin letters to build from - a CJK-only font - cannot compose anything | A game that draws each glyph itself, without a method shaped like drawing a string |
+| Layout | Widths stay the game's, and can be measured in its own pixels | Widths become the handset's, and this tool cannot measure them |
+
+**Most J2ME games are the second case in practice.** Composing is the more faithful route and the
+more expensive one; switching is what most people doing this by hand actually do, and for a game
+whose sheet holds only Chinese it is the only route there is.
+
+```
+tjlocalizer font <project> --system-font
+how this game draws its text:
+  GFont.class calls Graphics.drawRegion
+  GFont.class clips and draws an image, a glyph at a time
+
+what could be handed to the handset's own font:
+  GFont.class  drawString(Ljavax/microedition/lcdui/Graphics;Ljava/lang/String;III)V  (draw)
+      it calls Graphics.drawRegion
+  GFont.class  stringWidth(Ljava/lang/String;)I  (string-width)
+  GFont.class  getHeight()I  (height)
+```
+
+`--write-system-font-rules` turns those into rules, one per class, all switched off. The measuring
+methods travel with the drawing one on purpose: text drawn by the handset and measured from the
+old sheet is text in the wrong places.
+
+### How the switch is made
+
+A game has no setting for this. It has a font class with a method that blits characters out of an
+image, and everything else calls that method - so the switch is made there. The body of that one
+method is replaced; the method keeps its name and its descriptor, so every call site in the game
+keeps working untouched.
+
+This is the only place in this project that **writes** bytecode, and it is fenced accordingly:
+
+- Only recognised shapes are offered. A drawing method is a surface, a string, and at least two
+  numbers to place it at; the measuring methods must also be *named* like measuring methods,
+  because "takes a string, returns an int" describes half the methods in any program.
+- The written body has no branches, so it needs no stack map frames, so none have to be computed.
+  `set_method_body` refuses a body that branches rather than trusting the caller about it.
+- The rule pins the class by hash. A game updated underneath the project is refused rather than
+  having a method body written into whatever now carries that name.
+- Nothing is switched on by writing it.
+
+Once such a rule is on and fits, the tool stops judging the build against the sheet: coverage
+becomes the handset's font, and the pixel-width layout check goes quiet, because the widths that
+now matter belong to a font this tool has never seen. Saying nothing there is the honest answer;
+measuring the sheet the game no longer draws from would not be.
+
+### How it is known to work
+
+The bytecode is written by this tool, so a test asserting it looks right proves nothing. What
+proves it is a verifier: `tools/verify-roundtrip.sh` rewrites a fixture font class and hands the
+result to a real JVM, which loads, verifies and runs it. No desktop JVM has
+`javax.microedition.lcdui`, so the fixture and the toolkit are pointed at `java.io.PrintStream`
+and `java.lang.String` - the same rewrite, the same decisions about local slots and stack depth,
+against types an ordinary JVM has.
+
 ## Installing it
 
 Composing writes artwork. Putting it in the game is a rule (§19), because which entry the game

@@ -284,6 +284,15 @@ enum Command {
         /// Declare that the game uses the handset's own font and needs no sheet.
         #[arg(long)]
         device_font: bool,
+        /// Show how this game draws its text, and what could be switched to the handset's font.
+        ///
+        /// The other way of getting Vietnamese into a game that draws from a glyph sheet: instead
+        /// of composing 134 letters and teaching the game its sheet grew, stop using the sheet.
+        #[arg(long)]
+        system_font: bool,
+        /// Write the rules that make that switch, all switched off.
+        #[arg(long)]
+        write_system_font_rules: bool,
         /// Build a sheet with the missing Vietnamese letters composed from the game's own.
         #[arg(long)]
         compose: bool,
@@ -1213,12 +1222,87 @@ fn run(cli: Cli) -> Result<()> {
             cell,
             columns,
             device_font,
+            system_font,
+            write_system_font_rules,
             compose,
             marks_from,
             marks_library,
             preview,
         } => {
             let mut project = Project::open(&project)?;
+
+            if system_font || write_system_font_rules {
+                let strategy = project.font_strategy()?;
+                println!("how this game draws its text:");
+                if strategy.evidence.is_empty() {
+                    println!("  nothing said either way - no class here calls the platform's drawing at all");
+                } else {
+                    for note in &strategy.evidence {
+                        println!("  {note}");
+                    }
+                }
+                println!();
+
+                if !strategy.worth_switching() && !strategy.bitmap {
+                    println!(
+                        "It does not look like it draws from a glyph sheet. If it already uses the \
+                         handset's"
+                    );
+                    println!("font, translated text will simply appear:");
+                    println!("    tjlocalizer font <project> --device-font");
+                    return Ok(());
+                }
+
+                let candidates = project.system_font_candidates()?;
+                if candidates.is_empty() {
+                    println!(
+                        "No class here both touches a Graphics and has a method shaped like drawing"
+                    );
+                    println!(
+                        "text, so there is nothing this can rewrite. The composed-sheet route is the"
+                    );
+                    println!("one left: tjlocalizer font <project> --compose");
+                    return Ok(());
+                }
+
+                println!("what could be handed to the handset's own font:");
+                for found in &candidates {
+                    println!(
+                        "  {}  {}{}  ({})",
+                        found.class,
+                        found.method,
+                        found.descriptor,
+                        found.job.key()
+                    );
+                    for note in &found.evidence {
+                        println!("      {note}");
+                    }
+                }
+                println!();
+
+                if write_system_font_rules {
+                    let written = project.write_system_font_rules()?;
+                    for rule in &written {
+                        println!("wrote rule {}, switched off", rule.id);
+                    }
+                    println!();
+                    println!(
+                        "Switching costs the game's own lettering: the handset's letters replace it,"
+                    );
+                    println!(
+                        "which at twelve pixels is a visible change. It buys everything else - no"
+                    );
+                    println!(
+                        "letters to compose, no sheet to install, no character order to teach. For a"
+                    );
+                    println!("game whose sheet is CJK-only it is the only route there is.");
+                    println!("  tjlocalizer rules <project> --enable <id>");
+                } else {
+                    println!("Write them as rules (off until you enable them):");
+                    println!("  tjlocalizer font <project> --write-system-font-rules");
+                }
+                return Ok(());
+            }
 
             if device_font {
                 project.profile_mut().font = Some(FontProfile {
@@ -1286,6 +1370,17 @@ fn run(cli: Cli) -> Result<()> {
                     println!("device font: the handset draws the text, so nothing needs composing")
                 }
                 Some(profile) => println!("sheet: {}", profile.entry),
+            }
+
+            if project.switched_to_device_font()? {
+                println!(
+                    "  a rule hands this game's text to the handset's font, so the sheet above is \
+                     no longer what a player sees"
+                );
+            } else if project.profile().font.is_none() && project.font_strategy()?.worth_switching()
+            {
+                println!("  it looks like it blits its letters out of an image. The other route:");
+                println!("    tjlocalizer font <project> --system-font");
             }
 
             for language in languages(&project, lang.as_deref(), lang.is_none())? {
