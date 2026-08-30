@@ -193,6 +193,74 @@ export function FontView({ path, say }: Props) {
         </div>
       </div>
 
+      {systemFont && (systemFont.bitmap || systemFont.switched) && (
+        <div className="card">
+          <h3>Giao chữ cho font của máy</h3>
+          <div className="sub">
+            Game này cắt từng ký tự ra khỏi một ảnh để vẽ — như <b>đa số game J2ME</b>. Với
+            chúng đây thường là <b>đường ngắn hơn</b>: viết lại thân đúng một phương thức để gọi
+            thẳng <code>Graphics.drawString</code>, rồi máy tự vẽ chữ. Không phải ghép 134 chữ,
+            không phải cài bảng mới, không phải dạy game thứ tự ký tự — và mọi chỗ gọi trong game
+            vẫn chạy y như cũ, vì tên và descriptor của phương thức không đổi.
+            {" "}Đổi lại: nét chữ riêng của game mất, thay bằng nét của máy — ở cỡ 12px đó là
+            thay đổi nhìn thấy được. Muốn giữ đúng nét gốc thì đi đường ghép bảng chữ ở dưới. Với
+            game có bảng font chỉ toàn chữ Hán/Nhật/Hàn thì đây là đường <i>duy nhất</i>.
+          </div>
+
+          {systemFont.switched && (
+            <div className="row" style={{ gap: 8, marginBottom: 10 }}>
+              <span className="pill ok">đã chuyển</span>
+              <span style={{ color: "var(--text-faint)", fontSize: 12 }}>
+                một luật đang bật đang giao chữ cho font máy
+              </span>
+            </div>
+          )}
+
+          {systemFont.evidence.map((note) => (
+            <div key={note} style={{ color: "var(--text-faint)", fontSize: 11.5, marginTop: 2 }}>
+              · {note}
+            </div>
+          ))}
+
+          {systemFont.candidates.length > 0 && (
+            <div style={{ marginTop: 10 }}>
+              <div style={{ color: "var(--text-dim)", fontSize: 12, marginBottom: 4 }}>
+                Những phương thức có thể giao cho font máy:
+              </div>
+              {systemFont.candidates.map((found) => (
+                <div
+                  key={`${found.class}-${found.method}-${found.descriptor}`}
+                  style={{ color: "var(--text-faint)", fontSize: 11.5, marginTop: 2 }}
+                >
+                  · <span style={{ fontFamily: "var(--mono)" }}>{found.class}</span>{" "}
+                  {found.method} ({found.job})
+                </div>
+              ))}
+            </div>
+          )}
+
+          {systemFont.candidates.length > 0 && (
+            <div className="wrap" style={{ marginTop: 12 }}>
+              <button
+                disabled={busy !== null}
+                onClick={async () => {
+                  const updated = await run("system-font", () =>
+                    api.writeSystemFontRules(path),
+                  );
+                  if (updated) {
+                    setRules(updated);
+                    say("Đã viết luật chuyển sang font máy — đang tắt, bật ở dưới");
+                  }
+                }}
+              >
+                {busy === "system-font" ? <span className="spin" /> : null} Viết luật dùng font
+                máy
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
       {candidates && candidates.length > 0 && (
         <div className="card">
           <h3>Ảnh nào là font?</h3>
@@ -498,73 +566,6 @@ export function FontView({ path, say }: Props) {
             )}
           </div>
 
-          {systemFont && (systemFont.bitmap || systemFont.switched) && (
-            <div className="card">
-              <h3>Hoặc: giao chữ cho font của máy</h3>
-              <div className="sub">
-                Có <b>hai đường</b> để game hiện được tiếng Việt. Một là bổ sung 134 chữ vào bảng
-                font của game rồi dạy game đọc bảng cao hơn — chữ giữ đúng nét của game, nhưng mọi
-                bước đều là việc riêng của từng game. Hai là <b>bỏ bảng font đi</b>: viết lại thân
-                phương thức vẽ chữ để gọi thẳng <code>Graphics.drawString</code>, máy tự vẽ chữ.
-                Không phải ghép chữ, không phải cài bảng, không phải dạy thứ tự ký tự.
-                {" "}Đổi lại: nét chữ riêng của game mất, thay bằng nét của máy — ở cỡ 12px đó là
-                thay đổi nhìn thấy được. Với game có bảng font chỉ toàn chữ Hán/Nhật/Hàn thì đây là
-                đường <i>duy nhất</i>.
-              </div>
-
-              {systemFont.switched && (
-                <div className="row" style={{ gap: 8, marginBottom: 10 }}>
-                  <span className="pill ok">đã chuyển</span>
-                  <span style={{ color: "var(--text-faint)", fontSize: 12 }}>
-                    một luật đang bật đang giao chữ cho font máy
-                  </span>
-                </div>
-              )}
-
-              {systemFont.evidence.map((note) => (
-                <div key={note} style={{ color: "var(--text-faint)", fontSize: 11.5, marginTop: 2 }}>
-                  · {note}
-                </div>
-              ))}
-
-              {systemFont.candidates.length > 0 && (
-                <div style={{ marginTop: 10 }}>
-                  <div style={{ color: "var(--text-dim)", fontSize: 12, marginBottom: 4 }}>
-                    Những phương thức có thể giao cho font máy:
-                  </div>
-                  {systemFont.candidates.map((found) => (
-                    <div
-                      key={`${found.class}-${found.method}-${found.descriptor}`}
-                      style={{ color: "var(--text-faint)", fontSize: 11.5, marginTop: 2 }}
-                    >
-                      · <span style={{ fontFamily: "var(--mono)" }}>{found.class}</span>{" "}
-                      {found.method} ({found.job})
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {systemFont.candidates.length > 0 && (
-                <div className="wrap" style={{ marginTop: 12 }}>
-                  <button
-                    disabled={busy !== null}
-                    onClick={async () => {
-                      const updated = await run("system-font", () =>
-                        api.writeSystemFontRules(path),
-                      );
-                      if (updated) {
-                        setRules(updated);
-                        say("Đã viết luật chuyển sang font máy — đang tắt, bật ở dưới");
-                      }
-                    }}
-                  >
-                    {busy === "system-font" ? <span className="spin" /> : null} Viết luật dùng font
-                    máy
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
 
           <div className="card">
             <h3>Gắn vào game</h3>

@@ -274,6 +274,12 @@ both because neither is right for every game.
 more expensive one; switching is what most people doing this by hand actually do, and for a game
 whose sheet holds only Chinese it is the only route there is.
 
+So the tool offers them in that order. Where a game is *recognised* as blitting its letters out of
+an image, `font` names the evidence and puts switching first, with composing beside it as what it
+actually is — the way to keep the game's own lettering — rather than as the default. Where nothing
+was recognised either way, neither is led with, because then the tool does not know which case it
+is looking at and pretending otherwise would send somebody down the long road for no reason.
+
 ```
 tjlocalizer font <project> --system-font
 how this game draws its text:

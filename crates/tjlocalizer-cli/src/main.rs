@@ -1354,7 +1354,28 @@ fn run(cli: Cli) -> Result<()> {
                 );
             }
 
+            // Asked once rather than twice: it parses every class in the game.
+            let strategy = project.font_strategy()?;
+
             match project.profile().font.as_ref() {
+                // Most J2ME games draw from a glyph sheet, and for most of them handing the text
+                // to the handset is the shorter road: nothing to compose, nothing to install, no
+                // character order to establish, and it is what most people doing this by hand
+                // actually do. So it goes first, and composing is offered as what it really is -
+                // the way to keep the game's own letters - rather than as the default.
+                None if strategy.worth_switching() => {
+                    println!("no font established for this game, and it blits its letters out of an image:");
+                    for line in &strategy.evidence {
+                        println!("    {line}");
+                    }
+                    println!();
+                    println!("  the short way - let the handset draw the text:");
+                    println!("    tjlocalizer font <project> --system-font");
+                    println!("  the faithful way - keep the game's own letters, compose the 134 it lacks:");
+                    println!(
+                        "    tjlocalizer font <project> --sheet font.png --cell 8x12 --columns 16"
+                    );
+                }
                 None => {
                     println!("no font established for this game");
                     println!(
@@ -1377,10 +1398,6 @@ fn run(cli: Cli) -> Result<()> {
                     "  a rule hands this game's text to the handset's font, so the sheet above is \
                      no longer what a player sees"
                 );
-            } else if project.profile().font.is_none() && project.font_strategy()?.worth_switching()
-            {
-                println!("  it looks like it blits its letters out of an image. The other route:");
-                println!("    tjlocalizer font <project> --system-font");
             }
 
             for language in languages(&project, lang.as_deref(), lang.is_none())? {
