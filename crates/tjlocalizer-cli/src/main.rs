@@ -1989,7 +1989,7 @@ fn run(cli: Cli) -> Result<()> {
                             if candidate.value.chars().count() > 24 {
                                 format!(
                                     "{:?}…",
-                                    &candidate.value.chars().take(24).collect::<String>()
+                                    candidate.value.chars().take(24).collect::<String>()
                                 )
                             } else {
                                 format!("{:?}", candidate.value)
