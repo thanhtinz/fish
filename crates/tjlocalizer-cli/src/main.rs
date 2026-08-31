@@ -12,6 +12,7 @@ use std::path::{Path, PathBuf};
 use tjlocalizer_core::build::Branding;
 use tjlocalizer_core::claude::{self, Analyst};
 use tjlocalizer_core::dictionary::Dictionary;
+use tjlocalizer_core::emulator;
 use tjlocalizer_core::font::outline::MarkSource;
 use tjlocalizer_core::font::sheet::Grid;
 use tjlocalizer_core::graph::ContentGraph;
@@ -408,6 +409,31 @@ enum Command {
         /// appended.
         #[arg(long, num_args = 0..)]
         args: Vec<String>,
+        /// Look for an emulator already installed on this machine, and say where it looked.
+        ///
+        /// Nothing is downloaded and nothing is installed: this only reports what is here.
+        #[arg(long)]
+        find: bool,
+        /// Record the first emulator found, without asking again.
+        #[arg(long)]
+        use_found: bool,
+    },
+
+    /// Add a line to this project's journal.
+    ///
+    /// The thing the recorded milestones cannot know: why you stopped, and what you meant to do
+    /// next.
+    Note { project: PathBuf, text: String },
+
+    /// Where this project stands, and what was done to it last.
+    ///
+    /// Written for coming back after three weeks: what is left, what the last build said, and the
+    /// last few things that happened.
+    Status {
+        project: PathBuf,
+        /// How many journal entries to show.
+        #[arg(long, default_value_t = 8)]
+        history: usize,
     },
 
     /// The per-game patches a project holds, and whether they fit this game (§19).
@@ -1949,8 +1975,57 @@ fn run(cli: Cli) -> Result<()> {
             lang,
             command,
             args,
+            find,
+            use_found,
         } => {
             let mut project = Project::open(&project)?;
+
+            if find || use_found {
+                let home = std::env::var_os("HOME").map(PathBuf::from);
+                let found = emulator::find(home.as_deref());
+
+                if found.is_empty() {
+                    // The empty answer is the one that has to be useful. "No emulator found" is
+                    // not something anybody can act on; the list of places that were looked in is.
+                    println!("no J2ME emulator found on this machine. Looked in:");
+                    for place in emulator::searched(home.as_deref()) {
+                        println!("  {}", place.display());
+                    }
+                    if !emulator::java_available() {
+                        println!();
+                        println!(
+                            "there is also no java on PATH, and most J2ME emulators ship as a jar \
+                             that needs one"
+                        );
+                    }
+                    println!();
+                    println!(
+                        "nothing is downloaded here. Install one yourself, then point this at it:"
+                    );
+                    println!("    tjlocalizer play <project> --command <program> --args ...");
+                    return Ok(());
+                }
+
+                println!("emulators on this machine:");
+                for one in &found {
+                    println!("  {:<18} {}", one.name, one.path.display());
+                    println!("      {}", one.evidence);
+                }
+
+                if use_found {
+                    let chosen = found[0].clone();
+                    project.profile_mut().emulator = Some(chosen.emulator.clone());
+                    project.save()?;
+                    println!();
+                    println!("recorded {} for this project", chosen.name);
+                } else {
+                    println!();
+                    println!("to use the first of these:");
+                    println!("    tjlocalizer play <project> --use-found");
+                    return Ok(());
+                }
+            }
+
             if let Some(command) = command {
                 project.profile_mut().emulator =
                     Some(tjlocalizer_core::regress::Emulator { command, args });
@@ -1961,6 +2036,70 @@ fn run(cli: Cli) -> Result<()> {
             let status = project.play(&language)?;
             if !status.success() {
                 anyhow::bail!("the emulator exited with {status}");
+            }
+            Ok(())
+        }
+
+        Command::Note { project, text } => {
+            let project = Project::open(&project)?;
+            project.note(&text)?;
+            println!("noted");
+            Ok(())
+        }
+
+        Command::Status { project, history } => {
+            let project = Project::open(&project)?;
+            let p = project.profile();
+            println!("{}  ({})", p.name, project.root().display());
+            println!("  source   {}", p.source.label());
+
+            let graph = project.graph().ok();
+            let total = graph.as_ref().map(|g| g.translatable().count());
+            match total {
+                None => println!("  text     not extracted yet - run `tjlocalizer extract`"),
+                Some(total) => {
+                    for target in &p.targets {
+                        let approved = project
+                            .translations(&target.language)
+                            .map(|t| t.len())
+                            .unwrap_or(0);
+                        let builds = project.builds(&target.language).unwrap_or_default();
+                        let last = builds.first();
+                        println!(
+                            "  {:<8} {approved}/{total} approved{}",
+                            target.language.tag(),
+                            match last {
+                                // What the last build said, not whether one exists: a build that
+                                // failed validation is the thing somebody came back to fix.
+                                Some(record) if record.validation.is_ok() =>
+                                    format!(", build {} passed", record.revision),
+                                Some(record) => format!(
+                                    ", build {} reported {} error(s)",
+                                    record.revision,
+                                    record.validation.errors().count()
+                                ),
+                                None => ", never built".to_string(),
+                            }
+                        );
+                    }
+                }
+            }
+
+            let entries = tjlocalizer_core::journal::tail(project.root(), history);
+            if entries.is_empty() {
+                println!();
+                println!("  nothing in the journal yet");
+            } else {
+                println!();
+                println!("what happened, most recent last:");
+                for entry in entries {
+                    let language = if entry.language.is_empty() {
+                        String::new()
+                    } else {
+                        format!(" [{}]", entry.language)
+                    };
+                    println!("  {}  {}{language}  {}", entry.at, entry.kind, entry.detail);
+                }
             }
             Ok(())
         }

@@ -375,6 +375,10 @@ impl Project {
 
         let mut project = Project { root, profile };
         project.save()?;
+        crate::journal::record(
+            project.root(),
+            crate::journal::Entry::new("import", format!("imported {name} ({} bytes)", jar.len())),
+        );
         Ok(project)
     }
 
@@ -475,6 +479,18 @@ impl Project {
 
         let mut project = Project { root, profile };
         project.save()?;
+        crate::journal::record(
+            project.root(),
+            crate::journal::Entry::new(
+                "import",
+                format!(
+                    "imported the folder {}: {} files, {} read",
+                    game.display(),
+                    ingested.scanned,
+                    ingested.files.len()
+                ),
+            ),
+        );
         Ok((project, ingested))
     }
 
@@ -581,6 +597,11 @@ impl Project {
         if self.target(&language).is_some() {
             return Ok(());
         }
+        crate::journal::record(
+            &self.root,
+            crate::journal::Entry::new("target", format!("added, in the {style_profile} register"))
+                .about(&language),
+        );
         self.profile
             .targets
             .push(Target::new(language, style_profile));
@@ -593,6 +614,11 @@ impl Project {
     /// checkbox was cleared is not a thing a tool should do; re-adding the language picks them
     /// straight back up.
     pub fn remove_target(&mut self, language: &Language) -> crate::Result<()> {
+        crate::journal::record(
+            &self.root,
+            crate::journal::Entry::new("target", "set aside; its translations are still on disk")
+                .about(language),
+        );
         self.profile
             .targets
             .retain(|t| !(t.language == *language || t.language.same_language_as(language)));
@@ -713,6 +739,17 @@ impl Project {
     /// Shared by every target: the source text is the same whatever it is being translated into.
     pub fn extract(&self) -> crate::Result<ContentGraph> {
         let graph = graph::extract_with(&self.original()?, &self.plugin_formats()?);
+        crate::journal::record(
+            &self.root,
+            crate::journal::Entry::new(
+                "extract",
+                format!(
+                    "{} text nodes, {} of them for a translator",
+                    graph.nodes.len(),
+                    graph.translatable().count()
+                ),
+            ),
+        );
         write_json(&self.root.join("content/graph.json"), &graph)?;
         // Read straight away rather than on demand: the readings are about this graph, and a
         // stale set of them beside a fresh graph would attribute lines to characters who are no
@@ -1474,6 +1511,15 @@ impl Project {
             return Ok(false);
         };
         rule.enabled = enabled;
+        // Worth a line of its own: a rule is the part of a build that changes the game beyond its
+        // text, and "when did this start running" is the first question when one goes wrong.
+        crate::journal::record(
+            &self.root,
+            crate::journal::Entry::new(
+                "rule",
+                format!("{id} switched {}", if enabled { "on" } else { "off" }),
+            ),
+        );
         self.save_rules(&rules)?;
         Ok(true)
     }
@@ -1864,7 +1910,23 @@ impl Project {
             .join(format!("{:04}", manifest.revision))
             .join("backup");
         std::fs::create_dir_all(&backup)?;
-        crate::patch::apply(&manifest, game, &patch, &backup)
+        let written = crate::patch::apply(&manifest, game, &patch, &backup)?;
+        // The most destructive thing this tool does, so it is the entry a person most wants to
+        // find later: what was overwritten, where, and from which build.
+        crate::journal::record(
+            &self.root,
+            crate::journal::Entry::new(
+                "patch",
+                format!(
+                    "build {}'s patch applied to {}: {} file(s) overwritten, the old ones kept",
+                    manifest.revision,
+                    game.display(),
+                    written.len()
+                ),
+            )
+            .about(language),
+        );
+        Ok(written)
     }
 
     /// What applying the current patch would overwrite, without writing anything.
@@ -2070,7 +2132,41 @@ impl Project {
         } else {
             std::fs::write(self.root.join("output").join(&name), &bytes)?;
         }
+        // The one line worth reading in a month: which build, how much of it, and whether it
+        // passed. Recorded after the output is published, so nothing is logged that did not
+        // happen.
+        let errors = record.validation.errors().count();
+        crate::journal::record(
+            &self.root,
+            crate::journal::Entry::new(
+                "build",
+                format!(
+                    "build {revision}: {} translations applied, {}",
+                    record.translations_applied,
+                    if errors == 0 {
+                        "validation passed".to_string()
+                    } else {
+                        format!("validation reported {errors} error(s)")
+                    }
+                ),
+            )
+            .about(&target.language),
+        );
         Ok(record)
+    }
+
+    /// A line a person wrote about where they are.
+    ///
+    /// The one thing the recorded milestones cannot know: *why* somebody stopped. "waiting on a
+    /// screenshot of the shop menu" is not derivable from any file in the project.
+    pub fn note(&self, text: &str) -> crate::Result<()> {
+        crate::journal::append(&self.root, &crate::journal::Entry::new("note", text))?;
+        Ok(())
+    }
+
+    /// What has been done to this project, oldest first.
+    pub fn journal(&self) -> Vec<crate::journal::Entry> {
+        crate::journal::read(&self.root)
     }
 
     /// Builds every enabled target.

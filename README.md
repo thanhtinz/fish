@@ -113,6 +113,15 @@ Or in one pass:
 tjlocalizer localize game.jar --target vi-VN,en,th --style natural-dialogue
 ```
 
+Coming back to a project after a few weeks, and running it in an emulator you already have:
+
+```sh
+tjlocalizer status projects/game            # what's left, what the last build said, what happened
+tjlocalizer note projects/game "chờ ảnh menu cửa hàng"
+tjlocalizer play projects/game --find       # looks; downloads nothing
+tjlocalizer play projects/game --use-found
+```
+
 A one-shot run over a game with no translation memory behind it approves almost nothing and
 produces a working but largely untranslated archive. That is the honest outcome, and the CLI says
 so rather than reporting success.
