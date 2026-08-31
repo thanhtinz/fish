@@ -186,3 +186,29 @@ anybody can act on; the list of places checked is.
 
 Searching the disk happens when somebody asks, not on project open — a directory walk is not a thing
 to do to somebody's machine as a side effect of looking at their translations.
+
+
+## What `verify-desktop.sh` proves, and what it did not
+
+It used to boot the application, screenshot the window with no project open, and check that the
+picture was not mostly white. That catches one real failure — the webview showing "could not reach
+the dev server" because the frontend assets were not embedded — and nothing else. In particular it
+never opened a project, so no card past the empty state was ever rendered by it at all.
+
+That gap has a shape. React unmounts the whole tree when a component throws during render, so one
+bad prop anywhere leaves a window holding nothing but the page background. The background is
+**dark**, so a brightness check passes it comfortably. A card could throw on every run and the
+script would have said `ok`.
+
+It now opens a real project — built by the CLI in the same script, with text extracted, a build
+recorded and journal entries to draw — and visits every tab. Each screen is measured twice:
+
+| Measure | Catches | Threshold |
+| --- | --- | --- |
+| mean brightness | the webview showing an error page instead of the interface | fails above 0.5 |
+| standard deviation | the interface having rendered nothing at all | fails below 0.03 |
+
+The second threshold is measured rather than guessed. A real screen of this application ranges from
+0.064 (the empty state, which is mostly background) to 0.165; a page holding only its own background
+measures 0.0. A deliberately thrown card measures 0.008, which is how that number is known: the
+check was verified by breaking a card on purpose and confirming the script failed, and exited 1.
