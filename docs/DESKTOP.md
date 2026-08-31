@@ -166,3 +166,23 @@ a window appears and that the interface rendered. Compiling proves none of that:
 library, a bad config, or assets that were not embedded all produce a binary that builds and then
 shows an error page. The script measures the window's mean brightness, because that error page is
 almost white and the interface is not - a broken build measures 0.999, a working one 0.10.
+
+
+## The journal, and running the build
+
+Two things the application gained alongside the command line, because a person who only ever opens
+the window should not have to drop to a terminal for either.
+
+**The journal** sits on the Overview tab. It shows what has been done to the project — imports,
+extractions, builds and whether they passed, rules switched on, patches applied — and takes the one
+line no recorded milestone can know: why somebody stopped. Enter submits, because a note somebody
+has to reach for the mouse to save is a note that does not get written.
+
+**Running the build** sits on the Build tab, under the export controls. It searches this machine for
+a J2ME emulator and downloads nothing. The empty result got the most care: it lists every directory
+that was searched, says separately when there is no `java` for a jar-based emulator to run on, and
+explains that fetching one is not something this tool does. "No emulator found" is not something
+anybody can act on; the list of places checked is.
+
+Searching the disk happens when somebody asks, not on project open — a directory walk is not a thing
+to do to somebody's machine as a side effect of looking at their translations.

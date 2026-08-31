@@ -371,6 +371,43 @@ pub struct MismatchView {
     pub reason: String,
 }
 
+/// One thing that happened to this project.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct JournalView {
+    pub at: String,
+    pub kind: String,
+    #[serde(default)]
+    pub language: String,
+    pub detail: String,
+}
+
+/// An emulator found on this machine, and how it would be run.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EmulatorView {
+    pub name: String,
+    pub path: String,
+    /// How it was found, so a wrong answer can be argued with.
+    pub evidence: String,
+}
+
+/// What a search for an emulator turned up, and where it looked.
+///
+/// The places are carried even when something was found: a person whose emulator is the wrong one
+/// needs to know the search never looked where the right one is.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EmulatorSearch {
+    pub found: Vec<EmulatorView>,
+    pub searched: Vec<String>,
+    /// False when there is no `java` on this machine, which every jar-based emulator needs.
+    pub java_available: bool,
+    /// The command already recorded for this project, if any.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub configured: Option<String>,
+}
+
 /// A direction the dictionary covers, for the settings screen.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]

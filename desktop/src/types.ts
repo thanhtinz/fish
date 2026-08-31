@@ -427,3 +427,26 @@ export interface PatchPlanView {
   mismatched: { path: string; reason: string }[];
   applicable: boolean;
 }
+
+/** One thing that happened to this project. */
+export interface JournalView {
+  at: string;
+  kind: string;
+  language?: string;
+  detail: string;
+}
+
+/** An emulator found on this machine. */
+export interface EmulatorView {
+  name: string;
+  path: string;
+  evidence: string;
+}
+
+/** What a search turned up, and where it looked. */
+export interface EmulatorSearch {
+  found: EmulatorView[];
+  searched: string[];
+  javaAvailable: boolean;
+  configured?: string;
+}

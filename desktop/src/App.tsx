@@ -10,9 +10,11 @@ import type {
   BuildView,
   CapabilityView,
   DictionaryView,
+  EmulatorSearch,
   EngineView,
   LanguageView,
   NodeView,
+  JournalView,
   ProjectSummary,
   RecentView,
   ReviewNoteView,
@@ -35,6 +37,9 @@ export function App() {
   const [engine, setEngineState] = useState<EngineView | null>(null);
   const [analyst, setAnalystState] = useState<AnalystView | null>(null);
   const [suggestions, setSuggestions] = useState<SuggestionView[]>([]);
+  const [journal, setJournal] = useState<JournalView[]>([]);
+  // Null until somebody asks: searching the disk is not something to do on every project open.
+  const [emulator, setEmulator] = useState<EmulatorSearch | null>(null);
   // Kept in memory rather than on disk: a note is about one reading of one revision, and a stale
   // note left lying beside a row that has since been rewritten is worse than no note.
   const [reviewNotes, setReviewNotes] = useState<Record<string, ReviewNoteView[]>>({});
@@ -122,6 +127,8 @@ export function App() {
       setEngineState(await api.engine(path).catch(() => null));
       setAnalystState(await api.analyst(path).catch(() => null));
       setSuggestions(await api.suggestions(path).catch(() => []));
+      setJournal(await api.journal(path, 12).catch(() => []));
+      setEmulator(null);
       setRecents(await api.recentProjects().catch(() => []));
     },
     [run],
@@ -546,6 +553,14 @@ export function App() {
                         say(`${found.length} gợi ý — phỏng đoán, không đổi gì phần lõi đã xác định`);
                       }
                     }}
+                    journal={journal}
+                    onNote={async (text) => {
+                      const updated = await run("note", () => api.addNote(project.path, text));
+                      if (updated) {
+                        setJournal(updated);
+                        say("Đã ghi vào nhật ký");
+                      }
+                    }}
                     onInspect={(entry) =>
                       api.inspectEntry(project.path, entry).catch((e) => {
                         say(String(e), true);
@@ -606,6 +621,35 @@ export function App() {
                     builds={builds}
                     outputPath={target?.outputPath ?? null}
                     busy={busy}
+                    emulator={emulator}
+                    onFindEmulators={async () => {
+                      const found = await run("emulator", () => api.findEmulators(project.path));
+                      if (found) {
+                        setEmulator(found);
+                        say(
+                          found.found.length === 0
+                            ? "Không tìm thấy giả lập nào — xem danh sách chỗ đã dò"
+                            : `Tìm thấy ${found.found.length} giả lập`,
+                          found.found.length === 0,
+                        );
+                      }
+                    }}
+                    onUseEmulator={async (emulatorPath) => {
+                      const found = await run("emulator", () =>
+                        api.useEmulator(project.path, emulatorPath),
+                      );
+                      if (found) {
+                        setEmulator(found);
+                        say("Đã ghi lại giả lập cho dự án này");
+                      }
+                    }}
+                    onPlay={async () => {
+                      const outcome = await run("emulator", () =>
+                        api.play(project.path, language),
+                      );
+                      if (outcome) say(outcome);
+                      setJournal(await api.journal(project.path, 12).catch(() => journal));
+                    }}
                     onApplyPatch={
                       project.package.label === "directory"
                         ? async () => {

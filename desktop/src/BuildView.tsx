@@ -1,5 +1,6 @@
+import { EmulatorCard } from "./EmulatorCard";
 import { RegressionCard } from "./RegressionCard";
-import type { BuildView as Build, ProjectSummary } from "./types";
+import type { BuildView as Build, EmulatorSearch, ProjectSummary } from "./types";
 
 interface Props {
   project: ProjectSummary;
@@ -15,6 +16,10 @@ interface Props {
   /// Null unless this project's game is a directory, so the patch controls are absent rather
   /// than present and refusing.
   onApplyPatch: (() => void) | null;
+  emulator: EmulatorSearch | null;
+  onFindEmulators: () => void;
+  onUseEmulator: (path: string) => void;
+  onPlay: () => void;
 }
 
 /** Build, validation result, and the history that makes a rollback possible. */
@@ -141,6 +146,15 @@ export function BuildsView(props: Props) {
           ))
         )}
       </div>
+
+      <EmulatorCard
+        search={props.emulator}
+        busy={busy}
+        hasBuild={props.outputPath !== null}
+        onFind={props.onFindEmulators}
+        onUse={props.onUseEmulator}
+        onPlay={props.onPlay}
+      />
 
       <RegressionCard path={p.path} language={language} say={props.say} />
     </div>

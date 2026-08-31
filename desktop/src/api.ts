@@ -11,6 +11,7 @@ import type {
   CapabilityView,
   CompositionView,
   DictionaryView,
+  EmulatorSearch,
   EnginePreview,
   EngineView,
   FontScan,
@@ -26,6 +27,7 @@ import type {
   ReadingView,
   ImportReport,
   IngestView,
+  JournalView,
   InspectionView,
   LanguageView,
   NodeView,
@@ -252,6 +254,17 @@ export const api = {
     call<RuleView[]>("set_rule_enabled", { path, id, enabled }),
 
   removeRule: (path: string, id: string) => call<RuleView[]>("remove_rule", { path, id }),
+
+  journal: (path: string, limit: number) => call<JournalView[]>("journal", { path, limit }),
+
+  addNote: (path: string, text: string) => call<JournalView[]>("add_note", { path, text }),
+
+  findEmulators: (path: string) => call<EmulatorSearch>("find_emulators", { path }),
+
+  useEmulator: (path: string, emulatorPath: string) =>
+    call<EmulatorSearch>("use_emulator", { path, emulatorPath }),
+
+  play: (path: string, language: string) => call<string>("play", { path, language }),
 
   planPatch: (path: string, language: string, game: string) =>
     call<PatchPlanView>("plan_patch", { path, language, game }),

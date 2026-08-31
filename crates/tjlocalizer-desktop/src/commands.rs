@@ -1891,3 +1891,98 @@ pub fn apply_patch(path: String, language: String, game: String) -> Reply<Vec<St
         .apply_patch(&Language::new(&language), Path::new(&game))
         .map_err(err)
 }
+
+/// What has been done to this project, most recent last.
+#[tauri::command]
+pub fn journal(path: String, limit: usize) -> Reply<Vec<JournalView>> {
+    let project = open(&path)?;
+    Ok(
+        tjlocalizer_core::journal::tail(project.root(), limit.max(1))
+            .into_iter()
+            .map(|e| JournalView {
+                at: e.at,
+                kind: e.kind,
+                language: e.language,
+                detail: e.detail,
+            })
+            .collect(),
+    )
+}
+
+/// Adds the line no recorded milestone can know: why you stopped.
+#[tauri::command]
+pub fn add_note(path: String, text: String) -> Reply<Vec<JournalView>> {
+    let project = open(&path)?;
+    if text.trim().is_empty() {
+        return Err("a note with nothing in it is not worth keeping".into());
+    }
+    project.note(text.trim()).map_err(err)?;
+    journal(path, 12)
+}
+
+/// Looks for a J2ME emulator already on this machine. Downloads nothing.
+#[tauri::command]
+pub fn find_emulators(path: String) -> Reply<EmulatorSearch> {
+    let project = open(&path)?;
+    let home = std::env::var_os("HOME")
+        .or_else(|| std::env::var_os("USERPROFILE"))
+        .map(PathBuf::from);
+
+    Ok(EmulatorSearch {
+        found: tjlocalizer_core::emulator::find(home.as_deref())
+            .into_iter()
+            .map(|f| EmulatorView {
+                name: f.name.to_string(),
+                path: f.path.display().to_string(),
+                evidence: f.evidence,
+            })
+            .collect(),
+        // Carried whether or not anything was found: somebody whose emulator was missed needs to
+        // see that the search never looked where it is.
+        searched: tjlocalizer_core::emulator::searched(home.as_deref())
+            .into_iter()
+            .map(|p| p.display().to_string())
+            .collect(),
+        java_available: tjlocalizer_core::emulator::java_available(),
+        configured: project
+            .profile()
+            .emulator
+            .as_ref()
+            .map(|e| e.command.clone()),
+    })
+}
+
+/// Records one of the found emulators for this project.
+#[tauri::command]
+pub fn use_emulator(path: String, emulator_path: String) -> Reply<EmulatorSearch> {
+    let mut project = open(&path)?;
+    let home = std::env::var_os("HOME")
+        .or_else(|| std::env::var_os("USERPROFILE"))
+        .map(PathBuf::from);
+
+    let chosen = tjlocalizer_core::emulator::find(home.as_deref())
+        .into_iter()
+        .find(|f| f.path.display().to_string() == emulator_path)
+        .ok_or("that emulator is no longer where it was found")?;
+
+    project.profile_mut().emulator = Some(chosen.emulator);
+    project.save().map_err(err)?;
+    find_emulators(path)
+}
+
+/// Runs the recorded emulator on the newest build.
+///
+/// Blocks until it exits, which is what a person pressing "play" means: they are going to look at
+/// the game and come back.
+#[tauri::command]
+pub fn play(path: String, language: String) -> Reply<String> {
+    let project = open(&path)?;
+    let status = project.play(&Language::new(&language)).map_err(err)?;
+    if status.success() {
+        Ok("the emulator closed normally".into())
+    } else {
+        // Not an error of this tool's making, and said as such: an emulator exits non-zero for
+        // its own reasons, and reporting it as a failure of the build would be wrong.
+        Ok(format!("the emulator exited with {status}"))
+    }
+}

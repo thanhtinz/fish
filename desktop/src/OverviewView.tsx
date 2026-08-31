@@ -1,10 +1,12 @@
 import { Fragment, useState } from "react";
 import { AnalystCard } from "./AnalystCard";
+import { JournalCard } from "./JournalCard";
 import { EngineCard } from "./EngineCard";
 import { CastCard } from "./CastCard";
 import { PluginsCard } from "./PluginsCard";
 import type {
   AnalystView,
+  JournalView,
   CapabilityView,
   DictionaryView,
   EnginePreview,
@@ -47,6 +49,8 @@ interface Props {
   onPreviewScan: () => Promise<ScanPreview | null>;
   onScan: () => void;
   onInspect: (entry: string) => Promise<InspectionView | null>;
+  journal: JournalView[];
+  onNote: (text: string) => void;
 }
 
 /** The pipeline in the order §22 runs it, with each step's state visible rather than implied. */
@@ -311,6 +315,8 @@ export function OverviewView(props: Props) {
               </span>
             </div>
           </div>
+
+          <JournalCard entries={props.journal} busy={busy} onNote={props.onNote} />
 
           <EngineCard
             engine={props.engine}
